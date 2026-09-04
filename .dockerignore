@@ -1,0 +1,5 @@
+backend/vendor
+backend/node_modules
+backend/storage/*.key
+.git
+.scratch

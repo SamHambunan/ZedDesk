@@ -8,3 +8,18 @@
 /.idea
 /HANDOFF.md
 /.scratch
+
+# Dependencies
+/node_modules
+/frontend/node_modules
+/backend/vendor
+
+# Build and environment
+/frontend/dist
+/backend/.env
+/backend/storage/*.key
+/backend/storage/framework/cache/*
+/backend/storage/framework/sessions/*
+/backend/storage/framework/views/*
+/backend/storage/logs/*
+.env
