@@ -1,0 +1,106 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: zeddesk_nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./backend:/var/www/backend
+      - ./infrastructure/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - zeddesk-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/php/Dockerfile
+    container_name: zeddesk_backend
+    restart: unless-stopped
+    volumes:
+      - ./backend:/var/www/backend
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: zeddesk
+      DB_USERNAME: zeddesk
+      DB_PASSWORD: zeddesk_secret
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CACHE_STORE: redis
+      SESSION_DRIVER: redis
+      QUEUE_CONNECTION: redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - zeddesk-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: zeddesk_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: zeddesk
+      POSTGRES_USER: zeddesk
+      POSTGRES_PASSWORD: zeddesk_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zeddesk -d zeddesk"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zeddesk-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: zeddesk_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zeddesk-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: zeddesk_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - nginx
+    networks:
+      - zeddesk-network
+
+networks:
+  zeddesk-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
