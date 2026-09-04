@@ -4,24 +4,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
-    $dbStatus = 'disconnected';
-    try {
-        Illuminate\Support\Facades\DB::connection()->getPdo();
-        $dbStatus = 'connected';
-    } catch (\Throwable $e) {
-        $dbStatus = 'error: ' . $e->getMessage();
-    }
-
-    $redisStatus = 'disconnected';
-    try {
-        Illuminate\Support\Facades\Redis::connection()->ping();
-        $redisStatus = 'connected';
-    } catch (\Throwable $e) {
-        $redisStatus = 'error: ' . $e->getMessage();
-    }
+    $probe = function (callable $check): string {
+        try {
+            $check();
+            return 'connected';
+        } catch (\Throwable $e) {
+            return 'error: ' . $e->getMessage();
+        }
+    };
+    $dbStatus = $probe(fn () => Illuminate\Support\Facades\DB::connection()->getPdo());
+    $redisStatus = $probe(fn () => Illuminate\Support\Facades\Redis::connection()->ping());
 
     $isHealthy = ($dbStatus === 'connected' && $redisStatus === 'connected');
-
     return response()->json([
         'status' => $isHealthy ? 'ok' : 'degraded',
         'services' => [
@@ -30,7 +24,3 @@ Route::get('/health', function () {
         ],
     ], $isHealthy ? 200 : 503);
 });
-
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');

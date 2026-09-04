@@ -38,6 +38,28 @@ describe('ZedDesk Frontend Baseline Shell', () => {
     })
   })
 
+  it('displays degraded status when API returns partial service failure', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => ({
+        status: 'degraded',
+        services: {
+          database: 'connected',
+          redis: 'error: Connection refused',
+        },
+      }),
+    } as Response)
+
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('backend-status')).toHaveTextContent('DEGRADED')
+      expect(screen.getByTestId('db-status')).toHaveTextContent('connected')
+      expect(screen.getByTestId('redis-status')).toHaveTextContent(/error/)
+    })
+  })
+
   it('displays unavailable indicator when API fails', async () => {
     global.fetch = vi.fn().mockRejectedValue(new Error('Connection refused'))
 

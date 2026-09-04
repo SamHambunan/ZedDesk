@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 interface HealthStatus {
   status: string
@@ -6,6 +6,15 @@ interface HealthStatus {
     database: string
     redis: string
   }
+}
+
+function StatusRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <span style={{ color: '#cbd5e1' }}>{label}:</span>
+      {children}
+    </div>
+  )
 }
 
 export default function App() {
@@ -17,14 +26,13 @@ export default function App() {
 
   useEffect(() => {
     fetch(`${apiUrl}/api/health`)
-      .then((res) => {
-        if (!res.ok) {
+      .then(async (res) => {
+        const data = await res.json().catch(() => null)
+        if (data && data.services) {
+          setHealth(data)
+        } else if (!res.ok) {
           throw new Error(`HTTP ${res.status}`)
         }
-        return res.json()
-      })
-      .then((data: HealthStatus) => {
-        setHealth(data)
         setLoading(false)
       })
       .catch((err: Error) => {
@@ -50,15 +58,13 @@ export default function App() {
         </h2>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: '#cbd5e1' }}>Frontend:</span>
+          <StatusRow label="Frontend">
             <span style={{ backgroundColor: '#064e3b', color: '#34d399', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 600 }} data-testid="frontend-status">
               Operational
             </span>
-          </div>
+          </StatusRow>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: '#cbd5e1' }}>Backend API:</span>
+          <StatusRow label="Backend API">
             {loading ? (
               <span style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Checking...</span>
             ) : error ? (
@@ -66,25 +72,23 @@ export default function App() {
                 Unavailable ({error})
               </span>
             ) : (
-              <span style={{ backgroundColor: '#064e3b', color: '#34d399', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 600 }} data-testid="backend-status">
+              <span style={{ backgroundColor: health?.status === 'ok' ? '#064e3b' : '#78350f', color: health?.status === 'ok' ? '#34d399' : '#fbbf24', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 600 }} data-testid="backend-status">
                 {health?.status.toUpperCase()}
               </span>
             )}
-          </div>
+          </StatusRow>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: '#cbd5e1' }}>Database:</span>
+          <StatusRow label="Database">
             <span style={{ color: health?.services.database === 'connected' ? '#34d399' : '#94a3b8', fontSize: '0.875rem', fontWeight: 500 }} data-testid="db-status">
               {health ? health.services.database : 'Waiting for API'}
             </span>
-          </div>
+          </StatusRow>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: '#cbd5e1' }}>Redis Cache:</span>
+          <StatusRow label="Redis Cache">
             <span style={{ color: health?.services.redis === 'connected' ? '#34d399' : '#94a3b8', fontSize: '0.875rem', fontWeight: 500 }} data-testid="redis-status">
               {health ? health.services.redis : 'Waiting for API'}
             </span>
-          </div>
+          </StatusRow>
         </div>
       </main>
     </div>
