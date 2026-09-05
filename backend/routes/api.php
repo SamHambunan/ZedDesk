@@ -33,3 +33,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/organizations', [App\Http\Controllers\Api\OrganizationController::class, 'index']);
     Route::post('/organizations', [App\Http\Controllers\Api\OrganizationController::class, 'store']);
 });
+
+Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(function () {
+    Route::get('/workspace', [App\Http\Controllers\Api\WorkspaceController::class, 'show']);
+});
