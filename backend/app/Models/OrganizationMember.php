@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use App\Enums\Role;
 use App\Traits\BelongsToOrganization;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class OrganizationMember extends Model
 {
-    use HasFactory;
     use BelongsToOrganization;
+    use HasFactory;
 
     protected $table = 'organization_members';
 
@@ -23,13 +25,18 @@ class OrganizationMember extends Model
     protected function casts(): array
     {
         return [
-            'role' => \App\Enums\Role::class,
+            'role' => Role::class,
         ];
     }
-
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function teams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class, 'team_members', 'organization_member_id', 'team_id')
+            ->withTimestamps();
     }
 }

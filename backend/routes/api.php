@@ -1,21 +1,30 @@
 <?php
 
-use Illuminate\Http\Request;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\InvitationController;
+use App\Http\Controllers\Api\OrganizationController;
+use App\Http\Controllers\Api\OrganizationMemberController;
+use App\Http\Controllers\Api\TeamController;
+use App\Http\Controllers\Api\WorkspaceController;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
     $probe = function (callable $check): string {
         try {
             $check();
+
             return 'connected';
-        } catch (\Throwable $e) {
-            return 'error: ' . $e->getMessage();
+        } catch (Throwable $e) {
+            return 'error: '.$e->getMessage();
         }
     };
-    $dbStatus = $probe(fn () => Illuminate\Support\Facades\DB::connection()->getPdo());
-    $redisStatus = $probe(fn () => Illuminate\Support\Facades\Redis::connection()->ping());
+    $dbStatus = $probe(fn () => DB::connection()->getPdo());
+    $redisStatus = $probe(fn () => Redis::connection()->ping());
 
     $isHealthy = ($dbStatus === 'connected' && $redisStatus === 'connected');
+
     return response()->json([
         'status' => $isHealthy ? 'ok' : 'degraded',
         'services' => [
@@ -25,22 +34,31 @@ Route::get('/health', function () {
     ], $isHealthy ? 200 : 503);
 });
 
-Route::post('/register', [App\Http\Controllers\Api\AuthController::class, 'register']);
-Route::post('/login', [App\Http\Controllers\Api\AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [App\Http\Controllers\Api\AuthController::class, 'logout']);
-    Route::get('/organizations', [App\Http\Controllers\Api\OrganizationController::class, 'index']);
-    Route::post('/organizations', [App\Http\Controllers\Api\OrganizationController::class, 'store']);
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/organizations', [OrganizationController::class, 'index']);
+    Route::post('/organizations', [OrganizationController::class, 'store']);
 });
 
-Route::get('/invitations/{token}', [App\Http\Controllers\Api\InvitationController::class, 'show']);
-Route::post('/invitations/{token}/accept', [App\Http\Controllers\Api\InvitationController::class, 'accept']);
+Route::get('/invitations/{token}', [InvitationController::class, 'show']);
+Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept']);
 
 Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(function () {
-    Route::get('/workspace', [App\Http\Controllers\Api\WorkspaceController::class, 'show']);
-    Route::get('/invitations', [App\Http\Controllers\Api\InvitationController::class, 'index']);
-    Route::post('/invitations', [App\Http\Controllers\Api\InvitationController::class, 'store']);
-    Route::delete('/invitations/{id}', [App\Http\Controllers\Api\InvitationController::class, 'destroy']);
-});
+    Route::get('/workspace', [WorkspaceController::class, 'show']);
+    Route::get('/invitations', [InvitationController::class, 'index']);
+    Route::post('/invitations', [InvitationController::class, 'store']);
+    Route::delete('/invitations/{id}', [InvitationController::class, 'destroy']);
 
+    Route::get('/organization-members', [OrganizationMemberController::class, 'index']);
+    Route::get('/members', [OrganizationMemberController::class, 'index']);
+    Route::get('/teams', [TeamController::class, 'index']);
+    Route::post('/teams', [TeamController::class, 'store']);
+    Route::get('/teams/{id}', [TeamController::class, 'show']);
+    Route::put('/teams/{id}', [TeamController::class, 'update']);
+    Route::delete('/teams/{id}', [TeamController::class, 'destroy']);
+    Route::post('/teams/{id}/members', [TeamController::class, 'addMember']);
+    Route::delete('/teams/{id}/members/{memberId}', [TeamController::class, 'removeMember']);
+});
