@@ -34,6 +34,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/organizations', [App\Http\Controllers\Api\OrganizationController::class, 'store']);
 });
 
+Route::get('/invitations/{token}', [App\Http\Controllers\Api\InvitationController::class, 'show']);
+Route::post('/invitations/{token}/accept', [App\Http\Controllers\Api\InvitationController::class, 'accept']);
+
 Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(function () {
     Route::get('/workspace', [App\Http\Controllers\Api\WorkspaceController::class, 'show']);
+    Route::get('/invitations', [App\Http\Controllers\Api\InvitationController::class, 'index']);
+    Route::post('/invitations', [App\Http\Controllers\Api\InvitationController::class, 'store']);
+    Route::delete('/invitations/{id}', [App\Http\Controllers\Api\InvitationController::class, 'destroy']);
 });
+
