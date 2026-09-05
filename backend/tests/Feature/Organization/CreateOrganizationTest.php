@@ -109,7 +109,7 @@ test('organization creation fails when slug is already taken', function () {
     $token = $user->createToken('test_token')->plainTextToken;
 
     Organization::create([
-        'name' => 'Existing Company',
+        'name' => 'Existing Organization',
         'slug' => 'existing-company',
     ]);
 

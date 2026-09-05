@@ -60,7 +60,7 @@ describe('Central Hub Authentication and Organization Flow', () => {
     await user.type(screen.getByLabelText(/confirm password/i), 'Password123!')
 
     // Submit
-    await user.click(screen.getByRole('button', { name: /create account/i }))
+    await user.click(screen.getByRole('button', { name: /^register$/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/logged in as/i)).toHaveTextContent(/alice admin/i)
@@ -95,7 +95,7 @@ describe('Central Hub Authentication and Organization Flow', () => {
           ok: true,
           json: async () => [
             { id: 10, name: 'Acme Corp', slug: 'acme-corp', role: 'admin' },
-            { id: 11, name: 'Support Squad', slug: 'support-squad', role: 'agent' },
+            { id: 11, name: 'Support Team', slug: 'support-team', role: 'agent' },
           ],
         } as Response)
       }
@@ -119,10 +119,12 @@ describe('Central Hub Authentication and Organization Flow', () => {
 
     // Organizations listed
     await waitFor(() => {
-      expect(screen.getByText('Acme Corp')).toBeInTheDocument()
-      expect(screen.getByText(/support-squad/)).toBeInTheDocument()
-      expect(screen.getByText('admin')).toBeInTheDocument()
-      expect(screen.getByText('agent')).toBeInTheDocument()
+      expect(screen.getAllByText(/Acme Corp/).length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText(/support-team/).length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('admin').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('agent').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getByRole('heading', { name: /select organization/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /navigate to subdomain/i })).toBeInTheDocument()
     })
 
     // Log out
@@ -198,8 +200,8 @@ describe('Central Hub Authentication and Organization Flow', () => {
     await user.click(screen.getByRole('button', { name: /create organization/i }))
 
     await waitFor(() => {
-      expect(screen.getByText('Zed Helpdesk')).toBeInTheDocument()
-      expect(screen.getByText(/zed-help/)).toBeInTheDocument()
+      expect(screen.getAllByText(/Zed Helpdesk/).length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText(/zed-help/).length).toBeGreaterThanOrEqual(1)
     })
   })
 })

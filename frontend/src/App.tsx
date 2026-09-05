@@ -30,6 +30,24 @@ function StatusRow({ label, children }: { label: string; children: ReactNode }) 
   )
 }
 
+function extractErrorMessage(data: unknown, fallback: string): string {
+  if (data && typeof data === 'object') {
+    const errorObj = data as { message?: string; errors?: Record<string, string[]> }
+    if (errorObj.message) return errorObj.message
+    if (errorObj.errors) {
+      return Object.values(errorObj.errors).flat().join(', ')
+    }
+  }
+  return fallback
+}
+
+function getOrganizationUrl(slug: string): string {
+  const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost'
+  const port = typeof window !== 'undefined' && window.location.port ? `:${window.location.port}` : ''
+  const protocol = typeof window !== 'undefined' && window.location.protocol ? window.location.protocol : 'http:'
+  return `${protocol}//${slug}.${host}${port}`
+}
+
 export default function App() {
   const [health, setHealth] = useState<HealthStatus | null>(null)
   const [loadingHealth, setLoadingHealth] = useState(true)
@@ -58,7 +76,8 @@ export default function App() {
 
   // Organizations State
   const [organizations, setOrganizations] = useState<Organization[]>([])
-  const [loadingOrgs, setLoadingOrgs] = useState(false)
+  const [loadingOrgs, setLoadingOrgs] = useState<boolean>(() => Boolean(localStorage.getItem('zeddesk_token')))
+  const [selectedOrgSlug, setSelectedOrgSlug] = useState<string>('')
   const [orgName, setOrgName] = useState('')
   const [orgSlug, setOrgSlug] = useState('')
   const [createOrgError, setCreateOrgError] = useState<string | null>(null)
@@ -100,8 +119,13 @@ export default function App() {
         if (!res.ok) {
           throw new Error(`Failed to load organizations (${res.status})`)
         }
-        const data = await res.json()
-        if (!cancelled) setOrganizations(data)
+        const data: Organization[] = await res.json()
+        if (!cancelled) {
+          setOrganizations(data)
+          if (data.length > 0 && !selectedOrgSlug) {
+            setSelectedOrgSlug(data[0].slug)
+          }
+        }
       })
       .catch(() => {
         // Handled silently
@@ -113,7 +137,15 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [apiUrl, token])
+  }, [apiUrl, token, selectedOrgSlug])
+
+  const persistSession = (newToken: string, newUser: User) => {
+    setToken(newToken)
+    setUser(newUser)
+    setLoadingOrgs(true)
+    localStorage.setItem('zeddesk_token', newToken)
+    localStorage.setItem('zeddesk_user', JSON.stringify(newUser))
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -133,14 +165,11 @@ export default function App() {
       const data = await res.json()
 
       if (!res.ok) {
-        setLoginError(data.message || (data.errors ? Object.values(data.errors).flat().join(', ') : 'Login failed'))
+        setLoginError(extractErrorMessage(data, 'Login failed'))
         return
       }
 
-      setToken(data.token)
-      setUser(data.user)
-      localStorage.setItem('zeddesk_token', data.token)
-      localStorage.setItem('zeddesk_user', JSON.stringify(data.user))
+      persistSession(data.token, data.user)
       setLoginEmail('')
       setLoginPassword('')
     } catch {
@@ -179,14 +208,11 @@ export default function App() {
       const data = await res.json()
 
       if (!res.ok) {
-        setRegError(data.message || (data.errors ? Object.values(data.errors).flat().join(', ') : 'Registration failed'))
+        setRegError(extractErrorMessage(data, 'Registration failed'))
         return
       }
 
-      setToken(data.token)
-      setUser(data.user)
-      localStorage.setItem('zeddesk_token', data.token)
-      localStorage.setItem('zeddesk_user', JSON.stringify(data.user))
+      persistSession(data.token, data.user)
       setRegName('')
       setRegEmail('')
       setRegPassword('')
@@ -209,13 +235,14 @@ export default function App() {
           },
         })
       } catch {
-        // proceed with local cleanup
+        // Local cleanup regardless
       }
     }
 
     setToken(null)
     setUser(null)
     setOrganizations([])
+    setSelectedOrgSlug('')
     localStorage.removeItem('zeddesk_token')
     localStorage.removeItem('zeddesk_user')
   }
@@ -242,25 +269,32 @@ export default function App() {
       const data = await res.json()
 
       if (!res.ok) {
-        setCreateOrgError(data.message || (data.errors ? Object.values(data.errors).flat().join(', ') : 'Creation failed'))
+        setCreateOrgError(extractErrorMessage(data, 'Creation failed'))
         return
       }
 
-      setOrganizations((prev) => [
-        ...prev,
-        {
-          id: data.organization.id,
-          name: data.organization.name,
-          slug: data.organization.slug,
-          role: data.role,
-        },
-      ])
+      const newOrg: Organization = {
+        id: data.organization.id,
+        name: data.organization.name,
+        slug: data.organization.slug,
+        role: data.role,
+      }
+
+      setOrganizations((prev) => [...prev, newOrg])
+      setSelectedOrgSlug(newOrg.slug)
       setOrgName('')
       setOrgSlug('')
     } catch {
       setCreateOrgError('Network error creating organization')
     } finally {
       setIsCreatingOrg(false)
+    }
+  }
+
+  const handleNavigateOrganization = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (selectedOrgSlug) {
+      window.location.href = getOrganizationUrl(selectedOrgSlug)
     }
   }
 
@@ -340,7 +374,7 @@ export default function App() {
               </form>
             ) : (
               <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Create Platform Account</h2>
+                <h2 style={{ fontSize: '1.25rem', margin: 0 }}>User Registration</h2>
                 {regError && (
                   <div style={{ backgroundColor: '#7f1d1d', color: '#f87171', padding: '0.75rem', borderRadius: '0.375rem', fontSize: '0.875rem' }}>
                     {regError}
@@ -397,7 +431,7 @@ export default function App() {
                   disabled={isRegistering}
                   style={{ marginTop: '0.5rem', padding: '0.625rem', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '0.375rem', fontWeight: 600, cursor: 'pointer' }}
                 >
-                  {isRegistering ? 'Registering...' : 'Create Account'}
+                  {isRegistering ? 'Registering...' : 'Register'}
                 </button>
               </form>
             )}
@@ -417,7 +451,35 @@ export default function App() {
               </button>
             </div>
 
-            {/* Organizations List / Selection */}
+            {/* Organization Selection Form */}
+            {organizations.length > 0 && (
+              <form onSubmit={handleNavigateOrganization} style={{ padding: '1rem', backgroundColor: '#0f172a', borderRadius: '0.5rem', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>Select Organization</h3>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  <label htmlFor="org-select" style={{ fontSize: '0.875rem', color: '#cbd5e1' }}>Organization:</label>
+                  <select
+                    id="org-select"
+                    value={selectedOrgSlug}
+                    onChange={(e) => setSelectedOrgSlug(e.target.value)}
+                    style={{ flex: 1, padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid #475569', backgroundColor: '#1e293b', color: '#f8fafc', fontSize: '0.875rem' }}
+                  >
+                    {organizations.map((org) => (
+                      <option key={org.id} value={org.slug}>
+                        {org.name} ({org.slug}) - {org.role.toUpperCase()}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="submit"
+                    style={{ padding: '0.5rem 1rem', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '0.375rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}
+                  >
+                    Navigate to Subdomain
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Organizations List / Overview */}
             <div>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 600, margin: '0 0 1rem 0' }}>
                 Your Organizations
@@ -426,7 +488,7 @@ export default function App() {
                 <p style={{ color: '#94a3b8' }}>Loading organizations...</p>
               ) : organizations.length === 0 ? (
                 <p style={{ color: '#94a3b8', fontStyle: 'italic' }}>
-                  You are not a member of any organizations yet. Create one below to get started.
+                  No Organization Memberships found. Create one below to get started.
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -437,17 +499,17 @@ export default function App() {
                     >
                       <div>
                         <div style={{ fontWeight: 600, fontSize: '1rem' }}>{org.name}</div>
-                        <div style={{ fontSize: '0.875rem', color: '#94a3b8' }}>{org.slug}.localhost:5173</div>
+                        <div style={{ fontSize: '0.875rem', color: '#94a3b8' }}>{getOrganizationUrl(org.slug).replace(/^https?:\/\//, '')}</div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                         <span style={{ backgroundColor: org.role === 'admin' ? '#312e81' : '#14532d', color: org.role === 'admin' ? '#a5b4fc' : '#86efac', padding: '0.2rem 0.5rem', borderRadius: '0.25rem', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>
                           {org.role}
                         </span>
                         <a
-                          href={`http://${org.slug}.localhost:5173`}
+                          href={getOrganizationUrl(org.slug)}
                           style={{ padding: '0.375rem 0.75rem', backgroundColor: '#0284c7', color: 'white', borderRadius: '0.375rem', textDecoration: 'none', fontSize: '0.875rem', fontWeight: 500 }}
                         >
-                          Open Workspace
+                          Open Organization
                         </a>
                       </div>
                     </div>
@@ -492,7 +554,7 @@ export default function App() {
                       style={{ flex: 1, padding: '0.5rem 0.75rem', borderRadius: '0.375rem 0 0 0.375rem', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#f8fafc' }}
                     />
                     <span style={{ padding: '0.5rem 0.75rem', backgroundColor: '#334155', color: '#94a3b8', borderRadius: '0 0.375rem 0.375rem 0', border: '1px solid #475569', borderLeft: 'none', fontSize: '0.875rem' }}>
-                      .localhost:5173
+                      .{typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost'}{typeof window !== 'undefined' && window.location.port ? `:${window.location.port}` : ''}
                     </span>
                   </div>
                 </div>

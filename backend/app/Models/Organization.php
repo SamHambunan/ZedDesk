@@ -16,7 +16,7 @@ class Organization extends Model
         'slug',
     ];
 
-    public function members(): HasMany
+    public function organizationMembers(): HasMany
     {
         return $this->hasMany(OrganizationMember::class);
     }

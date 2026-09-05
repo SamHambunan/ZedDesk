@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\OrganizationMember;
@@ -62,7 +63,7 @@ class OrganizationController extends Controller
             OrganizationMember::create([
                 'organization_id' => $org->id,
                 'user_id' => $user->id,
-                'role' => 'admin',
+                'role' => Role::ADMIN->value,
             ]);
 
             return $org;
@@ -70,7 +71,7 @@ class OrganizationController extends Controller
 
         return response()->json([
             'organization' => $organization,
-            'role' => 'admin',
+            'role' => Role::ADMIN->value,
         ], 201);
     }
 }

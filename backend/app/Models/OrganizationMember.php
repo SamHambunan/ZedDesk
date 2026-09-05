@@ -18,6 +18,13 @@ class OrganizationMember extends Model
         'role',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'role' => \App\Enums\Role::class,
+        ];
+    }
+
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
