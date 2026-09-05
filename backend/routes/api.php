@@ -24,3 +24,12 @@ Route::get('/health', function () {
         ],
     ], $isHealthy ? 200 : 503);
 });
+
+Route::post('/register', [App\Http\Controllers\Api\AuthController::class, 'register']);
+Route::post('/login', [App\Http\Controllers\Api\AuthController::class, 'login']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/logout', [App\Http\Controllers\Api\AuthController::class, 'logout']);
+    Route::get('/organizations', [App\Http\Controllers\Api\OrganizationController::class, 'index']);
+    Route::post('/organizations', [App\Http\Controllers\Api\OrganizationController::class, 'store']);
+});
