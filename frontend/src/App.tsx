@@ -504,52 +504,18 @@ export default function App({ hostname }: { hostname?: string } = {}) {
 
             {!loadingWorkspace && isUnauthenticated && (
               <div style={{ maxWidth: '32rem', margin: '2rem auto', width: '100%' }}>
-                <div data-testid="workspace-unauthenticated" style={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '0.75rem', padding: '2rem' }}>
+                <div data-testid="workspace-unauthenticated" style={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '0.75rem', padding: '2rem', textAlign: 'center' }}>
                   <h2 style={{ fontSize: '1.25rem', marginTop: 0, color: '#f8fafc' }}>Authentication Required</h2>
-                  <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
+                  <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
                     You must be logged in to access the <strong>{subdomain}</strong> workspace.
                   </p>
-                  <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-                    {loginError && (
-                      <div style={{ backgroundColor: '#7f1d1d', color: '#f87171', padding: '0.5rem 0.75rem', borderRadius: '0.375rem', fontSize: '0.875rem' }}>
-                        {loginError}
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <label htmlFor="ws-login-email" style={{ fontSize: '0.875rem', color: '#cbd5e1' }}>Email</label>
-                      <input
-                        id="ws-login-email"
-                        type="email"
-                        required
-                        value={loginEmail}
-                        onChange={(e) => setLoginEmail(e.target.value)}
-                        style={{ padding: '0.5rem 0.75rem', borderRadius: '0.375rem', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#f8fafc' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <label htmlFor="ws-login-password" style={{ fontSize: '0.875rem', color: '#cbd5e1' }}>Password</label>
-                      <input
-                        id="ws-login-password"
-                        type="password"
-                        required
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        style={{ padding: '0.5rem 0.75rem', borderRadius: '0.375rem', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#f8fafc' }}
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={isLoggingIn}
-                      style={{ padding: '0.625rem', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '0.375rem', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      {isLoggingIn ? 'Logging in...' : 'Log In to Workspace'}
-                    </button>
-                  </form>
-                  <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
-                    <a href={getCentralHubUrl()} style={{ color: '#38bdf8', fontSize: '0.875rem', textDecoration: 'none' }}>
-                      &larr; Return to Central Hub
-                    </a>
-                  </div>
+                  <a
+                    href={getCentralHubUrl()}
+                    data-testid="login-redirect-btn"
+                    style={{ display: 'inline-block', padding: '0.625rem 1.25rem', backgroundColor: '#0284c7', color: 'white', borderRadius: '0.375rem', textDecoration: 'none', fontWeight: 600, fontSize: '0.875rem' }}
+                  >
+                    Log In at Central Hub
+                  </a>
                 </div>
               </div>
             )}

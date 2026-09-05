@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Context\OrganizationContext;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
@@ -15,15 +14,15 @@ class WorkspaceController extends Controller
     public function show(Request $request): JsonResponse
     {
         /** @var Organization $organization */
-        $organization = OrganizationContext::getCurrent() ?? $request->attributes->get('organization');
+        $organization = $request->attributes->get('organization');
         $user = $request->user();
 
-        /** @var OrganizationMember|null $organizationMember */
+        /** @var OrganizationMember $organizationMember */
         $organizationMember = $request->attributes->get('organization_member');
 
-        $role = $organizationMember?->role instanceof Role
+        $role = $organizationMember->role instanceof Role
             ? $organizationMember->role->value
-            : ($organizationMember?->role ?? $request->attributes->get('role'));
+            : (string) $organizationMember->role;
 
         return response()->json([
             'organization' => [
