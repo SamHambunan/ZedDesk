@@ -8,7 +8,6 @@
 /.idea
 /HANDOFF.md
 /.scratch
-
 # Dependencies
 /node_modules
 /frontend/node_modules
