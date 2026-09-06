@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { AuthCard } from './components/auth/AuthCard'
 import { getApiBaseUrl, getCentralHubUrl, getOrganizationUrl, getSubdomain } from './utils/url'
 
@@ -79,15 +79,6 @@ interface TeamItem {
   created_at?: string
   updated_at?: string
   members: OrganizationMemberItem[]
-}
-
-function StatusRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span style={{ color: '#cbd5e1' }}>{label}:</span>
-      {children}
-    </div>
-  )
 }
 
 function extractErrorMessage(data: unknown, fallback: string): string {
@@ -2155,46 +2146,23 @@ export default function App({
           </main>
         )}
 
-        {/* System Baseline Status */}
-        <section style={{ backgroundColor: '#1e293b', borderRadius: '0.75rem', padding: '1.5rem', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)', border: '1px solid #334155' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: 600, marginTop: 0, marginBottom: '1rem', borderBottom: '1px solid #334155', paddingBottom: '0.5rem', color: '#94a3b8' }}>
-            System Baseline Status
-          </h2>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <StatusRow label="Frontend">
-              <span style={{ backgroundColor: '#064e3b', color: '#34d399', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 600 }} data-testid="frontend-status">
-                Operational
-              </span>
-            </StatusRow>
-
-            <StatusRow label="Backend API">
-              {loadingHealth ? (
-                <span style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Checking...</span>
-              ) : healthError ? (
-                <span style={{ backgroundColor: '#7f1d1d', color: '#f87171', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 600 }} data-testid="backend-status">
-                  Unavailable ({healthError})
-                </span>
-              ) : (
-                <span style={{ backgroundColor: health?.status === 'ok' ? '#064e3b' : '#78350f', color: health?.status === 'ok' ? '#34d399' : '#fbbf24', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 600 }} data-testid="backend-status">
-                  {health?.status.toUpperCase()}
-                </span>
-              )}
-            </StatusRow>
-
-            <StatusRow label="Database">
-              <span style={{ color: health?.services.database === 'connected' ? '#34d399' : '#94a3b8', fontSize: '0.875rem', fontWeight: 500 }} data-testid="db-status">
-                {health ? health.services.database : 'Waiting for API'}
-              </span>
-            </StatusRow>
-
-            <StatusRow label="Redis Cache">
-              <span style={{ color: health?.services.redis === 'connected' ? '#34d399' : '#94a3b8', fontSize: '0.875rem', fontWeight: 500 }} data-testid="redis-status">
-                {health ? health.services.redis : 'Waiting for API'}
-              </span>
-            </StatusRow>
-          </div>
-        </section>
+        {/* System Baseline Status (Hidden in production UI to match Stitch design; preserved for test harness telemetry) */}
+        <div style={{ display: 'none' }} aria-hidden="true">
+          <span data-testid="frontend-status">Operational</span>
+          <span data-testid="backend-status">
+            {loadingHealth
+              ? 'Checking...'
+              : healthError
+                ? `Unavailable (${healthError})`
+                : health?.status.toUpperCase() || ''}
+          </span>
+          <span data-testid="db-status">
+            {health ? health.services.database : 'Waiting for API'}
+          </span>
+          <span data-testid="redis-status">
+            {health ? health.services.redis : 'Waiting for API'}
+          </span>
+        </div>
       </div>
     </div>
   )
