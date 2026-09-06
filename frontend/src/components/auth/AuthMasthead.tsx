@@ -14,16 +14,16 @@ export const AuthMasthead: React.FC<AuthMastheadProps> = ({
   className = '',
 }) => {
   return (
-    <header className={`flex flex-col items-center text-center space-y-3 ${className}`}>
-      <div className="w-14 h-14 rounded-lg bg-surface-panel dark:bg-surface-panel border border-border-subtle dark:border-border-subtle flex items-center justify-center shadow-keylight relative overflow-hidden group">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#38BDF8]/10 to-[#818CF8]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-        <Sparkles className="w-7 h-7 text-accent-indigo-glow dark:text-accent-indigo-glow" />
+    <header className={`flex flex-col items-center text-center space-y-4 ${className}`}>
+      <div className="w-16 h-16 rounded-xl bg-surface-panel border border-border-subtle flex items-center justify-center surface-level-2 relative overflow-hidden group">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#38BDF8]/10 to-[#818CF8]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        <Sparkles className="w-8 h-8 text-[#38BDF8]" />
       </div>
       <div>
-        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-[#38BDF8] to-[#818CF8] bg-clip-text text-transparent">
+        <h1 className="font-display-lg text-display-lg bg-gradient-to-r from-[#38BDF8] to-[#818CF8] bg-clip-text text-transparent">
           {title}
         </h1>
-        <p className="text-xs text-on-surface-variant dark:text-on-surface-variant mt-1 font-medium">
+        <p className="font-body-default text-body-default text-text-secondary mt-1">
           {subtitle}
         </p>
       </div>
@@ -32,3 +32,4 @@ export const AuthMasthead: React.FC<AuthMastheadProps> = ({
 }
 
 export default AuthMasthead
+

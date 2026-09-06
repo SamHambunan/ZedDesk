@@ -1970,22 +1970,17 @@ export default function App({
   }
 
   // --- RENDER CENTRAL HUB (Apex domain context) ---
-  return (
-    <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', minHeight: '100vh', backgroundColor: '#0f172a', color: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2rem' }}>
-      {token && user && (
-        <header style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h1 style={{ fontSize: '3rem', fontWeight: 800, margin: 0, background: 'linear-gradient(to right, #38bdf8, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            ZedDesk
-          </h1>
-          <p style={{ fontSize: '1.25rem', color: '#94a3b8', marginTop: '0.5rem' }}>
-            Multi-tenant AI-Powered Helpdesk
-          </p>
-        </header>
-      )}
+  if (!token || !user) {
+    return (
+      <div className="bg-canvas-base text-text-primary min-h-screen flex flex-col items-center justify-center font-sans antialiased selection:bg-accent-glow/30 selection:text-text-primary p-margin-mobile md:p-margin-desktop relative">
+        {/* Ambient Background Effect */}
+        <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden">
+          <div className="absolute w-[800px] h-[800px] bg-accent-glow/5 rounded-full blur-3xl opacity-50 mix-blend-screen" />
+          <div className="absolute w-[600px] h-[600px] bg-[#38BDF8]/5 rounded-full blur-3xl opacity-30 mix-blend-screen translate-x-1/4 translate-y-1/4" />
+        </div>
 
-      <div style={{ maxWidth: '40rem', width: '100%', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        {/* Central Hub Main Content */}
-        {!token || !user ? (
+        {/* Main Auth Container */}
+        <main className="w-full max-w-md z-10 flex flex-col gap-8">
           <AuthCard
             activeTab={activeTab}
             onTabChange={(tab) => {
@@ -2012,20 +2007,55 @@ export default function App({
             isRegistering={isRegistering}
             onRegisterSubmit={handleRegister}
           />
-        ) : (
-          <main style={{ backgroundColor: '#1e293b', borderRadius: '0.75rem', padding: '2rem', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #334155', paddingBottom: '1rem' }}>
-              <div>
-                <p style={{ margin: 0, fontSize: '0.875rem', color: '#94a3b8' }}>Logged in as <strong style={{ color: '#f8fafc' }}>{user.name}</strong> ({user.email})</p>
-              </div>
-              <button
-                type="button"
-                onClick={handleLogout}
-                style={{ padding: '0.375rem 0.75rem', backgroundColor: '#334155', color: '#e2e8f0', border: 'none', borderRadius: '0.375rem', fontSize: '0.875rem', cursor: 'pointer' }}
-              >
-                Log Out
-              </button>
+        </main>
+
+        {/* System Baseline Status (Hidden in production UI to match Stitch design; preserved for test harness telemetry) */}
+        <div style={{ display: 'none' }} aria-hidden="true">
+          <span data-testid="frontend-status">Operational</span>
+          <span data-testid="backend-status">
+            {loadingHealth
+              ? 'Checking...'
+              : healthError
+                ? `Unavailable (${healthError})`
+                : health?.status.toUpperCase() || ''}
+          </span>
+          <span data-testid="db-status">
+            {health ? health.services.database : 'Waiting for API'}
+          </span>
+          <span data-testid="redis-status">
+            {health ? health.services.redis : 'Waiting for API'}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', minHeight: '100vh', backgroundColor: '#0f172a', color: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2rem' }}>
+      <header style={{ textAlign: 'center', marginBottom: '2rem' }}>
+        <h1 style={{ fontSize: '3rem', fontWeight: 800, margin: 0, background: 'linear-gradient(to right, #38bdf8, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          ZedDesk
+        </h1>
+        <p style={{ fontSize: '1.25rem', color: '#94a3b8', marginTop: '0.5rem' }}>
+          Multi-tenant AI-Powered Helpdesk
+        </p>
+      </header>
+
+      <div style={{ maxWidth: '40rem', width: '100%', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <main style={{ backgroundColor: '#1e293b', borderRadius: '0.75rem', padding: '2rem', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #334155', paddingBottom: '1rem' }}>
+            <div>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: '#94a3b8' }}>Logged in as <strong style={{ color: '#f8fafc' }}>{user.name}</strong> ({user.email})</p>
             </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{ padding: '0.375rem 0.75rem', backgroundColor: '#334155', color: '#e2e8f0', border: 'none', borderRadius: '0.375rem', fontSize: '0.875rem', cursor: 'pointer' }}
+            >
+              Log Out
+            </button>
+          </div>
+
 
             {/* Organization Selection Form */}
             {organizations.length > 0 && (
@@ -2144,7 +2174,6 @@ export default function App({
               </form>
             </div>
           </main>
-        )}
 
         {/* System Baseline Status (Hidden in production UI to match Stitch design; preserved for test harness telemetry) */}
         <div style={{ display: 'none' }} aria-hidden="true">

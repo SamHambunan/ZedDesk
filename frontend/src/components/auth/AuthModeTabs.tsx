@@ -19,32 +19,34 @@ export const AuthModeTabs: React.FC<AuthModeTabsProps> = ({
   return (
     <div
       role="tablist"
-      className={`flex border-b border-border-subtle dark:border-border-subtle bg-surface-panel/60 dark:bg-surface-panel/60 ${className}`}
+      className={`flex border-b border-border-subtle bg-surface-panel/50 ${className}`}
     >
       <button
         type="button"
+        id="tab-signin"
         role="tab"
         aria-selected={activeTab === 'login'}
         aria-label="Log In"
         onClick={() => onTabChange('login')}
-        className={`flex-1 py-3 text-center text-xs font-semibold tracking-wide transition-colors ${
+        className={`flex-1 py-4 text-center font-title-md text-title-md transition-colors ${
           activeTab === 'login'
-            ? 'text-white border-b-2 border-accent-indigo-glow bg-surface-subpanel/50 dark:bg-surface-subpanel/50'
-            : 'text-on-surface-variant hover:text-white border-b-2 border-transparent'
+            ? 'text-text-primary border-b-2 border-accent-glow bg-surface-subpanel/50'
+            : 'text-text-secondary border-b-2 border-transparent hover:text-text-primary'
         }`}
       >
         {signinLabel}
       </button>
       <button
         type="button"
+        id="tab-signup"
         role="tab"
         aria-selected={activeTab === 'register'}
         aria-label="Register"
         onClick={() => onTabChange('register')}
-        className={`flex-1 py-3 text-center text-xs font-semibold tracking-wide transition-colors ${
+        className={`flex-1 py-4 text-center font-title-md text-title-md transition-colors ${
           activeTab === 'register'
-            ? 'text-white border-b-2 border-accent-indigo-glow bg-surface-subpanel/50 dark:bg-surface-subpanel/50'
-            : 'text-on-surface-variant hover:text-white border-b-2 border-transparent'
+            ? 'text-text-primary border-b-2 border-accent-glow bg-surface-subpanel/50'
+            : 'text-text-secondary border-b-2 border-transparent hover:text-text-primary'
         }`}
       >
         {signupLabel}
@@ -52,5 +54,6 @@ export const AuthModeTabs: React.FC<AuthModeTabsProps> = ({
     </div>
   )
 }
+
 
 export default AuthModeTabs

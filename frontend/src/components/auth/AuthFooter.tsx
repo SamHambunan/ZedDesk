@@ -1,6 +1,5 @@
 import React from 'react'
 import { Lock } from 'lucide-react'
-import { authContentData } from '../../data/mockData'
 
 export interface AuthFooterProps {
   readonly sessionText?: string
@@ -10,27 +9,22 @@ export interface AuthFooterProps {
 }
 
 export const AuthFooter: React.FC<AuthFooterProps> = ({
-  sessionText = authContentData.footer.sessionSecurity,
-  architectureText = authContentData.footer.architectureNote,
-  routingText = authContentData.footer.routingNote,
+  sessionText = 'Laravel Sanctum Encrypted Session',
+  architectureText = 'Adhering to ADR-0002 for decoupled identities across multi-tenant infrastructures.',
   className = '',
 }) => {
   return (
-    <footer className={`text-center space-y-1.5 pb-6 ${className}`}>
-      <div className="flex items-center justify-center gap-1.5 text-outline dark:text-outline text-xs">
-        <Lock className="w-3.5 h-3.5 text-accent-indigo-glow" />
-        <span className="font-mono text-[11px]">{sessionText}</span>
+    <footer className={`text-center space-y-2 pb-8 ${className}`}>
+      <div className="flex items-center justify-center gap-2 text-text-muted font-mono-data text-mono-data">
+        <Lock className="w-3.5 h-3.5" />
+        <span>{sessionText}</span>
       </div>
-      <p className="text-[11px] text-outline dark:text-outline leading-relaxed">
+      <p className="font-body-compact text-body-compact text-text-muted/60 max-w-xs mx-auto">
         {architectureText}
       </p>
-      {routingText && (
-        <p className="text-[11px] text-outline/70 dark:text-outline/70 leading-relaxed">
-          {routingText}
-        </p>
-      )}
     </footer>
   )
 }
 
 export default AuthFooter
+

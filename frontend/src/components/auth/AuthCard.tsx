@@ -63,12 +63,12 @@ export const AuthCard: React.FC<AuthCardProps> = ({
   } = useAuthForm()
 
   return (
-    <div className={`w-full max-w-md mx-auto flex flex-col gap-6 font-sans relative z-10 ${className}`}>
-      {/* Masthead */}
+    <div className={`w-full max-w-md mx-auto flex flex-col gap-8 font-sans relative z-10 ${className}`}>
+      {/* Centered Masthead */}
       <AuthMasthead />
 
-      {/* Auth Card (Surface Level 2) */}
-      <main className="bg-surface-subpanel dark:bg-surface-subpanel rounded-lg border border-border-prominent dark:border-border-prominent shadow-keylight overflow-hidden flex flex-col shadow-2xl shadow-black/50">
+      {/* Auth Card Box */}
+      <div className="bg-surface-subpanel rounded-xl border border-border-subtle surface-level-2 overflow-hidden flex flex-col shadow-2xl shadow-black/50">
         <AuthModeTabs activeTab={activeTab} onTabChange={onTabChange} />
 
         <div className="p-6">
@@ -102,7 +102,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({
             />
           )}
         </div>
-      </main>
+      </div>
 
       {/* Architecture Context Footer */}
       <AuthFooter />
