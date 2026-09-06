@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { DesignSystemShowcase } from './components/DesignSystemShowcase'
+import { AuthCard } from './components/auth/AuthCard'
 import { getApiBaseUrl, getCentralHubUrl, getOrganizationUrl, getSubdomain } from './utils/url'
 
 interface HealthStatus {
@@ -119,7 +119,6 @@ export default function App({
   const invitationToken = isInvitationRoute ? activePath.replace(/^\/invitations\//, '').split('/')[0] : null
 
   // Public Invitation State
-  const [showShowcase, setShowShowcase] = useState(activePath === '/design-system')
   const [publicInvitation, setPublicInvitation] = useState<PublicInvitation | null>(null)
   const [loadingInvitation, setLoadingInvitation] = useState<boolean>(Boolean(invitationToken))
   const [invitationError, setInvitationError] = useState<string | null>(null)
@@ -1979,182 +1978,49 @@ export default function App({
     )
   }
 
-  if (showShowcase || activePath === '/design-system') {
-    return (
-      <DesignSystemShowcase
-        onBack={() => {
-          setShowShowcase(false)
-          if (typeof window !== 'undefined' && window.location.pathname === '/design-system') {
-            window.history.pushState({}, '', '/')
-          }
-        }}
-      />
-    )
-  }
-
   // --- RENDER CENTRAL HUB (Apex domain context) ---
   return (
     <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', minHeight: '100vh', backgroundColor: '#0f172a', color: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2rem' }}>
-      <header style={{ textAlign: 'center', marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '3rem', fontWeight: 800, margin: 0, background: 'linear-gradient(to right, #38bdf8, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-          ZedDesk
-        </h1>
-        <p style={{ fontSize: '1.25rem', color: '#94a3b8', marginTop: '0.5rem' }}>
-          Multi-tenant AI-Powered Helpdesk
-        </p>
-        <div style={{ marginTop: '1.25rem' }}>
-          <button
-            type="button"
-            data-testid="view-showcase-btn"
-            onClick={() => setShowShowcase(true)}
-            style={{
-              padding: '0.5rem 1.25rem',
-              borderRadius: '0.25rem',
-              backgroundColor: '#4F46E5',
-              color: 'white',
-              border: 'none',
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontSize: '0.875rem',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.20)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-            }}
-          >
-            <span>🎨</span>
-            <span>View Design System & UI Primitives</span>
-          </button>
-        </div>
-      </header>
+      {token && user && (
+        <header style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <h1 style={{ fontSize: '3rem', fontWeight: 800, margin: 0, background: 'linear-gradient(to right, #38bdf8, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            ZedDesk
+          </h1>
+          <p style={{ fontSize: '1.25rem', color: '#94a3b8', marginTop: '0.5rem' }}>
+            Multi-tenant AI-Powered Helpdesk
+          </p>
+        </header>
+      )}
 
       <div style={{ maxWidth: '40rem', width: '100%', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         {/* Central Hub Main Content */}
         {!token || !user ? (
-          <main style={{ backgroundColor: '#1e293b', borderRadius: '0.75rem', padding: '2rem', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)', border: '1px solid #334155' }}>
-            <div role="tablist" style={{ display: 'flex', borderBottom: '1px solid #334155', marginBottom: '1.5rem' }}>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'login'}
-                onClick={() => { setActiveTab('login'); setLoginError(null); setRegError(null) }}
-                style={{ flex: 1, padding: '0.75rem', fontWeight: 600, background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: activeTab === 'login' ? '2px solid #38bdf8' : '2px solid transparent', color: activeTab === 'login' ? '#38bdf8' : '#94a3b8', cursor: 'pointer' }}
-              >
-                Log In
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'register'}
-                onClick={() => { setActiveTab('register'); setLoginError(null); setRegError(null) }}
-                style={{ flex: 1, padding: '0.75rem', fontWeight: 600, background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: activeTab === 'register' ? '2px solid #38bdf8' : '2px solid transparent', color: activeTab === 'register' ? '#38bdf8' : '#94a3b8', cursor: 'pointer' }}
-              >
-                Register
-              </button>
-            </div>
-
-            {activeTab === 'login' ? (
-              <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Central Hub Login</h2>
-                {loginError && (
-                  <div style={{ backgroundColor: '#7f1d1d', color: '#f87171', padding: '0.75rem', borderRadius: '0.375rem', fontSize: '0.875rem' }}>
-                    {loginError}
-                  </div>
-                )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                  <label htmlFor="login-email" style={{ fontSize: '0.875rem', color: '#cbd5e1' }}>Email</label>
-                  <input
-                    id="login-email"
-                    type="email"
-                    required
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    style={{ padding: '0.5rem 0.75rem', borderRadius: '0.375rem', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#f8fafc' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                  <label htmlFor="login-password" style={{ fontSize: '0.875rem', color: '#cbd5e1' }}>Password</label>
-                  <input
-                    id="login-password"
-                    type="password"
-                    required
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    style={{ padding: '0.5rem 0.75rem', borderRadius: '0.375rem', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#f8fafc' }}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={isLoggingIn}
-                  style={{ marginTop: '0.5rem', padding: '0.625rem', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '0.375rem', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  {isLoggingIn ? 'Logging in...' : 'Log In'}
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <h2 style={{ fontSize: '1.25rem', margin: 0 }}>User Registration</h2>
-                {regError && (
-                  <div style={{ backgroundColor: '#7f1d1d', color: '#f87171', padding: '0.75rem', borderRadius: '0.375rem', fontSize: '0.875rem' }}>
-                    {regError}
-                  </div>
-                )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                  <label htmlFor="reg-name" style={{ fontSize: '0.875rem', color: '#cbd5e1' }}>Name</label>
-                  <input
-                    id="reg-name"
-                    type="text"
-                    required
-                    value={regName}
-                    onChange={(e) => setRegName(e.target.value)}
-                    style={{ padding: '0.5rem 0.75rem', borderRadius: '0.375rem', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#f8fafc' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                  <label htmlFor="reg-email" style={{ fontSize: '0.875rem', color: '#cbd5e1' }}>Email</label>
-                  <input
-                    id="reg-email"
-                    type="email"
-                    required
-                    value={regEmail}
-                    onChange={(e) => setRegEmail(e.target.value)}
-                    style={{ padding: '0.5rem 0.75rem', borderRadius: '0.375rem', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#f8fafc' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                  <label htmlFor="reg-password" style={{ fontSize: '0.875rem', color: '#cbd5e1' }}>Password</label>
-                  <input
-                    id="reg-password"
-                    type="password"
-                    required
-                    minLength={8}
-                    value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    style={{ padding: '0.5rem 0.75rem', borderRadius: '0.375rem', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#f8fafc' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                  <label htmlFor="reg-password-confirm" style={{ fontSize: '0.875rem', color: '#cbd5e1' }}>Confirm Password</label>
-                  <input
-                    id="reg-password-confirm"
-                    type="password"
-                    required
-                    minLength={8}
-                    value={regPasswordConfirm}
-                    onChange={(e) => setRegPasswordConfirm(e.target.value)}
-                    style={{ padding: '0.5rem 0.75rem', borderRadius: '0.375rem', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#f8fafc' }}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={isRegistering}
-                  style={{ marginTop: '0.5rem', padding: '0.625rem', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '0.375rem', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  {isRegistering ? 'Registering...' : 'Register'}
-                </button>
-              </form>
-            )}
-          </main>
+          <AuthCard
+            activeTab={activeTab}
+            onTabChange={(tab) => {
+              setActiveTab(tab)
+              setLoginError(null)
+              setRegError(null)
+            }}
+            loginEmail={loginEmail}
+            setLoginEmail={setLoginEmail}
+            loginPassword={loginPassword}
+            setLoginPassword={setLoginPassword}
+            loginError={loginError}
+            isLoggingIn={isLoggingIn}
+            onLoginSubmit={handleLogin}
+            regName={regName}
+            setRegName={setRegName}
+            regEmail={regEmail}
+            setRegEmail={setRegEmail}
+            regPassword={regPassword}
+            setRegPassword={setRegPassword}
+            regPasswordConfirm={regPasswordConfirm}
+            setRegPasswordConfirm={setRegPasswordConfirm}
+            regError={regError}
+            isRegistering={isRegistering}
+            onRegisterSubmit={handleRegister}
+          />
         ) : (
           <main style={{ backgroundColor: '#1e293b', borderRadius: '0.75rem', padding: '2rem', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #334155', paddingBottom: '1rem' }}>
