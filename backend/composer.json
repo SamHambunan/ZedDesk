@@ -34,6 +34,15 @@
         }
     },
     "scripts": {
+        "test": [
+            "@php artisan test"
+        ],
+        "seed": [
+            "@php artisan db:seed"
+        ],
+        "verify": [
+            "@php artisan test tests/Feature/Seeder tests/Feature/Tenancy"
+        ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"

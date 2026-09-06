@@ -1,11 +1,60 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# ZedDesk Backend API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Multi-tenant helpdesk platform backend API powered by Laravel 11, PostgreSQL, Redis, and Sanctum token authentication.
+
+## Automated Seeder & Baseline Verification (Stage 1)
+
+### 1. Seeding the Database in Docker
+To populate the database with the canonical test organizations, users, roles, and sample teams:
+```bash
+docker compose exec backend php artisan db:seed
+# Or using the composer shortcut:
+docker compose exec backend composer seed
+```
+
+### 2. Canonical Seeded Baseline Credentials
+The seeder runs idempotently and provisions two isolated organizations:
+
+#### Acme Organization (`acme.localhost`)
+| Role | Email | Password | Assigned Teams |
+|---|---|---|---|
+| **Admin** | `admin@acme.test` | `password` | `Billing Support` |
+| **Agent** | `agent@acme.test` | `password` | `Support Tier 1`, `Billing Support` |
+
+- **Sample Teams:**
+  - `Support Tier 1`: First-tier technical support and ticket triaging (Member: `agent@acme.test`).
+  - `Billing Support`: Customer billing, subscription, and invoicing support (Members: `admin@acme.test`, `agent@acme.test`).
+
+#### Beta Organization (`beta.localhost`)
+| Role | Email | Password | Assigned Teams |
+|---|---|---|---|
+| **Admin** | `admin@beta.test` | `password` | `Beta Escalations` |
+| **Agent** | `agent@beta.test` | `password` | `Beta Support` |
+
+- **Sample Teams:**
+  - `Beta Support`: Customer success and onboarding (Member: `agent@beta.test`).
+  - `Beta Escalations`: Critical escalations and priority support (Member: `admin@beta.test`).
+
+### 3. Running Verification Tests in Docker
+
+Run all backend Pest feature and unit tests:
+```bash
+docker compose exec backend php artisan test
+# Or using composer:
+docker compose exec backend composer test
+```
+
+Run tenancy and seeder verification tests specifically:
+```bash
+docker compose exec backend composer verify
+```
+
+Run frontend Vitest tests:
+```bash
+docker compose exec frontend npm test
+```
+
+---
 
 ## About Laravel
 
