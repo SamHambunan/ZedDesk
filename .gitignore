@@ -22,3 +22,6 @@
 /backend/storage/framework/views/*
 /backend/storage/logs/*
 .env
+/.stitch
+DESIGN.md
+frontend/.stitch
