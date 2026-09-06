@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { DesignSystemShowcase } from './components/DesignSystemShowcase'
 import { getApiBaseUrl, getCentralHubUrl, getOrganizationUrl, getSubdomain } from './utils/url'
 
 interface HealthStatus {
@@ -118,6 +119,7 @@ export default function App({
   const invitationToken = isInvitationRoute ? activePath.replace(/^\/invitations\//, '').split('/')[0] : null
 
   // Public Invitation State
+  const [showShowcase, setShowShowcase] = useState(activePath === '/design-system')
   const [publicInvitation, setPublicInvitation] = useState<PublicInvitation | null>(null)
   const [loadingInvitation, setLoadingInvitation] = useState<boolean>(Boolean(invitationToken))
   const [invitationError, setInvitationError] = useState<string | null>(null)
@@ -1977,6 +1979,19 @@ export default function App({
     )
   }
 
+  if (showShowcase || activePath === '/design-system') {
+    return (
+      <DesignSystemShowcase
+        onBack={() => {
+          setShowShowcase(false)
+          if (typeof window !== 'undefined' && window.location.pathname === '/design-system') {
+            window.history.pushState({}, '', '/')
+          }
+        }}
+      />
+    )
+  }
+
   // --- RENDER CENTRAL HUB (Apex domain context) ---
   return (
     <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', minHeight: '100vh', backgroundColor: '#0f172a', color: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2rem' }}>
@@ -1987,6 +2002,30 @@ export default function App({
         <p style={{ fontSize: '1.25rem', color: '#94a3b8', marginTop: '0.5rem' }}>
           Multi-tenant AI-Powered Helpdesk
         </p>
+        <div style={{ marginTop: '1.25rem' }}>
+          <button
+            type="button"
+            data-testid="view-showcase-btn"
+            onClick={() => setShowShowcase(true)}
+            style={{
+              padding: '0.5rem 1.25rem',
+              borderRadius: '0.25rem',
+              backgroundColor: '#4F46E5',
+              color: 'white',
+              border: 'none',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.20)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <span>🎨</span>
+            <span>View Design System & UI Primitives</span>
+          </button>
+        </div>
       </header>
 
       <div style={{ maxWidth: '40rem', width: '100%', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
