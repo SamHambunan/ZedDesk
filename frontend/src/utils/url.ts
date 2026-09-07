@@ -1,5 +1,11 @@
 export function getSubdomain(hostname?: string): string | null {
-  const host = hostname ?? (typeof window !== 'undefined' && window.location?.hostname ? window.location.hostname : '')
+  const rawHost = hostname ?? (typeof window !== 'undefined' && window.location?.hostname ? window.location.hostname : '')
+  if (!rawHost) {
+    return null
+  }
+
+  // Strip port if present (e.g. acme.localhost:5173 -> acme.localhost)
+  const host = rawHost.split(':')[0]
   if (!host || host === 'localhost' || host === '127.0.0.1') {
     return null
   }
@@ -48,7 +54,8 @@ export function getCentralHubUrl(): string {
   if (typeof window === 'undefined' || !window.location) return 'http://localhost:5173'
   const protocol = window.location.protocol || 'http:'
   const port = window.location.port ? `:${window.location.port}` : ''
-  const host = window.location.hostname || 'localhost'
+  const rawHost = window.location.hostname || 'localhost'
+  const host = rawHost.split(':')[0]
 
   let baseHost = 'localhost'
   if (!host.endsWith('.localhost') && host !== 'localhost' && host !== '127.0.0.1') {
@@ -62,7 +69,8 @@ export function getCentralHubUrl(): string {
 }
 
 export function getOrganizationUrl(slug: string): string {
-  const host = typeof window !== 'undefined' && window.location?.hostname ? window.location.hostname : 'localhost'
+  const rawHost = typeof window !== 'undefined' && window.location?.hostname ? window.location.hostname : 'localhost'
+  const host = rawHost.split(':')[0]
   const port = typeof window !== 'undefined' && window.location?.port ? `:${window.location.port}` : ''
   const protocol = typeof window !== 'undefined' && window.location?.protocol ? window.location.protocol : 'http:'
 

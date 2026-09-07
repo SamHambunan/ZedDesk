@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import App from './App'
+import { queryClient } from './lib/query-client'
 
 describe('Tenant Subdomain Workspace Shell', () => {
   const originalFetch = global.fetch
@@ -8,6 +9,7 @@ describe('Tenant Subdomain Workspace Shell', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     localStorage.clear()
+    queryClient.clear()
   })
 
   afterEach(() => {
@@ -170,5 +172,66 @@ describe('Tenant Subdomain Workspace Shell', () => {
       expect(screen.getByTestId('workspace-404')).toBeInTheDocument()
       expect(screen.getByText(/organization not found/i)).toBeInTheDocument()
     })
+  })
+
+  it('detects subdomain with port {slug}.localhost:5173 and mounts Workspace Shell with Operational Overview dashboard', async () => {
+    localStorage.setItem('zeddesk_token', 'mock-port-admin-token')
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/workspace')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            organization: {
+              id: 1,
+              name: 'Acme Corp Support',
+              slug: 'acme',
+            },
+            user: {
+              id: 10,
+              name: 'Alice Admin',
+              email: 'admin@acme.test',
+            },
+            role: 'admin',
+          }),
+        } as Response)
+      }
+      return Promise.reject(new Error(`Unhandled URL: ${url}`))
+    })
+
+    render(<App hostname="acme.localhost:5173" />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('workspace-org-name')).toHaveTextContent('Acme Corp Support')
+      expect(screen.getByTestId('workspace-slug')).toHaveTextContent('acme')
+    })
+
+    // Stitch Screen 58931638cff14be4843b2db8e097606c: Operational Overview Dashboard elements
+    expect(screen.getByText('Operational Overview')).toBeInTheDocument()
+    expect(screen.getByText('Invite Member')).toBeInTheDocument()
+
+    // Telemetry metric cards
+    expect(screen.getByText('Total Members')).toBeInTheDocument()
+    expect(screen.getByText('14')).toBeInTheDocument()
+    expect(screen.getByText('+2 this week')).toBeInTheDocument()
+    expect(screen.getByText('Active Teams')).toBeInTheDocument()
+    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.getByText('Open Tickets')).toBeInTheDocument()
+    expect(screen.getByText('24')).toBeInTheDocument()
+    expect(screen.getByText('SLA Status')).toBeInTheDocument()
+    expect(screen.getByText('99.4%')).toBeInTheDocument()
+
+    // Recent activity & quick routing
+    expect(screen.getByText('Recent Activity')).toBeInTheDocument()
+    expect(screen.getByText('Sarah Jenkins joined the workspace.')).toBeInTheDocument()
+    expect(screen.getByText('Quick Routing')).toBeInTheDocument()
+    expect(screen.getAllByText('Support Tier 1').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('12 active agents • 8 tickets open')).toBeInTheDocument()
+
+    // Active route highlight on Overview with 2px #6366F1 border
+    const overviewBtn = screen.getByTestId('nav-overview')
+    expect(overviewBtn).toHaveClass('border-[#6366F1]')
+    expect(overviewBtn).toHaveClass('border-l-2')
   })
 })
