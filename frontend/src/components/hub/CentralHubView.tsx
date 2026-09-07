@@ -6,10 +6,10 @@ import { PendingInvitesBanner, type PendingInvitationItem } from './PendingInvit
 import { UserProfileCard } from './UserProfileCard'
 import type { HubOrganizationItem } from './OrganizationCard'
 import { AuthCard } from '../auth/AuthCard'
-import { Modal } from '../ui/Modal'
+import { CreateOrganizationModal } from './CreateOrganizationModal'
 import { Input } from '../ui/Input'
 import { Button } from '../ui/Button'
-import { getApiBaseUrl } from '../../utils/url'
+import { getApiBaseUrl, getOrganizationUrl } from '../../utils/url'
 
 export interface CentralHubUser {
   readonly id: number
@@ -39,10 +39,11 @@ interface RawOrganization {
 function extractErrorMessage(data: unknown, fallback: string): string {
   if (data && typeof data === 'object') {
     const errorObj = data as { message?: string; errors?: Record<string, string[]> }
-    if (errorObj.message) return errorObj.message
     if (errorObj.errors) {
-      return Object.values(errorObj.errors).flat().join(', ')
+      const errorList = Object.values(errorObj.errors).flat()
+      if (errorList.length > 0) return errorList.join(', ')
     }
+    if (errorObj.message) return errorObj.message
   }
   return fallback
 }
@@ -288,12 +289,22 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
       }
       return data
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['organizations'] })
       setIsCreateOrgModalOpen(false)
       setNewOrgName('')
       setNewOrgSlug('')
       setCreateOrgError(null)
+
+      const targetSlug = data?.organization?.slug || variables?.slug
+      if (targetSlug) {
+        handleLaunchWorkspace({
+          id: data?.organization?.id || 0,
+          name: data?.organization?.name || variables?.name || '',
+          slug: targetSlug,
+          role: data?.role || 'admin',
+        })
+      }
     },
     onError: (err: Error) => {
       setCreateOrgError(err.message)
@@ -339,9 +350,7 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
 
   const handleLaunchWorkspace = (org: HubOrganizationItem) => {
     if (typeof window !== 'undefined') {
-      const port = window.location.port ? `:${window.location.port}` : ''
-      const protocol = window.location.protocol || 'http:'
-      window.location.href = `${protocol}//${org.slug}.localhost${port}`
+      window.location.href = getOrganizationUrl(org.slug)
     }
   }
 
@@ -503,76 +512,20 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
       </main>
 
       {/* Create Organization Modal */}
-      <Modal
+      <CreateOrganizationModal
         isOpen={isCreateOrgModalOpen}
-        onClose={() => setIsCreateOrgModalOpen(false)}
-        title="Create Organization"
-        description="Establish a new multi-tenant support organization workspace."
-      >
-        <form onSubmit={handleCreateOrgSubmit} className="space-y-4 text-left">
-          {createOrgError && (
-            <div role="alert" className="bg-sentiment-critical/10 border border-sentiment-critical/20 rounded-lg p-3 text-sentiment-critical text-body-compact">
-              {createOrgError}
-            </div>
-          )}
-
-          <div className="space-y-1.5">
-            <label htmlFor="modal-org-name" className="font-label-regular text-label-regular text-text-secondary block">
-              Organization Name
-            </label>
-            <Input
-              id="modal-org-name"
-              type="text"
-              required
-              placeholder="Acme Corporation"
-              value={newOrgName}
-              onChange={(e) => {
-                setNewOrgName(e.target.value)
-                if (!newOrgSlug) {
-                  setNewOrgSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '-'))
-                }
-              }}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="modal-org-slug" className="font-label-regular text-label-regular text-text-secondary block">
-              Subdomain Slug
-            </label>
-            <div className="flex items-center">
-              <Input
-                id="modal-org-slug"
-                type="text"
-                required
-                placeholder="acme"
-                value={newOrgSlug}
-                onChange={(e) => setNewOrgSlug(e.target.value.toLowerCase())}
-                className="rounded-r-none"
-              />
-              <span className="h-9 px-3 bg-surface-panel border border-l-0 border-border-subtle rounded-r text-body-compact text-text-muted flex items-center select-none shrink-0">
-                .zeddesk.app
-              </span>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-border-subtle">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setIsCreateOrgModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={createOrgMutation.isPending}
-            >
-              {createOrgMutation.isPending ? 'Creating...' : 'Create Organization'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
+        onClose={() => {
+          setIsCreateOrgModalOpen(false)
+          setCreateOrgError(null)
+        }}
+        onSubmit={({ name, slug }) => {
+          setCreateOrgError(null)
+          createOrgMutation.mutate({ name, slug })
+        }}
+        isSubmitting={createOrgMutation.isPending}
+        error={createOrgError}
+        onClearError={() => setCreateOrgError(null)}
+      />
       {/* Baseline Telemetry for Test Harness */}
       <div style={{ display: 'none' }} aria-hidden="true">
         <span data-testid="frontend-status">Operational</span>
