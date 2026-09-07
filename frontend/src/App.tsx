@@ -1,8 +1,9 @@
-import { useEffect, useState, useContext } from 'react'
+﻿import { useEffect, useState, useContext } from 'react'
 import { QueryClientContext, QueryClientProvider } from '@tanstack/react-query'
 import { queryClient as defaultQueryClient } from './lib/query-client'
 import { CentralHubView } from './components/hub'
 import { WorkspaceShell } from './components/workspace'
+import { TeamsView, TeamManagementView } from './components/teams'
 import { useWorkspace } from './hooks/useWorkspace'
 import { getApiBaseUrl, getCentralHubUrl, getOrganizationUrl, getSubdomain } from './utils/url'
 
@@ -1144,104 +1145,23 @@ function AppInner({
             )}
 
             {!loadingWorkspace && workspaceData && workspaceView === 'teams' && (
-              <div data-testid="teams-view" style={{ backgroundColor: '#1e293b', borderRadius: '0.75rem', padding: '2rem', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                  <div>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>
-                      Teams
-                    </h2>
-                    <p style={{ color: '#94a3b8', fontSize: '0.875rem', margin: 0 }}>
-                      Functional teams within {workspaceData.organization.name} for ticket routing and agent collaboration.
-                    </p>
-                  </div>
-                  {workspaceData.role === 'admin' && (
-                    <button
-                      type="button"
-                      onClick={() => setWorkspaceView('team-management')}
-                      style={{ padding: '0.5rem 1rem', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '0.375rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      Manage Teams
-                    </button>
-                  )}
-                  {workspaceData.role === 'agent' && (
-                    <span style={{ backgroundColor: '#14532d', color: '#86efac', padding: '0.35rem 0.75rem', borderRadius: '0.375rem', fontSize: '0.75rem', fontWeight: 700 }}>
-                      Agent View (Read-Only)
-                    </span>
-                  )}
-                </div>
-
-                {loadingTeams ? (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
-                    Loading teams...
-                  </div>
-                ) : teamsError ? (
-                  <div style={{ padding: '0.75rem', backgroundColor: '#7f1d1d', color: '#fca5a5', borderRadius: '0.375rem', fontSize: '0.875rem' }}>
-                    {teamsError}
-                  </div>
-                ) : teams.length === 0 ? (
-                  <div data-testid="no-teams-message" style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b' }}>
-                    <p style={{ fontSize: '1rem', margin: 0 }}>No teams configured in this organization.</p>
-                  </div>
-                ) : (
-                  <div data-testid="teams-list" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                    {teams.map((team) => (
-                      <div
-                        key={team.id}
-                        data-testid={`team-card-${team.id}`}
-                        style={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '0.5rem', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}
-                      >
-                        <div>
-                          <h3 data-testid={`team-name-${team.id}`} style={{ fontSize: '1.125rem', fontWeight: 600, margin: '0 0 0.25rem 0', color: '#f8fafc' }}>
-                            {team.name}
-                          </h3>
-                          <p data-testid={`team-description-${team.id}`} style={{ fontSize: '0.875rem', color: '#94a3b8', margin: 0 }}>
-                            {team.description || 'No description provided'}
-                          </p>
-                        </div>
-
-                        <div>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-                            Members ({team.members?.length || 0})
-                          </div>
-                          <div data-testid={`team-members-list-${team.id}`} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                            {(!team.members || team.members.length === 0) ? (
-                              <span data-testid={`team-no-members-${team.id}`} style={{ color: '#64748b', fontSize: '0.8125rem', fontStyle: 'italic' }}>
-                                No members assigned
-                              </span>
-                            ) : (
-                              team.members.map((member) => (
-                                <div
-                                  key={member.id}
-                                  data-testid={`team-member-${team.id}-${member.id}`}
-                                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#1e293b', border: '1px solid #334155', padding: '0.35rem 0.65rem', borderRadius: '0.375rem', fontSize: '0.8125rem' }}
-                                >
-                                  <span style={{ fontWeight: 500, color: '#f8fafc' }}>{member.user?.name || `Member #${member.id}`}</span>
-                                  <span style={{ color: '#94a3b8' }}>({member.user?.email || 'N/A'})</span>
-                                  <span style={{ backgroundColor: member.role === 'admin' ? '#312e81' : '#14532d', color: member.role === 'admin' ? '#a5b4fc' : '#86efac', padding: '0.1rem 0.35rem', borderRadius: '0.2rem', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>
-                                    {member.role}
-                                  </span>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <TeamsView
+                teams={teams}
+                isLoading={loadingTeams}
+                error={teamsError}
+              />
             )}
 
             {!loadingWorkspace && workspaceData && workspaceView === 'team-management' && workspaceData.role !== 'admin' && (
-              <div data-testid="team-management-forbidden" style={{ backgroundColor: '#1e293b', border: '1px solid #7f1d1d', borderRadius: '0.75rem', padding: '2rem', textAlign: 'center' }}>
-                <h3 style={{ fontSize: '1.25rem', color: '#f87171', marginTop: 0 }}>Access Denied</h3>
-                <p style={{ color: '#cbd5e1', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+              <div data-testid="team-management-forbidden" className="bg-surface-subpanel border border-sentiment-negative/30 rounded-xl p-8 text-center">
+                <h3 className="text-headline-sm font-headline-sm text-sentiment-negative mb-2">Access Denied</h3>
+                <p className="text-body-default text-text-secondary mb-6">
                   Team management is restricted to Administrators.
                 </p>
                 <button
                   type="button"
                   onClick={() => setWorkspaceView('teams')}
-                  style={{ padding: '0.5rem 1rem', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '0.375rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}
+                  className="h-9 px-5 text-label-regular font-label-regular bg-primary-container hover:bg-primary-dark text-white rounded shadow-keylight-primary transition-colors"
                 >
                   View Teams
                 </button>
@@ -1249,264 +1169,46 @@ function AppInner({
             )}
 
             {!loadingWorkspace && workspaceData && workspaceView === 'team-management' && workspaceData.role === 'admin' && (
-              <div data-testid="team-management-view" style={{ backgroundColor: '#1e293b', borderRadius: '0.75rem', padding: '2rem', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                <div>
-                  <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>
-                    Team Management
-                  </h2>
-                  <p style={{ color: '#94a3b8', fontSize: '0.875rem', margin: 0 }}>
-                    Create and manage functional teams and assign organization members.
-                  </p>
-                </div>
-
-                {/* Team Creation Form */}
-                <div style={{ backgroundColor: '#0f172a', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #334155' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: '0 0 1rem 0' }}>
-                    Create New Team
-                  </h3>
-
-                  {createTeamSuccess && (
-                    <div data-testid="team-create-success" style={{ padding: '0.75rem', backgroundColor: '#064e3b', color: '#6ee7b7', borderRadius: '0.375rem', marginBottom: '1rem', fontSize: '0.875rem' }}>
-                      {createTeamSuccess}
-                    </div>
-                  )}
-
-                  {createTeamError && (
-                    <div data-testid="team-create-error" style={{ padding: '0.75rem', backgroundColor: '#7f1d1d', color: '#fca5a5', borderRadius: '0.375rem', marginBottom: '1rem', fontSize: '0.875rem' }}>
-                      {createTeamError}
-                    </div>
-                  )}
-
-                  <form data-testid="create-team-form" onSubmit={handleCreateTeam} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                      <div style={{ flex: 1, minWidth: '15rem', display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                        <label htmlFor="team-name" style={{ fontSize: '0.875rem', color: '#cbd5e1' }}>
-                          Team Name
-                        </label>
-                        <input
-                          id="team-name"
-                          data-testid="team-name-input"
-                          type="text"
-                          required
-                          placeholder="e.g. Tier 1 Support"
-                          value={newTeamName}
-                          onChange={(e) => setNewTeamName(e.target.value)}
-                          style={{ padding: '0.5rem 0.75rem', borderRadius: '0.375rem', border: '1px solid #475569', backgroundColor: '#1e293b', color: '#f8fafc' }}
-                        />
-                      </div>
-
-                      <div style={{ flex: 2, minWidth: '18rem', display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                        <label htmlFor="team-desc" style={{ fontSize: '0.875rem', color: '#cbd5e1' }}>
-                          Description
-                        </label>
-                        <input
-                          id="team-desc"
-                          data-testid="team-description-input"
-                          type="text"
-                          placeholder="Team responsibilities or scope"
-                          value={newTeamDesc}
-                          onChange={(e) => setNewTeamDesc(e.target.value)}
-                          style={{ padding: '0.5rem 0.75rem', borderRadius: '0.375rem', border: '1px solid #475569', backgroundColor: '#1e293b', color: '#f8fafc' }}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <button
-                        type="submit"
-                        data-testid="team-create-submit"
-                        disabled={isCreatingTeam}
-                        style={{ padding: '0.5rem 1.25rem', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '0.375rem', fontWeight: 600, fontSize: '0.875rem', cursor: isCreatingTeam ? 'not-allowed' : 'pointer' }}
-                      >
-                        {isCreatingTeam ? 'Creating...' : 'Create Team'}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
-                {/* Teams List and Member Assignment */}
-                <div>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: '0 0 1rem 0' }}>
-                    Active Teams
-                  </h3>
-
-                  {loadingTeams ? (
-                    <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
-                      Loading teams...
-                    </div>
-                  ) : teams.length === 0 ? (
-                    <p style={{ color: '#64748b', fontSize: '0.875rem' }}>No teams created yet.</p>
-                  ) : (
-                    <div data-testid="manage-teams-list" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                      {teams.map((team) => (
-                        <div
-                          key={team.id}
-                          data-testid={`team-card-${team.id}`}
-                          style={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '0.5rem', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
-                        >
-                          {/* Team Info / Edit Mode */}
-                          {editingTeamId === team.id ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', backgroundColor: '#1e293b', padding: '1rem', borderRadius: '0.375rem' }}>
-                              <h4 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: '#93c5fd' }}>Edit Team</h4>
-                              {updateTeamError && (
-                                <div style={{ color: '#fca5a5', fontSize: '0.8125rem' }}>{updateTeamError}</div>
-                              )}
-                              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                                <input
-                                  type="text"
-                                  data-testid={`edit-team-name-input-${team.id}`}
-                                  value={editTeamName}
-                                  onChange={(e) => setEditTeamName(e.target.value)}
-                                  placeholder="Team Name"
-                                  style={{ flex: 1, minWidth: '12rem', padding: '0.4rem 0.6rem', borderRadius: '0.25rem', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#f8fafc', fontSize: '0.875rem' }}
-                                />
-                                <input
-                                  type="text"
-                                  data-testid={`edit-team-desc-input-${team.id}`}
-                                  value={editTeamDesc}
-                                  onChange={(e) => setEditTeamDesc(e.target.value)}
-                                  placeholder="Team Description"
-                                  style={{ flex: 2, minWidth: '15rem', padding: '0.4rem 0.6rem', borderRadius: '0.25rem', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#f8fafc', fontSize: '0.875rem' }}
-                                />
-                              </div>
-                              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                <button
-                                  type="button"
-                                  data-testid={`save-team-btn-${team.id}`}
-                                  onClick={() => handleSaveEditTeam(team.id)}
-                                  disabled={isUpdatingTeam}
-                                  style={{ padding: '0.35rem 0.75rem', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '0.25rem', fontSize: '0.8125rem', fontWeight: 600, cursor: isUpdatingTeam ? 'not-allowed' : 'pointer' }}
-                                >
-                                  {isUpdatingTeam ? 'Saving...' : 'Save'}
-                                </button>
-                                <button
-                                  type="button"
-                                  data-testid={`cancel-edit-team-btn-${team.id}`}
-                                  onClick={() => setEditingTeamId(null)}
-                                  style={{ padding: '0.35rem 0.75rem', backgroundColor: '#334155', color: '#cbd5e1', border: 'none', borderRadius: '0.25rem', fontSize: '0.8125rem', cursor: 'pointer' }}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
-                              <div>
-                                <h4 data-testid={`team-name-${team.id}`} style={{ fontSize: '1.125rem', fontWeight: 600, margin: '0 0 0.25rem 0', color: '#f8fafc' }}>
-                                  {team.name}
-                                </h4>
-                                <p data-testid={`team-description-${team.id}`} style={{ fontSize: '0.875rem', color: '#94a3b8', margin: 0 }}>
-                                  {team.description || 'No description provided'}
-                                </p>
-                              </div>
-                              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                <button
-                                  type="button"
-                                  data-testid={`edit-team-btn-${team.id}`}
-                                  onClick={() => handleStartEditTeam(team)}
-                                  style={{ padding: '0.35rem 0.75rem', backgroundColor: '#334155', color: '#e2e8f0', border: 'none', borderRadius: '0.375rem', fontSize: '0.8125rem', cursor: 'pointer' }}
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  data-testid={`delete-team-btn-${team.id}`}
-                                  onClick={() => handleDeleteTeam(team.id)}
-                                  disabled={deletingTeamId === team.id}
-                                  style={{ padding: '0.35rem 0.75rem', backgroundColor: '#7f1d1d', color: '#fca5a5', border: 'none', borderRadius: '0.375rem', fontSize: '0.8125rem', fontWeight: 600, cursor: deletingTeamId === team.id ? 'not-allowed' : 'pointer' }}
-                                >
-                                  {deletingTeamId === team.id ? 'Deleting...' : 'Delete'}
-                                </button>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Member Assignment Section */}
-                          <div style={{ borderTop: '1px solid #1e293b', paddingTop: '1rem' }}>
-                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
-                              Assigned Members
-                            </div>
-
-                            {teamActionError[team.id] && (
-                              <div data-testid={`member-action-error-${team.id}`} style={{ padding: '0.5rem', backgroundColor: '#7f1d1d', color: '#fca5a5', borderRadius: '0.25rem', marginBottom: '0.75rem', fontSize: '0.8125rem' }}>
-                                {teamActionError[team.id]}
-                              </div>
-                            )}
-
-                            {/* Members List */}
-                            <div data-testid={`team-members-list-${team.id}`} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
-                              {(!team.members || team.members.length === 0) ? (
-                                <span data-testid={`team-no-members-${team.id}`} style={{ color: '#64748b', fontSize: '0.8125rem', fontStyle: 'italic' }}>
-                                  No members assigned
-                                </span>
-                              ) : (
-                                team.members.map((member) => (
-                                  <div
-                                    key={member.id}
-                                    data-testid={`team-member-${team.id}-${member.id}`}
-                                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#1e293b', border: '1px solid #334155', padding: '0.4rem 0.75rem', borderRadius: '0.375rem', fontSize: '0.8125rem' }}
-                                  >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                      <span style={{ fontWeight: 500, color: '#f8fafc' }}>{member.user?.name || `Member #${member.id}`}</span>
-                                      <span style={{ color: '#94a3b8' }}>({member.user?.email || 'N/A'})</span>
-                                      <span style={{ backgroundColor: member.role === 'admin' ? '#312e81' : '#14532d', color: member.role === 'admin' ? '#a5b4fc' : '#86efac', padding: '0.1rem 0.35rem', borderRadius: '0.2rem', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>
-                                        {member.role}
-                                      </span>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      data-testid={`remove-member-btn-${team.id}-${member.id}`}
-                                      onClick={() => handleRemoveMemberFromTeam(team.id, member.id)}
-                                      disabled={removingMemberKey === `${team.id}-${member.id}`}
-                                      style={{ padding: '0.2rem 0.5rem', backgroundColor: '#7f1d1d', color: '#fca5a5', border: 'none', borderRadius: '0.25rem', fontSize: '0.75rem', cursor: removingMemberKey === `${team.id}-${member.id}` ? 'not-allowed' : 'pointer' }}
-                                    >
-                                      {removingMemberKey === `${team.id}-${member.id}` ? 'Removing...' : 'Remove'}
-                                    </button>
-                                  </div>
-                                ))
-                              )}
-                            </div>
-
-                            {/* Add Member Dropdown */}
-                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                              <select
-                                data-testid={`add-member-select-${team.id}`}
-                                value={selectedMemberToAdd[team.id] || ''}
-                                onChange={(e) => setSelectedMemberToAdd((prev) => ({ ...prev, [team.id]: e.target.value }))}
-                                style={{ flex: 1, minWidth: '15rem', padding: '0.4rem 0.6rem', borderRadius: '0.375rem', border: '1px solid #475569', backgroundColor: '#1e293b', color: '#f8fafc', fontSize: '0.8125rem' }}
-                              >
-                                <option value="">{loadingMembers ? 'Loading members...' : 'Select Organization Member to add...'}</option>
-                                {orgMembers
-                                  .filter((m) => !team.members?.some((tm) => tm.id === m.id))
-                                  .map((m) => (
-                                    <option key={m.id} value={m.id}>
-                                      {m.user?.name || `Member #${m.id}`} ({m.user?.email || 'N/A'}) - {m.role.toUpperCase()}
-                                    </option>
-                                  ))}
-                              </select>
-                              <button
-                                type="button"
-                                data-testid={`add-member-btn-${team.id}`}
-                                onClick={() => handleAddMemberToTeam(team.id)}
-                                disabled={!selectedMemberToAdd[team.id] || addingMemberTeamId === team.id}
-                                style={{ padding: '0.4rem 0.85rem', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '0.375rem', fontSize: '0.8125rem', fontWeight: 600, cursor: (!selectedMemberToAdd[team.id] || addingMemberTeamId === team.id) ? 'not-allowed' : 'pointer' }}
-                              >
-                                {addingMemberTeamId === team.id ? 'Adding...' : 'Add Member'}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <TeamManagementView
+                teams={teams}
+                orgMembers={orgMembers}
+                isLoadingTeams={loadingTeams}
+                isLoadingMembers={loadingMembers}
+                createSuccess={createTeamSuccess}
+                createError={createTeamError}
+                newTeamName={newTeamName}
+                newTeamDescription={newTeamDesc}
+                isCreating={isCreatingTeam}
+                editingTeamId={editingTeamId}
+                editTeamName={editTeamName}
+                editTeamDescription={editTeamDesc}
+                isUpdating={isUpdatingTeam}
+                updateError={updateTeamError}
+                selectedMemberToAdd={selectedMemberToAdd}
+                addingMemberTeamId={addingMemberTeamId}
+                removingMemberKey={removingMemberKey}
+                deletingTeamId={deletingTeamId}
+                teamActionError={teamActionError}
+                onNameChange={setNewTeamName}
+                onDescChange={setNewTeamDesc}
+                onCreateSubmit={handleCreateTeam}
+                onStartEdit={handleStartEditTeam}
+                onEditNameChange={setEditTeamName}
+                onEditDescChange={setEditTeamDesc}
+                onSaveEdit={handleSaveEditTeam}
+                onCancelEdit={() => setEditingTeamId(null)}
+                onDelete={handleDeleteTeam}
+                onSelectMember={(teamId, value) =>
+                  setSelectedMemberToAdd((prev) => ({ ...prev, [teamId]: value }))
+                }
+                onAddMember={handleAddMemberToTeam}
+                onRemoveMember={handleRemoveMemberFromTeam}
+              />
             )}
 
       </WorkspaceShell>
     )
   }
-
   // --- RENDER CENTRAL HUB (Apex domain context) ---
   return <CentralHubView />
 }
