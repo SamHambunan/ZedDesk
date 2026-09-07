@@ -48,7 +48,7 @@ export const OrganizationGrid: React.FC<OrganizationGridProps> = ({
           <button
             type="button"
             onClick={onCreateNew}
-            aria-label="Create New Organization"
+            aria-label="+ Create New Organization"
             className="w-full bg-surface-panel border border-dashed border-border-prominent rounded-xl p-5 flex items-center justify-center gap-2 text-text-secondary hover:text-text-primary hover:border-accent-glow/50 hover:bg-surface-subpanel/50 transition-all mt-2 group cursor-pointer"
           >
             <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />

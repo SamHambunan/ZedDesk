@@ -255,4 +255,240 @@ describe('CentralHubView (Seam 2)', () => {
       expect(screen.getByRole('button', { name: /log in/i })).toBeInTheDocument()
     })
   })
+
+  describe('Organization Creation Flow (Ticket #17)', () => {
+    it('+ Create New Organization button opens the accessible modal dialog and previews URL in real-time', async () => {
+      const user = userEvent.setup()
+
+      global.fetch = vi.fn().mockImplementation((url: string) => {
+        if (url.endsWith('/api/health')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ status: 'ok', services: { database: 'connected', redis: 'connected' } }),
+          } as Response)
+        }
+        if (url.endsWith('/api/organizations')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [],
+          } as Response)
+        }
+        return Promise.reject(new Error(`Unhandled URL: ${url}`))
+      })
+
+      renderView('valid-token', { id: 1, name: 'Alex Vance', email: 'alex@example.com' })
+
+      await waitFor(() => {
+        expect(screen.getByText('Alex Vance')).toBeInTheDocument()
+      })
+
+      // Modal should not be in document initially
+      expect(screen.queryByRole('dialog', { name: /create new organization/i })).not.toBeInTheDocument()
+
+      // Click "+ Create New Organization" button
+      const createButton = screen.getByRole('button', { name: /\+? ?create new organization/i })
+      await user.click(createButton)
+
+      // Modal is opened
+      const modal = screen.getByRole('dialog', { name: /create new organization/i })
+      expect(modal).toBeInTheDocument()
+
+      // Form inputs exist
+      const orgNameInput = within(modal).getByLabelText(/organization name/i)
+      const slugInput = within(modal).getByLabelText(/workspace subdomain url/i)
+
+      // Typing organization name auto-generates slug and updates real-time preview
+      await user.type(orgNameInput, 'Stark Industries')
+      expect(slugInput).toHaveValue('stark-industries')
+      expect(within(modal).getByText('https://stark-industries.zeddesk.app')).toBeInTheDocument()
+      expect(within(modal).getByText('Subdomain is valid and available')).toBeInTheDocument()
+
+      // Can close modal via Cancel button
+      await user.click(within(modal).getByRole('button', { name: /cancel/i }))
+      expect(screen.queryByRole('dialog', { name: /create new organization/i })).not.toBeInTheDocument()
+    })
+
+    it('validates against reserved and invalid slugs client-side in the creation modal', async () => {
+      const user = userEvent.setup()
+
+      global.fetch = vi.fn().mockImplementation((url: string) => {
+        if (url.endsWith('/api/health')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ status: 'ok', services: { database: 'connected', redis: 'connected' } }),
+          } as Response)
+        }
+        if (url.endsWith('/api/organizations')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [],
+          } as Response)
+        }
+        return Promise.reject(new Error(`Unhandled URL: ${url}`))
+      })
+
+      renderView('valid-token', { id: 1, name: 'Alex Vance', email: 'alex@example.com' })
+
+      await waitFor(() => {
+        expect(screen.getByText('Alex Vance')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByRole('button', { name: /\+? ?create new organization/i }))
+
+      const modal = screen.getByRole('dialog', { name: /create new organization/i })
+      const orgNameInput = within(modal).getByLabelText(/organization name/i)
+      const slugInput = within(modal).getByLabelText(/workspace subdomain url/i)
+      const submitButton = within(modal).getByRole('button', { name: /create organization & launch/i })
+
+      await user.type(orgNameInput, 'Admin Operations')
+      // Manually set reserved slug
+      await user.clear(slugInput)
+      await user.type(slugInput, 'admin')
+
+      expect(within(modal).getByText(/reserved by the system/i)).toBeInTheDocument()
+      expect(submitButton).toBeDisabled()
+
+      // Test invalid characters (regex /^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+      await user.clear(slugInput)
+      await user.type(slugInput, '-invalid-')
+      expect(within(modal).getByText(/lowercase alphanumeric/i)).toBeInTheDocument()
+      expect(submitButton).toBeDisabled()
+    })
+
+    it('submits payload to POST /api/organizations, invalidates cache, and automatically navigates to subdomain', async () => {
+      const user = userEvent.setup()
+      let organizationsFetchCount = 0
+      let postPayload: unknown = null
+      let authHeader: string | null = null
+
+      global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (url.endsWith('/api/health')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ status: 'ok', services: { database: 'connected', redis: 'connected' } }),
+          } as Response)
+        }
+
+        if (url.endsWith('/api/organizations') && (!init?.method || init.method.toUpperCase() === 'GET')) {
+          organizationsFetchCount++
+          return Promise.resolve({
+            ok: true,
+            json: async () => [
+              { id: 101, name: 'Acme Support', slug: 'acme', role: 'admin', agents_count: 14 },
+            ],
+          } as Response)
+        }
+
+        if (url.endsWith('/api/organizations') && init?.method === 'POST') {
+          postPayload = JSON.parse(init.body as string)
+          authHeader = (init.headers as Record<string, string>)['Authorization'] || null
+          return Promise.resolve({
+            ok: true,
+            status: 201,
+            json: async () => ({
+              organization: {
+                id: 200,
+                name: 'Wayne Enterprises',
+                slug: 'wayne-enterprises',
+              },
+              role: 'admin',
+            }),
+          } as Response)
+        }
+
+        return Promise.reject(new Error(`Unhandled URL: ${url}`))
+      })
+
+      renderView('valid-token', { id: 1, name: 'Alex Vance', email: 'alex@example.com' })
+
+      await waitFor(() => {
+        expect(screen.getByText('Acme Support')).toBeInTheDocument()
+      })
+
+      const initialFetchCount = organizationsFetchCount
+
+      // Open modal
+      await user.click(screen.getByRole('button', { name: /\+? ?create new organization/i }))
+      const modal = screen.getByRole('dialog', { name: /create new organization/i })
+
+      // Fill in org name
+      await user.type(within(modal).getByLabelText(/organization name/i), 'Wayne Enterprises')
+
+      // Submit
+      const submitButton = within(modal).getByRole('button', { name: /create organization & launch/i })
+      await user.click(submitButton)
+
+      await waitFor(() => {
+        // Assert payload sent
+        expect(postPayload).toEqual({
+          name: 'Wayne Enterprises',
+          slug: 'wayne-enterprises',
+        })
+        expect(authHeader).toBe('Bearer valid-token')
+
+        // Assert query cache invalidated (refetched organizations)
+        expect(organizationsFetchCount).toBeGreaterThan(initialFetchCount)
+
+        // Assert automatic navigation to tenant subdomain
+        expect(window.location.href).toBe('http://wayne-enterprises.localhost:5173')
+
+        // Assert modal closed
+        expect(screen.queryByRole('dialog', { name: /create new organization/i })).not.toBeInTheDocument()
+      })
+    })
+
+    it('handles server-side 422 conflict and displays error in modal', async () => {
+      const user = userEvent.setup()
+
+      global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (url.endsWith('/api/health')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ status: 'ok', services: { database: 'connected', redis: 'connected' } }),
+          } as Response)
+        }
+
+        if (url.endsWith('/api/organizations') && (!init?.method || init.method.toUpperCase() === 'GET')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [],
+          } as Response)
+        }
+
+        if (url.endsWith('/api/organizations') && init?.method === 'POST') {
+          return Promise.resolve({
+            ok: false,
+            status: 422,
+            json: async () => ({
+              message: 'The slug has already been taken.',
+              errors: {
+                slug: ['The slug has already been taken.'],
+              },
+            }),
+          } as Response)
+        }
+
+        return Promise.reject(new Error(`Unhandled URL: ${url}`))
+      })
+
+      renderView('valid-token', { id: 1, name: 'Alex Vance', email: 'alex@example.com' })
+
+      await waitFor(() => {
+        expect(screen.getByText('Alex Vance')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByRole('button', { name: /\+? ?create new organization/i }))
+      const modal = screen.getByRole('dialog', { name: /create new organization/i })
+
+      await user.type(within(modal).getByLabelText(/organization name/i), 'Duplicate Org')
+      await user.click(within(modal).getByRole('button', { name: /create organization & launch/i }))
+
+      await waitFor(() => {
+        expect(within(modal).getByRole('alert')).toHaveTextContent(/slug has already been taken/i)
+      })
+
+      // Navigation should not have occurred
+      expect(window.location.href).toBe('http://localhost:5173')
+    })
+  })
 })

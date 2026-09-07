@@ -103,6 +103,60 @@ export interface HubContentData {
   }
 }
 
+export interface CreateOrganizationModalData {
+  readonly title: string
+  readonly orgNameLabel: string
+  readonly orgNamePlaceholder: string
+  readonly subdomainLabel: string
+  readonly subdomainSuffix: string
+  readonly subdomainPlaceholder: string
+  readonly previewProtocol: string
+  readonly previewPlaceholderDomain: string
+  readonly validSubdomainMessage: string
+  readonly invalidSubdomainMessage: string
+  readonly reservedSubdomainMessage: string
+  readonly minLengthMessage: string
+  readonly infoCallout: {
+    readonly title: string
+    readonly role: string
+    readonly prefix: string
+    readonly suffix: string
+  }
+  readonly cancelButton: string
+  readonly submitButton: string
+  readonly submittingButton: string
+  readonly reservedSlugs: readonly string[]
+}
+
+export const createOrgModalData: CreateOrganizationModalData = {
+  title: 'Create New Organization',
+  orgNameLabel: 'Organization Name',
+  orgNamePlaceholder: 'Enter company or team name',
+  subdomainLabel: 'Workspace Subdomain URL',
+  subdomainSuffix: '.zeddesk.app',
+  subdomainPlaceholder: 'acmecorp',
+  previewProtocol: 'https://',
+  previewPlaceholderDomain: 'https://[slug].zeddesk.app',
+  validSubdomainMessage: 'Subdomain is valid and available',
+  invalidSubdomainMessage: 'Subdomain can only contain lowercase alphanumeric characters and hyphens',
+  reservedSubdomainMessage: 'This subdomain is reserved by the system',
+  minLengthMessage: 'Subdomain must be at least 3 characters',
+  infoCallout: {
+    title: 'Admin Role Assignment',
+    role: 'Owner',
+    prefix: 'As the creator of this organization, you will automatically be assigned the ',
+    suffix: ' role. You can invite team members and configure SSO after creation.',
+  },
+  cancelButton: 'Cancel',
+  submitButton: 'Create Organization & Launch',
+  submittingButton: 'Creating Organization...',
+  reservedSlugs: [
+    'api', 'admin', 'www', 'central', 'app', 'support', 'mail', 'billing',
+    'help', 'test', 'dashboard', 'login', 'register', 'status', 'docs',
+    'assets', 'static', 'cdn', 'auth', 'account', 'portal',
+  ],
+}
+
 export const hubContentData: HubContentData = {
   brand: {
     name: 'ZedDesk',

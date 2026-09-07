@@ -1,0 +1,25 @@
+export const RESERVED_ORGANIZATION_SLUGS = [
+  'api',
+  'admin',
+  'www',
+  'central',
+  'app',
+  'support',
+  'mail',
+  'billing',
+  'help',
+  'test',
+  'dashboard',
+  'login',
+  'register',
+  'status',
+  'docs',
+  'assets',
+  'static',
+  'cdn',
+  'auth',
+  'account',
+  'portal',
+] as const
+
+export type ReservedOrganizationSlug = (typeof RESERVED_ORGANIZATION_SLUGS)[number]
