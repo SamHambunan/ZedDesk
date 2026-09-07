@@ -1,6 +1,6 @@
 import React from 'react'
 import { Plus } from 'lucide-react'
-import { OrganizationCard, HubOrganizationItem } from './OrganizationCard'
+import { OrganizationCard, type HubOrganizationItem } from './OrganizationCard'
 import { hubContentData } from '../../data/mockData'
 
 export interface OrganizationGridProps {

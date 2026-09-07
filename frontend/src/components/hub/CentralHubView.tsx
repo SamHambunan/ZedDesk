@@ -2,9 +2,9 @@ import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CentralHubHeader } from './CentralHubHeader'
 import { OrganizationGrid } from './OrganizationGrid'
-import { PendingInvitesBanner, PendingInvitationItem } from './PendingInvitesBanner'
+import { PendingInvitesBanner, type PendingInvitationItem } from './PendingInvitesBanner'
 import { UserProfileCard } from './UserProfileCard'
-import { HubOrganizationItem } from './OrganizationCard'
+import type { HubOrganizationItem } from './OrganizationCard'
 import { AuthCard } from '../auth/AuthCard'
 import { Modal } from '../ui/Modal'
 import { Input } from '../ui/Input'
@@ -446,7 +446,7 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
                       </option>
                     ))}
                   </select>
-                  <Button type="submit" variant="primary" size="sm">
+                  <Button type="submit" variant="primary" size="compact">
                     Navigate to Subdomain
                   </Button>
                 </div>
@@ -596,7 +596,7 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
           <div className="flex justify-end gap-3 pt-4 border-t border-border-subtle">
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               onClick={() => setIsCreateOrgModalOpen(false)}
             >
               Cancel

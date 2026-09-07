@@ -21,23 +21,30 @@ describe('CentralHubView (Seam 2)', () => {
     })
 
     // Mock window.location
-    delete (window as unknown as { location?: unknown }).location
-    window.location = {
-      ...originalLocation,
-      href: 'http://localhost:5173',
-      hostname: 'localhost',
-      port: '5173',
-      protocol: 'http:',
-      pathname: '/',
-      assign: vi.fn(),
-      replace: vi.fn(),
-      reload: vi.fn(),
-    } as unknown as Location
+    Object.defineProperty(window, 'location', {
+      value: {
+        ...originalLocation,
+        href: 'http://localhost:5173',
+        hostname: 'localhost',
+        port: '5173',
+        protocol: 'http:',
+        pathname: '/',
+        assign: vi.fn(),
+        replace: vi.fn(),
+        reload: vi.fn(),
+      },
+      writable: true,
+      configurable: true,
+    })
   })
 
   afterEach(() => {
     global.fetch = originalFetch
-    window.location = originalLocation
+    Object.defineProperty(window, 'location', {
+      value: originalLocation,
+      writable: true,
+      configurable: true,
+    })
   })
 
   const renderView = (initialToken?: string, initialUser?: { id: number; name: string; email: string }) => {
