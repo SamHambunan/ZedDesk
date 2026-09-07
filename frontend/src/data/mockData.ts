@@ -69,3 +69,70 @@ export const authContentData: AuthContentData = {
     routingNote: 'Row-level database scoping & subdomain routing ({org}.zeddesk.app)',
   },
 }
+
+export interface HubContentData {
+  readonly brand: {
+    readonly name: string
+    readonly badge: string
+  }
+  readonly telemetry: {
+    readonly operational: string
+    readonly degraded: string
+    readonly down: string
+  }
+  readonly nav: {
+    readonly docs: string
+    readonly help: string
+  }
+  readonly organizations: {
+    readonly title: string
+    readonly agentsLabel: string
+    readonly launchWorkspace: string
+    readonly createNew: string
+  }
+  readonly profile: {
+    readonly defaultAvatarUrl: string
+    readonly accountSettings: string
+    readonly billingPlans: string
+    readonly logout: string
+  }
+  readonly invitations: {
+    readonly title: string
+    readonly accept: string
+    readonly decline: string
+  }
+}
+
+export const hubContentData: HubContentData = {
+  brand: {
+    name: 'ZedDesk',
+    badge: 'AI',
+  },
+  telemetry: {
+    operational: 'All Systems Operational',
+    degraded: 'Systems Degraded',
+    down: 'Systems Offline',
+  },
+  nav: {
+    docs: 'Docs',
+    help: 'Help',
+  },
+  organizations: {
+    title: 'Your Organizations & Workspaces',
+    agentsLabel: 'Agents',
+    launchWorkspace: 'Launch Workspace',
+    createNew: 'Create New Organization',
+  },
+  profile: {
+    defaultAvatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDOPcEppQ7Ix_FTF35p0pkFKhPM0cTWkQ6ndLk35CFTizlCHq6AHCS-KTZOBbbRO2UDq-ruDk7lqqOE5delOtrzQ3mnCgRSLeF5oXfs-l0eu_3tNdhQPfgocTS1xFw4Mf75rDnekbEX59jsjr1yc-kUiKTHL_zAriFBgkdVHUu6K2pnXPsolRKHC3CDl-rXBQ7zvsr_-QJKiygHSjgSAD_1sKNiq4Z5DVjBBV1m7zVAIMlb32ckkfsCOjkon29qPVrLuGwFhE-RewM',
+    accountSettings: 'Account Settings',
+    billingPlans: 'Billing & Plans',
+    logout: 'Log out',
+  },
+  invitations: {
+    title: 'Invitation Pending',
+    accept: 'Accept',
+    decline: 'Decline',
+  },
+}
+
