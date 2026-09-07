@@ -2,6 +2,8 @@ import { useEffect, useState, useContext } from 'react'
 import { QueryClientContext, QueryClientProvider } from '@tanstack/react-query'
 import { queryClient as defaultQueryClient } from './lib/query-client'
 import { CentralHubView } from './components/hub'
+import { WorkspaceShell } from './components/workspace'
+import { useWorkspace } from './hooks/useWorkspace'
 import { getApiBaseUrl, getCentralHubUrl, getOrganizationUrl, getSubdomain } from './utils/url'
 
 function SafeQueryProvider({ children }: { children: React.ReactNode }) {
@@ -16,20 +18,6 @@ interface User {
   id: number
   name: string
   email: string
-}
-
-interface WorkspaceData {
-  organization: {
-    id: number
-    name: string
-    slug: string
-  }
-  user: {
-    id: number
-    name: string
-    email: string
-  }
-  role: string
 }
 
 interface InvitationItem {
@@ -87,12 +75,14 @@ function extractErrorMessage(data: unknown, fallback: string): string {
   return fallback
 }
 
-export default function App({
+function AppInner({
   hostname,
   pathname,
+  search,
 }: {
   hostname?: string
   pathname?: string
+  search?: string
 } = {}) {
   const activeHost = hostname ?? (typeof window !== 'undefined' ? window.location?.hostname : '')
   const activePath = pathname ?? (typeof window !== 'undefined' ? window.location?.pathname : '/')
@@ -163,74 +153,41 @@ export default function App({
   const [teamActionError, setTeamActionError] = useState<{ [teamId: number]: string | null }>({})
 
   // Auth State (for Workspace Shell)
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('zeddesk_token'))
+  const activeSearch = search ?? (typeof window !== 'undefined' ? window.location?.search : '')
+  const [token, setToken] = useState<string | null>(() => {
+    const urlToken = new URLSearchParams(activeSearch).get('token')
+    if (urlToken) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('zeddesk_token', urlToken)
+      }
+      return urlToken
+    }
+    return typeof window !== 'undefined' ? localStorage.getItem('zeddesk_token') : null
+  })
   const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('zeddesk_user')
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('zeddesk_user') : null
     return saved ? JSON.parse(saved) : null
   })
 
-  // Workspace Shell State
-  const [workspaceData, setWorkspaceData] = useState<WorkspaceData | null>(null)
-  const [loadingWorkspace, setLoadingWorkspace] = useState<boolean>(isWorkspace && Boolean(token))
-  const [workspaceError, setWorkspaceError] = useState<{ status: number; message: string } | null>(null)
-
-
-
-  // Load Tenant Workspace Shell data
+  // Clean up ?token= from address bar after ingestion
   useEffect(() => {
-    if (!isWorkspace || !token) return
-
-    let cancelled = false
-
-    fetch(`${apiUrl}/api/workspace`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-    })
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({}))
-        if (cancelled) return
-
-        if (!res.ok) {
-          if (res.status === 404) {
-            setWorkspaceError({ status: 404, message: data.message || 'Organization not found.' })
-          } else if (res.status === 403) {
-            setWorkspaceError({ status: 403, message: data.message || 'Forbidden. You are not an Organization Member of this Organization.' })
-          } else if (res.status === 401) {
-            setWorkspaceError({ status: 401, message: data.message || 'Authentication required or session expired.' })
-          } else {
-            setWorkspaceError({ status: res.status, message: data.message || 'Error loading workspace.' })
-          }
-          return
-        }
-
-        setWorkspaceData(data)
-      })
-      .catch((err: Error) => {
-        if (!cancelled) {
-          setWorkspaceError({ status: 500, message: err.message || 'Network error loading workspace.' })
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingWorkspace(false)
-      })
-
-    return () => {
-      cancelled = true
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.has('token')) {
+      params.delete('token')
+      const newSearch = params.toString() ? `?${params.toString()}` : ''
+      window.history.replaceState({}, '', `${window.location.pathname}${newSearch}${window.location.hash}`)
     }
-  }, [apiUrl, isWorkspace, token])
+  }, [])
+
+  // Workspace Shell State via TanStack Query
+  const { data: workspaceData, isLoading: loadingWorkspace } = useWorkspace(isWorkspace ? subdomain : null, token)
 
   const persistSession = (newToken: string, newUser: User) => {
     setToken(newToken)
     setUser(newUser)
     localStorage.setItem('zeddesk_token', newToken)
     localStorage.setItem('zeddesk_user', JSON.stringify(newUser))
-    if (isWorkspace) {
-      setLoadingWorkspace(true)
-      setWorkspaceError(null)
-    }
   }
 
   // Public Invitation fetch effect
@@ -802,8 +759,6 @@ export default function App({
 
     setToken(null)
     setUser(null)
-    setWorkspaceData(null)
-    setWorkspaceError(null)
     localStorage.removeItem('zeddesk_token')
     localStorage.removeItem('zeddesk_user')
   }
@@ -1040,200 +995,25 @@ export default function App({
 
   // --- RENDER WORKSPACE SHELL (Subdomain context) ---
   if (isWorkspace) {
-    const isUnauthenticated = !token || workspaceError?.status === 401
-
     return (
-      <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', minHeight: '100vh', backgroundColor: '#0f172a', color: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
-        {/* Workspace Shell Top Bar */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 2rem', backgroundColor: '#1e293b', borderBottom: '1px solid #334155' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <span style={{ fontSize: '1.5rem', fontWeight: 800, background: 'linear-gradient(to right, #38bdf8, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              ZedDesk
-            </span>
-            <span style={{ color: '#64748b', fontSize: '1.25rem' }}>/</span>
-            {workspaceData ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <h1 data-testid="workspace-org-name" style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
-                  {workspaceData.organization.name}
-                </h1>
-                <span data-testid="workspace-slug" style={{ backgroundColor: '#334155', color: '#94a3b8', fontSize: '0.75rem', padding: '0.15rem 0.5rem', borderRadius: '0.25rem', fontFamily: 'monospace' }}>
-                  {workspaceData.organization.slug}
-                </span>
-              </div>
-            ) : (
-              <span style={{ fontSize: '1.125rem', color: '#94a3b8' }}>
-                Workspace ({subdomain})
-              </span>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-            {workspaceData && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.875rem' }}>
-                <span data-testid="workspace-user-name" style={{ fontWeight: 600 }}>{workspaceData.user.name}</span>
-                <span data-testid="workspace-user-email" style={{ color: '#94a3b8' }}>({workspaceData.user.email})</span>
-                <span data-testid="workspace-user-role" style={{ backgroundColor: workspaceData.role === 'admin' ? '#312e81' : '#14532d', color: workspaceData.role === 'admin' ? '#a5b4fc' : '#86efac', padding: '0.2rem 0.5rem', borderRadius: '0.25rem', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>
-                  {workspaceData.role}
-                </span>
-              </div>
-            )}
-            <a
-              href={getCentralHubUrl()}
-              data-testid="central-hub-link"
-              style={{ color: '#38bdf8', textDecoration: 'none', fontSize: '0.875rem', fontWeight: 500 }}
-            >
-              Central Hub
-            </a>
-            {token && (
-              <button
-                type="button"
-                onClick={handleLogout}
-                data-testid="workspace-logout-btn"
-                style={{ padding: '0.375rem 0.75rem', backgroundColor: '#334155', color: '#e2e8f0', border: 'none', borderRadius: '0.375rem', fontSize: '0.875rem', cursor: 'pointer' }}
-              >
-                Log Out
-              </button>
-            )}
-          </div>
-        </header>
-
-        {/* Workspace Shell Body */}
-        <div style={{ display: 'flex', flex: 1 }}>
-          {/* Workspace Shell Sidebar / Navigation */}
-          {workspaceData && (
-            <aside style={{ width: '16rem', backgroundColor: '#1e293b', borderRight: '1px solid #334155', padding: '1.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <nav aria-label="Workspace Navigation" data-testid="workspace-nav" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>
-                    Workspace
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <button
-                      type="button"
-                      data-testid="nav-tickets"
-                      onClick={() => setWorkspaceView('overview')}
-                      style={{ textAlign: 'left', padding: '0.5rem 0.75rem', backgroundColor: workspaceView === 'overview' ? '#0284c7' : 'transparent', color: workspaceView === 'overview' ? 'white' : '#cbd5e1', border: 'none', borderRadius: '0.375rem', fontWeight: 500, fontSize: '0.875rem', cursor: 'pointer' }}
-                    >
-                      Tickets
-                    </button>
-                    <button
-                      type="button"
-                      data-testid="nav-teams"
-                      onClick={() => setWorkspaceView('teams')}
-                      style={{ textAlign: 'left', padding: '0.5rem 0.75rem', backgroundColor: workspaceView === 'teams' ? '#0284c7' : 'transparent', color: workspaceView === 'teams' ? 'white' : '#cbd5e1', border: 'none', borderRadius: '0.375rem', fontWeight: 500, fontSize: '0.875rem', cursor: 'pointer' }}
-                    >
-                      Teams
-                    </button>
-                  </div>
-                </div>
-
-                {/* Role-Aware Administrative Sections (Rendered ONLY if role is admin) */}
-                {workspaceData.role === 'admin' && (
-                  <div data-testid="nav-admin-section">
-                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>
-                      Administration
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <button
-                        type="button"
-                        data-testid="nav-org-settings"
-                        style={{ textAlign: 'left', padding: '0.5rem 0.75rem', backgroundColor: 'transparent', color: '#cbd5e1', border: 'none', borderRadius: '0.375rem', fontWeight: 500, fontSize: '0.875rem', cursor: 'pointer' }}
-                      >
-                        Organization Settings
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="nav-invitations"
-                        onClick={() => setWorkspaceView('invitations')}
-                        style={{ textAlign: 'left', padding: '0.5rem 0.75rem', backgroundColor: workspaceView === 'invitations' ? '#0284c7' : 'transparent', color: workspaceView === 'invitations' ? 'white' : '#cbd5e1', border: 'none', borderRadius: '0.375rem', fontWeight: 500, fontSize: '0.875rem', cursor: 'pointer' }}
-                      >
-                        Member Invitations
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="nav-team-management"
-                        onClick={() => setWorkspaceView('team-management')}
-                        style={{ textAlign: 'left', padding: '0.5rem 0.75rem', backgroundColor: workspaceView === 'team-management' ? '#0284c7' : 'transparent', color: workspaceView === 'team-management' ? 'white' : '#cbd5e1', border: 'none', borderRadius: '0.375rem', fontWeight: 500, fontSize: '0.875rem', cursor: 'pointer' }}
-                      >
-                        Team Management
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </nav>
-            </aside>
-          )}
-
-          {/* Workspace Shell Main Content Area */}
-          <main style={{ flex: 1, padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {loadingWorkspace && (
-              <div data-testid="workspace-loading" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
-                Loading workspace...
-              </div>
-            )}
-
-            {!loadingWorkspace && isUnauthenticated && (
-              <div style={{ maxWidth: '32rem', margin: '2rem auto', width: '100%' }}>
-                <div data-testid="workspace-unauthenticated" style={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '0.75rem', padding: '2rem', textAlign: 'center' }}>
-                  <h2 style={{ fontSize: '1.25rem', marginTop: 0, color: '#f8fafc' }}>Authentication Required</h2>
-                  <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-                    You must be logged in to access the <strong>{subdomain}</strong> workspace.
-                  </p>
-                  <a
-                    href={getCentralHubUrl()}
-                    data-testid="login-redirect-btn"
-                    style={{ display: 'inline-block', padding: '0.625rem 1.25rem', backgroundColor: '#0284c7', color: 'white', borderRadius: '0.375rem', textDecoration: 'none', fontWeight: 600, fontSize: '0.875rem' }}
-                  >
-                    Log In at Central Hub
-                  </a>
-                </div>
-              </div>
-            )}
-
-            {!loadingWorkspace && !isUnauthenticated && workspaceError && (
-              <div style={{ maxWidth: '32rem', margin: '2rem auto', width: '100%' }}>
-                {workspaceError.status === 403 && (
-                  <div data-testid="workspace-403" style={{ backgroundColor: '#1e293b', border: '1px solid #7f1d1d', borderRadius: '0.75rem', padding: '2rem', textAlign: 'center' }}>
-                    <h2 style={{ fontSize: '1.25rem', color: '#f87171', marginTop: 0 }}>Access Denied</h2>
-                    <p style={{ color: '#cbd5e1', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-                      You are not an Organization Member of this Organization.
-                    </p>
-                    <a
-                      href={getCentralHubUrl()}
-                      style={{ display: 'inline-block', padding: '0.5rem 1rem', backgroundColor: '#0284c7', color: 'white', borderRadius: '0.375rem', textDecoration: 'none', fontSize: '0.875rem', fontWeight: 600 }}
-                    >
-                      Return to Central Hub
-                    </a>
-                  </div>
-                )}
-
-                {workspaceError.status === 404 && (
-                  <div data-testid="workspace-404" style={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '0.75rem', padding: '2rem', textAlign: 'center' }}>
-                    <h2 style={{ fontSize: '1.25rem', color: '#f87171', marginTop: 0 }}>Organization Not Found</h2>
-                    <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-                      The organization subdomain <strong>{subdomain}</strong> does not exist.
-                    </p>
-                    <a
-                      href={getCentralHubUrl()}
-                      style={{ display: 'inline-block', padding: '0.5rem 1rem', backgroundColor: '#0284c7', color: 'white', borderRadius: '0.375rem', textDecoration: 'none', fontSize: '0.875rem', fontWeight: 600 }}
-                    >
-                      Return to Central Hub
-                    </a>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {!loadingWorkspace && workspaceData && workspaceView === 'invitations' && (
-              <div data-testid="invitations-manager" style={{ backgroundColor: '#1e293b', borderRadius: '0.75rem', padding: '2rem', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                <div>
-                  <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>
-                    Organization Member Invitations
-                  </h2>
-                  <p style={{ color: '#94a3b8', fontSize: '0.875rem', margin: 0 }}>
-                    Invite new colleagues to join {workspaceData.organization.name} as Admins or Agents.
-                  </p>
-                </div>
+      <WorkspaceShell
+        subdomain={subdomain!}
+        token={token}
+        activeView={workspaceView}
+        onNavigate={(view) => setWorkspaceView(view as any)}
+        onLogout={handleLogout}
+        onAuthSuccess={persistSession}
+      >
+        {workspaceView === 'invitations' && (
+          <div data-testid="invitations-manager" style={{ backgroundColor: '#1e293b', borderRadius: '0.75rem', padding: '2rem', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>
+                Organization Member Invitations
+              </h2>
+              <p style={{ color: '#94a3b8', fontSize: '0.875rem', margin: 0 }}>
+                Invite new colleagues to join {workspaceData ? workspaceData.organization.name : 'the organization'} as Admins or Agents.
+              </p>
+            </div>
 
                 {/* Invite Creation Form */}
                 <div style={{ backgroundColor: '#0f172a', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #334155' }}>
@@ -1723,35 +1503,19 @@ export default function App({
               </div>
             )}
 
-            {!loadingWorkspace && workspaceData && workspaceView === 'overview' && (
-              <div style={{ backgroundColor: '#1e293b', borderRadius: '0.75rem', padding: '2rem', border: '1px solid #334155' }}>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 1rem 0' }}>
-                  Welcome to {workspaceData.organization.name}
-                </h2>
-                <p style={{ color: '#94a3b8', lineHeight: 1.6 }}>
-                  Active tenant context established. You are currently operating with the role of{' '}
-                  <strong style={{ color: workspaceData.role === 'admin' ? '#a5b4fc' : '#86efac' }}>
-                    {workspaceData.role.toUpperCase()}
-                  </strong>.
-                </p>
-                <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: '#0f172a', borderRadius: '0.5rem', border: '1px solid #334155' }}>
-                  <div style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Tenant Isolation Status:</div>
-                  <div style={{ fontWeight: 600, color: '#34d399', marginTop: '0.25rem' }}>
-                    Row-Level Database Scoping Active ({workspaceData.organization.slug})
-                  </div>
-                </div>
-              </div>
-            )}
-          </main>
-        </div>
-      </div>
+      </WorkspaceShell>
     )
   }
 
   // --- RENDER CENTRAL HUB (Apex domain context) ---
+  return <CentralHubView />
+}
+
+export default function App(props: { hostname?: string; pathname?: string; search?: string } = {}) {
   return (
     <SafeQueryProvider>
-      <CentralHubView />
+      <AppInner {...props} />
     </SafeQueryProvider>
   )
 }
+

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CentralHubHeader } from './CentralHubHeader'
 import { OrganizationGrid } from './OrganizationGrid'
@@ -93,6 +93,24 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
   const [regPasswordConfirm, setRegPasswordConfirm] = useState('')
   const [regError, setRegError] = useState<string | null>(null)
   const [isRegistering, setIsRegistering] = useState(false)
+
+  // If returnUrl is present and user is authenticated, redirect with token
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const returnUrl = params.get('returnUrl')
+    const currentToken = token || localStorage.getItem('zeddesk_token')
+    if (returnUrl && currentToken) {
+      try {
+        const parsed = new URL(returnUrl)
+        parsed.searchParams.set('token', currentToken)
+        window.location.href = parsed.toString()
+      } catch {
+        const sep = returnUrl.includes('?') ? '&' : '?'
+        window.location.href = `${returnUrl}${sep}token=${encodeURIComponent(currentToken)}`
+      }
+    }
+  }, [token])
 
   // Create Org Modal State
   const [isCreateOrgModalOpen, setIsCreateOrgModalOpen] = useState(false)
@@ -204,6 +222,21 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
         onAuthSuccess(receivedToken, receivedUser)
       }
 
+      const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+      const returnUrl = searchParams?.get('returnUrl')
+      if (returnUrl) {
+        try {
+          const parsed = new URL(returnUrl)
+          parsed.searchParams.set('token', receivedToken)
+          window.location.href = parsed.toString()
+          return
+        } catch {
+          const sep = returnUrl.includes('?') ? '&' : '?'
+          window.location.href = `${returnUrl}${sep}token=${encodeURIComponent(receivedToken)}`
+          return
+        }
+      }
+
       queryClient.invalidateQueries({ queryKey: ['organizations'] })
     } catch (err) {
       setLoginError(err instanceof Error ? err.message : 'An error occurred during login.')
@@ -261,6 +294,21 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
 
       if (onAuthSuccess) {
         onAuthSuccess(receivedToken, receivedUser)
+      }
+
+      const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+      const returnUrl = searchParams?.get('returnUrl')
+      if (returnUrl) {
+        try {
+          const parsed = new URL(returnUrl)
+          parsed.searchParams.set('token', receivedToken)
+          window.location.href = parsed.toString()
+          return
+        } catch {
+          const sep = returnUrl.includes('?') ? '&' : '?'
+          window.location.href = `${returnUrl}${sep}token=${encodeURIComponent(receivedToken)}`
+          return
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ['organizations'] })
@@ -350,7 +398,11 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
 
   const handleLaunchWorkspace = (org: HubOrganizationItem) => {
     if (typeof window !== 'undefined') {
-      window.location.href = getOrganizationUrl(org.slug)
+      const port = window.location.port ? `:${window.location.port}` : ''
+      const protocol = window.location.protocol || 'http:'
+      const currentToken = token || localStorage.getItem('zeddesk_token')
+      const tokenParam = currentToken ? `?token=${encodeURIComponent(currentToken)}` : ''
+      window.location.href = `${protocol}//${org.slug}.localhost${port}${tokenParam}`
     }
   }
 

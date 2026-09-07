@@ -190,3 +190,181 @@ export const hubContentData: HubContentData = {
   },
 }
 
+export interface WorkspaceActivityItem {
+  readonly id: string | number
+  readonly description: string
+  readonly timestamp: string
+  readonly highlight?: string
+  readonly iconType: 'person' | 'group' | 'report' | 'default'
+}
+
+export interface WorkspaceShortcutTeam {
+  readonly id: string | number
+  readonly name: string
+  readonly activeAgentsCount: number
+  readonly openTicketsCount: number
+  readonly iconType?: 'tier1' | 'billing' | 'custom'
+}
+
+export interface WorkspaceContentData {
+  readonly brand: {
+    readonly name: string
+    readonly badge: string
+    readonly searchPlaceholder: string
+    readonly searchShortcut: string
+    readonly copilotLabel: string
+  }
+  readonly nav: {
+    readonly viewsTitle: string
+    readonly overview: string
+    readonly tickets: string
+    readonly teams: string
+    readonly invitations: string
+    readonly knowledgeBase: string
+    readonly settings: string
+    readonly collapse: string
+    readonly adminSectionTitle: string
+    readonly orgSettings: string
+    readonly teamManagement: string
+  }
+  readonly hero: {
+    readonly title: string
+    readonly inviteMember: string
+  }
+  readonly telemetry: {
+    readonly totalMembers: string
+    readonly totalMembersValue: string | number
+    readonly totalMembersTrend: string
+    readonly activeTeams: string
+    readonly activeTeamsValue: string | number
+    readonly openTickets: string
+    readonly openTicketsValue: string | number
+    readonly slaStatus: string
+    readonly slaValue: string
+  }
+  readonly activity: {
+    readonly title: string
+    readonly items: readonly WorkspaceActivityItem[]
+  }
+  readonly routing: {
+    readonly title: string
+    readonly shortcuts: readonly WorkspaceShortcutTeam[]
+    readonly pendingInvitationsLabel: string
+    readonly pendingInvitationsCount: number
+  }
+  readonly errors: {
+    readonly unauthenticatedTitle: string
+    readonly unauthenticatedDesc: string
+    readonly loginAtCentralHub: string
+    readonly forbiddenTitle: string
+    readonly forbiddenDesc: string
+    readonly notFoundTitle: string
+    readonly notFoundDesc: string
+    readonly returnToCentralHub: string
+  }
+  readonly profile: {
+    readonly defaultAvatarUrl: string
+    readonly defaultOrgLogoUrl: string
+  }
+}
+
+export const workspaceContentData: WorkspaceContentData = {
+  brand: {
+    name: 'ZedDesk',
+    badge: 'AI',
+    searchPlaceholder: 'Search...',
+    searchShortcut: '⌘K',
+    copilotLabel: 'AI Copilot',
+  },
+  nav: {
+    viewsTitle: 'VIEWS',
+    overview: 'Overview',
+    tickets: 'Tickets Queue',
+    teams: 'Teams & Routing',
+    invitations: 'Members & Invites',
+    knowledgeBase: 'Knowledge Base',
+    settings: 'Settings',
+    collapse: 'Collapse',
+    adminSectionTitle: 'ADMINISTRATION',
+    orgSettings: 'Organization Settings',
+    teamManagement: 'Team Management',
+  },
+  hero: {
+    title: 'Operational Overview',
+    inviteMember: 'Invite Member',
+  },
+  telemetry: {
+    totalMembers: 'Total Members',
+    totalMembersValue: 14,
+    totalMembersTrend: '+2 this week',
+    activeTeams: 'Active Teams',
+    activeTeamsValue: 3,
+    openTickets: 'Open Tickets',
+    openTicketsValue: 24,
+    slaStatus: 'SLA Status',
+    slaValue: '99.4%',
+  },
+  activity: {
+    title: 'Recent Activity',
+    items: [
+      {
+        id: '1',
+        description: 'Sarah Jenkins joined the workspace.',
+        timestamp: '2 hours ago',
+        iconType: 'person',
+      },
+      {
+        id: '2',
+        description: 'Alex Chen assigned to',
+        highlight: 'Support Tier 1',
+        timestamp: '5 hours ago',
+        iconType: 'group',
+      },
+      {
+        id: '3',
+        description: 'Weekly SLA report automatically generated.',
+        timestamp: 'Yesterday at 18:00',
+        iconType: 'report',
+      },
+    ],
+  },
+  routing: {
+    title: 'Quick Routing',
+    shortcuts: [
+      {
+        id: '1',
+        name: 'Support Tier 1',
+        activeAgentsCount: 12,
+        openTicketsCount: 8,
+        iconType: 'tier1',
+      },
+      {
+        id: '2',
+        name: 'Billing',
+        activeAgentsCount: 4,
+        openTicketsCount: 16,
+        iconType: 'billing',
+      },
+    ],
+    pendingInvitationsLabel: 'Pending Invitations',
+    pendingInvitationsCount: 2,
+  },
+  errors: {
+    unauthenticatedTitle: 'Authentication Required',
+    unauthenticatedDesc: 'You must be logged in to access the workspace.',
+    loginAtCentralHub: 'Log In at Central Hub',
+    forbiddenTitle: 'Access Denied',
+    forbiddenDesc: 'You are not an Organization Member of this Organization.',
+    notFoundTitle: 'Organization Not Found',
+    notFoundDesc: 'The organization subdomain does not exist.',
+    returnToCentralHub: 'Return to Central Hub',
+  },
+  profile: {
+    defaultAvatarUrl:
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuBuDafyneHGqTh1IWuJutKIT5O59i6uRVcmEnhXbHvs6jvcjRDb5XeKeRpHd9weXzdAH9SVhVc50pouONbcN_1H8wVAABVV_Ndq6R4x9JmX3bGy2uFSX-67zPmdE6qrhcMxSgLmh-2AnlHVLk0Hb7_o9Bp2xr78rYK5QMmArNvsyrnmMNIFIIPlIZ8dxt9jQoantm7b8KiExsZpM8cwodgBY1yj0MY2PFY2ZDAMldacExFnKPmTejxZ_DuXHJV5j04M-Tw_0PSI-JE',
+    defaultOrgLogoUrl:
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuAEK6Rvz6oIKl6cPoSjZ0DlnsQOlUyikPZgYNYQjd-Lvk4MixqUs_0wl1L8VPaxpsN3-iib7sBoBXT0Ipk-4gXrWa285eAhGERIennj9-6F0CYqK-ZqTHihwJzjscDrskIPOV-juQmjkPIZJl81YNlkYSuApcJWTt7TY3Urlgfp5yB7CY3xBnA6uu5JPizEi5SOkt9RlAt9IZuhfMrupkGmP-qF524fdjpLi6mdYDqx2gTDOp7pyfmCjBXqL1N_89QybyemSeQsGfs',
+  },
+}
+
+
