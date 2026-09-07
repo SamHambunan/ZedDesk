@@ -234,4 +234,41 @@ describe('Tenant Subdomain Workspace Shell', () => {
     expect(overviewBtn).toHaveClass('border-[#6366F1]')
     expect(overviewBtn).toHaveClass('border-l-2')
   })
+
+  it('ingests token from URL search param (?token=url-token), persists to localStorage, and authenticates workspace', async () => {
+    // Ensure localStorage starts empty on this origin
+    expect(localStorage.getItem('zeddesk_token')).toBeNull()
+
+    // Simulate arriving with ?token=url-admin-token
+    window.location.search = '?token=url-admin-token'
+
+    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes('/api/workspace')) {
+        expect(init?.headers).toMatchObject({
+          Authorization: 'Bearer url-admin-token',
+        })
+
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            organization: { id: 1, name: 'Acme Handshake', slug: 'acme' },
+            user: { id: 10, name: 'Admin Handshake', email: 'admin@acme.test' },
+            role: 'admin',
+          }),
+        } as Response)
+      }
+      return Promise.reject(new Error(`Unhandled URL: ${url}`))
+    })
+
+    render(<App hostname="acme.localhost" search="?token=url-admin-token" />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('workspace-org-name')).toHaveTextContent('Acme Handshake')
+      expect(localStorage.getItem('zeddesk_token')).toBe('url-admin-token')
+    })
+
+    // Clean up
+    window.location.search = ''
+  })
 })

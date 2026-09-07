@@ -68,7 +68,7 @@ export function getCentralHubUrl(): string {
   return `${protocol}//${baseHost}${port}`
 }
 
-export function getOrganizationUrl(slug: string): string {
+export function getOrganizationUrl(slug: string, token?: string | null): string {
   const rawHost = typeof window !== 'undefined' && window.location?.hostname ? window.location.hostname : 'localhost'
   const host = rawHost.split(':')[0]
   const port = typeof window !== 'undefined' && window.location?.port ? `:${window.location.port}` : ''
@@ -85,5 +85,6 @@ export function getOrganizationUrl(slug: string): string {
     }
   }
 
-  return `${protocol}//${slug}.${baseHost}${port}`
+  const tokenParam = token ? `?token=${encodeURIComponent(token)}` : ''
+  return `${protocol}//${slug}.${baseHost}${port}${tokenParam}`
 }

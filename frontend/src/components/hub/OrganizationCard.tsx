@@ -34,7 +34,9 @@ export const OrganizationCard: React.FC<OrganizationCardProps> = ({
 
     if (typeof window !== 'undefined') {
       const port = window.location.port ? `:${window.location.port}` : ''
-      const targetUrl = `${window.location.protocol}//${organization.slug}.localhost${port}`
+      const currentToken = localStorage.getItem('zeddesk_token')
+      const tokenParam = currentToken ? `?token=${encodeURIComponent(currentToken)}` : ''
+      const targetUrl = `${window.location.protocol}//${organization.slug}.localhost${port}${tokenParam}`
       window.location.href = targetUrl
     }
   }

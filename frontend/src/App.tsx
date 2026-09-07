@@ -78,9 +78,11 @@ function extractErrorMessage(data: unknown, fallback: string): string {
 function AppInner({
   hostname,
   pathname,
+  search,
 }: {
   hostname?: string
   pathname?: string
+  search?: string
 } = {}) {
   const activeHost = hostname ?? (typeof window !== 'undefined' ? window.location?.hostname : '')
   const activePath = pathname ?? (typeof window !== 'undefined' ? window.location?.pathname : '/')
@@ -151,11 +153,32 @@ function AppInner({
   const [teamActionError, setTeamActionError] = useState<{ [teamId: number]: string | null }>({})
 
   // Auth State (for Workspace Shell)
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('zeddesk_token'))
+  const activeSearch = search ?? (typeof window !== 'undefined' ? window.location?.search : '')
+  const [token, setToken] = useState<string | null>(() => {
+    const urlToken = new URLSearchParams(activeSearch).get('token')
+    if (urlToken) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('zeddesk_token', urlToken)
+      }
+      return urlToken
+    }
+    return typeof window !== 'undefined' ? localStorage.getItem('zeddesk_token') : null
+  })
   const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('zeddesk_user')
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('zeddesk_user') : null
     return saved ? JSON.parse(saved) : null
   })
+
+  // Clean up ?token= from address bar after ingestion
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.has('token')) {
+      params.delete('token')
+      const newSearch = params.toString() ? `?${params.toString()}` : ''
+      window.history.replaceState({}, '', `${window.location.pathname}${newSearch}${window.location.hash}`)
+    }
+  }, [])
 
   // Workspace Shell State via TanStack Query
   const { data: workspaceData, isLoading: loadingWorkspace } = useWorkspace(isWorkspace ? subdomain : null, token)
@@ -979,6 +1002,7 @@ function AppInner({
         activeView={workspaceView}
         onNavigate={(view) => setWorkspaceView(view as any)}
         onLogout={handleLogout}
+        onAuthSuccess={persistSession}
       >
         {workspaceView === 'invitations' && (
           <div data-testid="invitations-manager" style={{ backgroundColor: '#1e293b', borderRadius: '0.75rem', padding: '2rem', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -1487,7 +1511,7 @@ function AppInner({
   return <CentralHubView />
 }
 
-export default function App(props: { hostname?: string; pathname?: string } = {}) {
+export default function App(props: { hostname?: string; pathname?: string; search?: string } = {}) {
   return (
     <SafeQueryProvider>
       <AppInner {...props} />

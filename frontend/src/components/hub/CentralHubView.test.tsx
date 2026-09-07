@@ -207,7 +207,7 @@ describe('CentralHubView (Seam 2)', () => {
     const launchButton = screen.getByRole('button', { name: /launch workspace for acme support/i })
     await user.click(launchButton)
 
-    expect(window.location.href).toBe('http://acme.localhost:5173')
+    expect(window.location.href).toContain('http://acme.localhost:5173')
   })
 
   it('calls POST /api/logout and clears session state when user logs out', async () => {

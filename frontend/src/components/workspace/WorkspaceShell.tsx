@@ -26,6 +26,7 @@ export interface WorkspaceShellProps {
   readonly onNavigate?: (view: string) => void
   readonly onLogout?: () => void
   readonly onInviteMemberClick?: () => void
+  readonly onAuthSuccess?: (token: string, user: any) => void
   readonly children?: React.ReactNode
   readonly className?: string
 }
@@ -37,6 +38,7 @@ const WorkspaceShellContent: React.FC<WorkspaceShellProps> = ({
   onNavigate,
   onLogout,
   onInviteMemberClick,
+  onAuthSuccess,
   children,
   className = '',
 }) => {
@@ -74,6 +76,8 @@ const WorkspaceShellContent: React.FC<WorkspaceShellProps> = ({
     )
   }
 
+  const returnUrl = typeof window !== 'undefined' ? window.location.href : undefined
+
   if (isUnauthenticated) {
     return (
       <div className="min-h-screen bg-canvas-base flex flex-col justify-center items-center p-4">
@@ -81,6 +85,8 @@ const WorkspaceShellContent: React.FC<WorkspaceShellProps> = ({
           status={401}
           subdomain={subdomain}
           message={queryError?.message}
+          returnUrl={returnUrl}
+          onAuthSuccess={onAuthSuccess}
         />
       </div>
     )
@@ -93,6 +99,8 @@ const WorkspaceShellContent: React.FC<WorkspaceShellProps> = ({
           status={queryError.status}
           subdomain={subdomain}
           message={queryError.message}
+          returnUrl={returnUrl}
+          onAuthSuccess={onAuthSuccess}
         />
       </div>
     )
