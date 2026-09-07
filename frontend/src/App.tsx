@@ -1,26 +1,21 @@
-import { useEffect, useState } from 'react'
-import { AuthCard } from './components/auth/AuthCard'
+import { useEffect, useState, useContext } from 'react'
+import { QueryClientContext, QueryClientProvider } from '@tanstack/react-query'
+import { queryClient as defaultQueryClient } from './lib/query-client'
+import { CentralHubView } from './components/hub'
 import { getApiBaseUrl, getCentralHubUrl, getOrganizationUrl, getSubdomain } from './utils/url'
 
-interface HealthStatus {
-  status: string
-  services: {
-    database: string
-    redis: string
+function SafeQueryProvider({ children }: { children: React.ReactNode }) {
+  const client = useContext(QueryClientContext)
+  if (client) {
+    return <>{children}</>
   }
+  return <QueryClientProvider client={defaultQueryClient}>{children}</QueryClientProvider>
 }
 
 interface User {
   id: number
   name: string
   email: string
-}
-
-interface Organization {
-  id: number
-  name: string
-  slug: string
-  role: string
 }
 
 interface WorkspaceData {
@@ -167,101 +162,19 @@ export default function App({
   const [deletingTeamId, setDeletingTeamId] = useState<number | null>(null)
   const [teamActionError, setTeamActionError] = useState<{ [teamId: number]: string | null }>({})
 
-  // System Health state (for Central Hub)
-  const [health, setHealth] = useState<HealthStatus | null>(null)
-  const [loadingHealth, setLoadingHealth] = useState(!isWorkspace)
-  const [healthError, setHealthError] = useState<string | null>(null)
-
-  // Auth State
+  // Auth State (for Workspace Shell)
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('zeddesk_token'))
   const [user, setUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('zeddesk_user')
     return saved ? JSON.parse(saved) : null
   })
-  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login')
-
-  // Form states
-  const [loginEmail, setLoginEmail] = useState('')
-  const [loginPassword, setLoginPassword] = useState('')
-  const [loginError, setLoginError] = useState<string | null>(null)
-  const [isLoggingIn, setIsLoggingIn] = useState(false)
-
-  const [regName, setRegName] = useState('')
-  const [regEmail, setRegEmail] = useState('')
-  const [regPassword, setRegPassword] = useState('')
-  const [regPasswordConfirm, setRegPasswordConfirm] = useState('')
-  const [regError, setRegError] = useState<string | null>(null)
-  const [isRegistering, setIsRegistering] = useState(false)
-
-  // Organizations State (for Central Hub)
-  const [organizations, setOrganizations] = useState<Organization[]>([])
-  const [loadingOrgs, setLoadingOrgs] = useState<boolean>(() => !isWorkspace && Boolean(localStorage.getItem('zeddesk_token')))
-  const [selectedOrgSlug, setSelectedOrgSlug] = useState<string>('')
-  const [orgName, setOrgName] = useState('')
-  const [orgSlug, setOrgSlug] = useState('')
-  const [createOrgError, setCreateOrgError] = useState<string | null>(null)
-  const [isCreatingOrg, setIsCreatingOrg] = useState(false)
 
   // Workspace Shell State
   const [workspaceData, setWorkspaceData] = useState<WorkspaceData | null>(null)
   const [loadingWorkspace, setLoadingWorkspace] = useState<boolean>(isWorkspace && Boolean(token))
   const [workspaceError, setWorkspaceError] = useState<{ status: number; message: string } | null>(null)
 
-  // Health check on Central Hub
-  useEffect(() => {
-    if (isWorkspace) return
 
-    fetch(`${apiUrl}/api/health`)
-      .then(async (res) => {
-        const data = await res.json().catch(() => null)
-        if (data && data.services) {
-          setHealth(data)
-        } else if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`)
-        }
-        setLoadingHealth(false)
-      })
-      .catch((err: Error) => {
-        setHealthError(err.message)
-        setLoadingHealth(false)
-      })
-  }, [apiUrl, isWorkspace])
-
-  // Load organizations on Central Hub
-  useEffect(() => {
-    if (isWorkspace || !token) return
-
-    let cancelled = false
-    fetch(`${apiUrl}/api/organizations`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          throw new Error(`Failed to load organizations (${res.status})`)
-        }
-        const data: Organization[] = await res.json()
-        if (!cancelled) {
-          setOrganizations(data)
-          if (data.length > 0 && !selectedOrgSlug) {
-            setSelectedOrgSlug(data[0].slug)
-          }
-        }
-      })
-      .catch(() => {
-        // Handled silently
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingOrgs(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [apiUrl, isWorkspace, token, selectedOrgSlug])
 
   // Load Tenant Workspace Shell data
   useEffect(() => {
@@ -314,9 +227,7 @@ export default function App({
     setUser(newUser)
     localStorage.setItem('zeddesk_token', newToken)
     localStorage.setItem('zeddesk_user', JSON.stringify(newUser))
-    if (!isWorkspace) {
-      setLoadingOrgs(true)
-    } else {
+    if (isWorkspace) {
       setLoadingWorkspace(true)
       setWorkspaceError(null)
     }
@@ -874,85 +785,6 @@ export default function App({
     }
   }
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoginError(null)
-    setIsLoggingIn(true)
-
-    try {
-      const loginUrl = `${getApiBaseUrl(null)}/api/login`
-      const res = await fetch(loginUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        setLoginError(extractErrorMessage(data, 'Login failed'))
-        return
-      }
-
-      persistSession(data.token, data.user)
-      setLoginEmail('')
-      setLoginPassword('')
-    } catch {
-      setLoginError('Network error connecting to API')
-    } finally {
-      setIsLoggingIn(false)
-    }
-  }
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setRegError(null)
-
-    if (regPassword !== regPasswordConfirm) {
-      setRegError('Passwords do not match')
-      return
-    }
-
-    setIsRegistering(true)
-
-    try {
-      const registerUrl = `${getApiBaseUrl(null)}/api/register`
-      const res = await fetch(registerUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({
-          name: regName,
-          email: regEmail,
-          password: regPassword,
-          password_confirmation: regPasswordConfirm,
-        }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        setRegError(extractErrorMessage(data, 'Registration failed'))
-        return
-      }
-
-      persistSession(data.token, data.user)
-      setRegName('')
-      setRegEmail('')
-      setRegPassword('')
-      setRegPasswordConfirm('')
-    } catch {
-      setRegError('Network error connecting to API')
-    } finally {
-      setIsRegistering(false)
-    }
-  }
-
   const handleLogout = async () => {
     if (token) {
       try {
@@ -970,63 +802,10 @@ export default function App({
 
     setToken(null)
     setUser(null)
-    setOrganizations([])
-    setSelectedOrgSlug('')
     setWorkspaceData(null)
     setWorkspaceError(null)
     localStorage.removeItem('zeddesk_token')
     localStorage.removeItem('zeddesk_user')
-  }
-
-  const handleCreateOrganization = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setCreateOrgError(null)
-    setIsCreatingOrg(true)
-
-    try {
-      const res = await fetch(`${apiUrl}/api/organizations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({
-          name: orgName,
-          slug: orgSlug,
-        }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        setCreateOrgError(extractErrorMessage(data, 'Creation failed'))
-        return
-      }
-
-      const newOrg: Organization = {
-        id: data.organization.id,
-        name: data.organization.name,
-        slug: data.organization.slug,
-        role: data.role,
-      }
-
-      setOrganizations((prev) => [...prev, newOrg])
-      setSelectedOrgSlug(newOrg.slug)
-      setOrgName('')
-      setOrgSlug('')
-    } catch {
-      setCreateOrgError('Network error creating organization')
-    } finally {
-      setIsCreatingOrg(false)
-    }
-  }
-
-  const handleNavigateOrganization = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (selectedOrgSlug) {
-      window.location.href = getOrganizationUrl(selectedOrgSlug)
-    }
   }
 
   // --- RENDER PUBLIC INVITATION ACCEPTANCE SCREEN ---
@@ -1970,229 +1749,9 @@ export default function App({
   }
 
   // --- RENDER CENTRAL HUB (Apex domain context) ---
-  if (!token || !user) {
-    return (
-      <div className="bg-canvas-base text-text-primary min-h-screen flex flex-col items-center justify-center font-sans antialiased selection:bg-accent-glow/30 selection:text-text-primary p-margin-mobile md:p-margin-desktop relative">
-        {/* Ambient Background Effect */}
-        <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden">
-          <div className="absolute w-[800px] h-[800px] bg-accent-glow/5 rounded-full blur-3xl opacity-50 mix-blend-screen" />
-          <div className="absolute w-[600px] h-[600px] bg-[#38BDF8]/5 rounded-full blur-3xl opacity-30 mix-blend-screen translate-x-1/4 translate-y-1/4" />
-        </div>
-
-        {/* Main Auth Container */}
-        <main className="w-full max-w-md z-10 flex flex-col gap-8">
-          <AuthCard
-            activeTab={activeTab}
-            onTabChange={(tab) => {
-              setActiveTab(tab)
-              setLoginError(null)
-              setRegError(null)
-            }}
-            loginEmail={loginEmail}
-            setLoginEmail={setLoginEmail}
-            loginPassword={loginPassword}
-            setLoginPassword={setLoginPassword}
-            loginError={loginError}
-            isLoggingIn={isLoggingIn}
-            onLoginSubmit={handleLogin}
-            regName={regName}
-            setRegName={setRegName}
-            regEmail={regEmail}
-            setRegEmail={setRegEmail}
-            regPassword={regPassword}
-            setRegPassword={setRegPassword}
-            regPasswordConfirm={regPasswordConfirm}
-            setRegPasswordConfirm={setRegPasswordConfirm}
-            regError={regError}
-            isRegistering={isRegistering}
-            onRegisterSubmit={handleRegister}
-          />
-        </main>
-
-        {/* System Baseline Status (Hidden in production UI to match Stitch design; preserved for test harness telemetry) */}
-        <div style={{ display: 'none' }} aria-hidden="true">
-          <span data-testid="frontend-status">Operational</span>
-          <span data-testid="backend-status">
-            {loadingHealth
-              ? 'Checking...'
-              : healthError
-                ? `Unavailable (${healthError})`
-                : health?.status.toUpperCase() || ''}
-          </span>
-          <span data-testid="db-status">
-            {health ? health.services.database : 'Waiting for API'}
-          </span>
-          <span data-testid="redis-status">
-            {health ? health.services.redis : 'Waiting for API'}
-          </span>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', minHeight: '100vh', backgroundColor: '#0f172a', color: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2rem' }}>
-      <header style={{ textAlign: 'center', marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '3rem', fontWeight: 800, margin: 0, background: 'linear-gradient(to right, #38bdf8, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-          ZedDesk
-        </h1>
-        <p style={{ fontSize: '1.25rem', color: '#94a3b8', marginTop: '0.5rem' }}>
-          Multi-tenant AI-Powered Helpdesk
-        </p>
-      </header>
-
-      <div style={{ maxWidth: '40rem', width: '100%', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        <main style={{ backgroundColor: '#1e293b', borderRadius: '0.75rem', padding: '2rem', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #334155', paddingBottom: '1rem' }}>
-            <div>
-              <p style={{ margin: 0, fontSize: '0.875rem', color: '#94a3b8' }}>Logged in as <strong style={{ color: '#f8fafc' }}>{user.name}</strong> ({user.email})</p>
-            </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              style={{ padding: '0.375rem 0.75rem', backgroundColor: '#334155', color: '#e2e8f0', border: 'none', borderRadius: '0.375rem', fontSize: '0.875rem', cursor: 'pointer' }}
-            >
-              Log Out
-            </button>
-          </div>
-
-
-            {/* Organization Selection Form */}
-            {organizations.length > 0 && (
-              <form onSubmit={handleNavigateOrganization} style={{ padding: '1rem', backgroundColor: '#0f172a', borderRadius: '0.5rem', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>Select Organization</h3>
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                  <label htmlFor="org-select" style={{ fontSize: '0.875rem', color: '#cbd5e1' }}>Organization:</label>
-                  <select
-                    id="org-select"
-                    value={selectedOrgSlug}
-                    onChange={(e) => setSelectedOrgSlug(e.target.value)}
-                    style={{ flex: 1, padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid #475569', backgroundColor: '#1e293b', color: '#f8fafc', fontSize: '0.875rem' }}
-                  >
-                    {organizations.map((org) => (
-                      <option key={org.id} value={org.slug}>
-                        {org.name} ({org.slug}) - {org.role.toUpperCase()}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="submit"
-                    style={{ padding: '0.5rem 1rem', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '0.375rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}
-                  >
-                    Navigate to Subdomain
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Organizations List / Overview */}
-            <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, margin: '0 0 1rem 0' }}>
-                Your Organizations
-              </h2>
-              {loadingOrgs ? (
-                <p style={{ color: '#94a3b8' }}>Loading organizations...</p>
-              ) : organizations.length === 0 ? (
-                <p style={{ color: '#94a3b8', fontStyle: 'italic' }}>
-                  No Organization Memberships found. Create one below to get started.
-                </p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {organizations.map((org) => (
-                    <div
-                      key={org.id}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: '#0f172a', borderRadius: '0.5rem', border: '1px solid #334155' }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: '1rem' }}>{org.name}</div>
-                        <div style={{ fontSize: '0.875rem', color: '#94a3b8' }}>{getOrganizationUrl(org.slug).replace(/^https?:\/\//, '')}</div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <span style={{ backgroundColor: org.role === 'admin' ? '#312e81' : '#14532d', color: org.role === 'admin' ? '#a5b4fc' : '#86efac', padding: '0.2rem 0.5rem', borderRadius: '0.25rem', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>
-                          {org.role}
-                        </span>
-                        <a
-                          href={getOrganizationUrl(org.slug)}
-                          style={{ padding: '0.375rem 0.75rem', backgroundColor: '#0284c7', color: 'white', borderRadius: '0.375rem', textDecoration: 'none', fontSize: '0.875rem', fontWeight: 500 }}
-                        >
-                          Open Organization
-                        </a>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Create Organization Form */}
-            <div style={{ borderTop: '1px solid #334155', paddingTop: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: '0 0 1rem 0' }}>
-                Create Organization
-              </h3>
-              {createOrgError && (
-                <div style={{ backgroundColor: '#7f1d1d', color: '#f87171', padding: '0.75rem', borderRadius: '0.375rem', fontSize: '0.875rem', marginBottom: '1rem' }}>
-                  {createOrgError}
-                </div>
-              )}
-              <form onSubmit={handleCreateOrganization} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                  <label htmlFor="org-name" style={{ fontSize: '0.875rem', color: '#cbd5e1' }}>Organization Name</label>
-                  <input
-                    id="org-name"
-                    type="text"
-                    required
-                    placeholder="Acme Corporation"
-                    value={orgName}
-                    onChange={(e) => setOrgName(e.target.value)}
-                    style={{ padding: '0.5rem 0.75rem', borderRadius: '0.375rem', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#f8fafc' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                  <label htmlFor="org-slug" style={{ fontSize: '0.875rem', color: '#cbd5e1' }}>Subdomain Slug</label>
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <input
-                      id="org-slug"
-                      type="text"
-                      required
-                      placeholder="acme"
-                      value={orgSlug}
-                      onChange={(e) => setOrgSlug(e.target.value.toLowerCase())}
-                      style={{ flex: 1, padding: '0.5rem 0.75rem', borderRadius: '0.375rem 0 0 0.375rem', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#f8fafc' }}
-                    />
-                    <span style={{ padding: '0.5rem 0.75rem', backgroundColor: '#334155', color: '#94a3b8', borderRadius: '0 0.375rem 0.375rem 0', border: '1px solid #475569', borderLeft: 'none', fontSize: '0.875rem' }}>
-                      .{typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost'}{typeof window !== 'undefined' && window.location.port ? `:${window.location.port}` : ''}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  disabled={isCreatingOrg}
-                  style={{ alignSelf: 'flex-start', padding: '0.5rem 1rem', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '0.375rem', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  {isCreatingOrg ? 'Creating...' : 'Create Organization'}
-                </button>
-              </form>
-            </div>
-          </main>
-
-        {/* System Baseline Status (Hidden in production UI to match Stitch design; preserved for test harness telemetry) */}
-        <div style={{ display: 'none' }} aria-hidden="true">
-          <span data-testid="frontend-status">Operational</span>
-          <span data-testid="backend-status">
-            {loadingHealth
-              ? 'Checking...'
-              : healthError
-                ? `Unavailable (${healthError})`
-                : health?.status.toUpperCase() || ''}
-          </span>
-          <span data-testid="db-status">
-            {health ? health.services.database : 'Waiting for API'}
-          </span>
-          <span data-testid="redis-status">
-            {health ? health.services.redis : 'Waiting for API'}
-          </span>
-        </div>
-      </div>
-    </div>
+    <SafeQueryProvider>
+      <CentralHubView />
+    </SafeQueryProvider>
   )
 }
