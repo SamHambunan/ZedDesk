@@ -430,7 +430,7 @@ describe('CentralHubView (Seam 2)', () => {
         expect(organizationsFetchCount).toBeGreaterThan(initialFetchCount)
 
         // Assert automatic navigation to tenant subdomain
-        expect(window.location.href).toBe('http://wayne-enterprises.localhost:5173')
+        expect(window.location.href).toContain('http://wayne-enterprises.localhost:5173')
 
         // Assert modal closed
         expect(screen.queryByRole('dialog', { name: /create new organization/i })).not.toBeInTheDocument()

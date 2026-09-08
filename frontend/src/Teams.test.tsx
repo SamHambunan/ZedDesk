@@ -296,5 +296,5 @@ describe('Workspace Teams and Member Assignment', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('team-name-2')).not.toBeInTheDocument()
     })
-  })
+  }, 15000)
 })

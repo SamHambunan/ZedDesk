@@ -108,6 +108,7 @@ describe('Organization Member Invitations Flow', () => {
       })
 
       // Create new invitation
+      await user.click(screen.getByTestId('invite-member-btn'))
       await user.type(screen.getByTestId('invite-email-input'), 'bob@example.test')
       await user.selectOptions(screen.getByTestId('invite-role-select'), 'admin')
       await user.click(screen.getByTestId('invite-submit-btn'))
