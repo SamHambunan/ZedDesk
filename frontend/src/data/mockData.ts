@@ -367,4 +367,133 @@ export const workspaceContentData: WorkspaceContentData = {
   },
 }
 
+export interface MembersContentData {
+  readonly title: string
+  readonly subtitle: string
+  readonly inviteMemberBtn: string
+  readonly filterPlaceholder: string
+  readonly roleFilterLabel: string
+  readonly allRoles: string
+  readonly activeMembersLabel: string
+  readonly pendingInvitesLabel: string
+  readonly emptyMembersMessage: string
+  readonly columns: {
+    readonly member: string
+    readonly role: string
+    readonly teams: string
+    readonly joinedDate: string
+    readonly status: string
+    readonly actions: string
+  }
+  readonly pendingSection: {
+    readonly title: string
+    readonly badgeSuffix: string
+    readonly emptyMessage: string
+    readonly columns: {
+      readonly invitedEmail: string
+      readonly assignedRole: string
+      readonly invitedBy: string
+      readonly createdDate: string
+      readonly expiresIn: string
+      readonly invitationLink: string
+      readonly action: string
+    }
+    readonly copyLink: string
+    readonly copiedLink: string
+    readonly revoke: string
+    readonly revoking: string
+  }
+}
+
+export const membersContentData: MembersContentData = {
+  title: 'Members & Invitations',
+  subtitle: 'Manage staff access, assign administrative roles, and track onboarding invitations.',
+  inviteMemberBtn: 'Invite Member',
+  filterPlaceholder: 'Filter by name or email...',
+  roleFilterLabel: 'Role',
+  allRoles: 'All Roles',
+  activeMembersLabel: 'Active Members',
+  pendingInvitesLabel: 'Pending Invites',
+  emptyMembersMessage: 'No members found matching your search criteria.',
+  columns: {
+    member: 'Member',
+    role: 'Role',
+    teams: 'Teams',
+    joinedDate: 'Joined Date',
+    status: 'Status',
+    actions: 'Actions',
+  },
+  pendingSection: {
+    title: 'Pending Invitations',
+    badgeSuffix: 'Awaiting Acceptance',
+    emptyMessage: 'No pending invitations outstanding.',
+    columns: {
+      invitedEmail: 'Invited Email',
+      assignedRole: 'Assigned Role',
+      invitedBy: 'Invited By',
+      createdDate: 'Created Date',
+      expiresIn: 'Expires In',
+      invitationLink: 'Invitation Link',
+      action: 'Action',
+    },
+    copyLink: 'COPY LINK',
+    copiedLink: 'COPIED',
+    revoke: 'Revoke',
+    revoking: 'Revoking...',
+  },
+}
+
+export interface InvitationsContentData {
+  readonly brandName: string
+  readonly aiBadge: string
+  readonly securityFooter: string
+  readonly loadingMessage: string
+  readonly registerTitle: string
+  readonly loginTitle: string
+  readonly fullNameLabel: string
+  readonly emailLabel: string
+  readonly fullNamePlaceholder: string
+  readonly passwordLabel: string
+  readonly passwordPlaceholder: string
+  readonly confirmPasswordLabel: string
+  readonly confirmPasswordPlaceholder: string
+  readonly acceptAndLaunchBtn: string
+  readonly acceptingBtn: string
+  readonly signInAndAcceptBtn: string
+  readonly signingInBtn: string
+  readonly alreadyHaveAccount: string
+  readonly needAccount: string
+  readonly switchUser: string
+  readonly acceptedSuccessTitle: string
+  readonly goToWorkspaceBtn: string
+  readonly goToCentralHubBtn: string
+}
+
+export const invitationsContentData: InvitationsContentData = {
+  brandName: 'ZedDesk',
+  aiBadge: 'AI',
+  securityFooter: 'ZedDesk Secure Multi-Tenant Perimeter • Sanctum Bearer Authentication',
+  loadingMessage: 'Validating invitation credentials...',
+  registerTitle: 'Create your staff account',
+  loginTitle: 'Sign in to accept invitation',
+  fullNameLabel: 'Full Name',
+  emailLabel: 'Email Address',
+  fullNamePlaceholder: 'Alex Rivera',
+  passwordLabel: 'Password',
+  passwordPlaceholder: '••••••••',
+  confirmPasswordLabel: 'Confirm Password',
+  confirmPasswordPlaceholder: '••••••••',
+  acceptAndLaunchBtn: 'Accept Invitation & Launch Workspace',
+  acceptingBtn: 'Accepting & Launching...',
+  signInAndAcceptBtn: 'Sign In & Accept Invitation',
+  signingInBtn: 'Signing In & Joining...',
+  alreadyHaveAccount: 'Already have an account? Sign in instead',
+  needAccount: 'Need to create an account? Register instead',
+  switchUser: 'Switch User / Sign Out',
+  acceptedSuccessTitle: 'Invitation accepted successfully!',
+  goToWorkspaceBtn: 'Launch Workspace',
+  goToCentralHubBtn: 'Go to Central Hub',
+}
+
+
 

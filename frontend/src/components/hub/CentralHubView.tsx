@@ -9,7 +9,7 @@ import { AuthCard } from '../auth/AuthCard'
 import { CreateOrganizationModal } from './CreateOrganizationModal'
 import { Input } from '../ui/Input'
 import { Button } from '../ui/Button'
-import { getApiBaseUrl, getOrganizationUrl } from '../../utils/url'
+import { getApiBaseUrl } from '../../utils/url'
 
 export interface CentralHubUser {
   readonly id: number

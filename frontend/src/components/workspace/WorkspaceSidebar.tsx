@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   Ticket,
   Users2,
+  User,
   Sliders,
   UserPlus,
   FolderCog,
@@ -141,6 +142,18 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 {!isCollapsed && <span>{workspaceContentData.nav.teams}</span>}
               </button>
             </li>
+            <li>
+              <button
+                type="button"
+                data-testid="nav-members"
+                onClick={() => handleNav('members')}
+                title="Members"
+                className={navItemClass(activeRoute === 'members' || activeRoute === 'invitations')}
+              >
+                <User className="w-[18px] h-[18px] shrink-0" />
+                {!isCollapsed && <span>Members</span>}
+              </button>
+            </li>
           </ul>
         </div>
 
@@ -171,7 +184,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                   data-testid="nav-invitations"
                   onClick={() => handleNav('invitations')}
                   title={workspaceContentData.nav.invitations}
-                  className={navItemClass(activeRoute === 'invitations')}
+                  className={navItemClass(activeRoute === 'invitations' || activeRoute === 'members')}
                 >
                   <UserPlus className="w-[18px] h-[18px] shrink-0" />
                   {!isCollapsed && <span>{workspaceContentData.nav.invitations}</span>}
