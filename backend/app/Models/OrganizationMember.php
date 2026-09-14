@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class OrganizationMember extends Model
 {
@@ -38,5 +39,10 @@ class OrganizationMember extends Model
     {
         return $this->belongsToMany(Team::class, 'team_members', 'organization_member_id', 'team_id')
             ->withTimestamps();
+    }
+
+    public function assignedTickets(): HasMany
+    {
+        return $this->hasMany(Ticket::class, 'assigned_member_id');
     }
 }

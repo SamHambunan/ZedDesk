@@ -6,6 +6,7 @@ use App\Traits\BelongsToOrganization;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Team extends Model
 {
@@ -27,5 +28,10 @@ class Team extends Model
     public function organizationMembers(): BelongsToMany
     {
         return $this->members();
+    }
+
+    public function assignedTickets(): HasMany
+    {
+        return $this->hasMany(Ticket::class, 'assigned_team_id');
     }
 }
