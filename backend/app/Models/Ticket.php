@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Context\OrganizationContext;
+use App\Enums\TicketMessageType;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Exceptions\InvalidTicketTransitionException;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Ticket extends Model
@@ -129,5 +131,62 @@ class Ticket extends Model
     public function canReply(): bool
     {
         return ! $this->isClosed();
+    }
+
+    /**
+     * Get all conversation messages for this ticket ordered chronologically.
+     */
+    public function messages(): HasMany
+    {
+        return $this->hasMany(TicketMessage::class)->oldest();
+    }
+
+    /**
+     * Get only customer-visible messages (public replies) ordered chronologically.
+     */
+    public function customerVisibleMessages(): HasMany
+    {
+        return $this->hasMany(TicketMessage::class)
+            ->where('message_type', TicketMessageType::PUBLIC_REPLY->value)
+            ->oldest();
+    }
+
+    /**
+     * Get only private internal notes ordered chronologically.
+     */
+    public function internalNotes(): HasMany
+    {
+        return $this->hasMany(TicketMessage::class)
+            ->where('message_type', TicketMessageType::INTERNAL_NOTE->value)
+            ->oldest();
+    }
+
+    /**
+     * Add a public reply to this ticket.
+     */
+    public function addPublicReply(Model $author, string $body, TicketStatus|string|null $targetStatus = null): TicketMessage
+    {
+        return $this->messages()->create([
+            'organization_id' => $this->organization_id,
+            'message_type' => TicketMessageType::PUBLIC_REPLY,
+            'author_type' => $author->getMorphClass(),
+            'author_id' => (string) $author->getKey(),
+            'body' => $body,
+            'target_status' => $targetStatus,
+        ]);
+    }
+
+    /**
+     * Add an internal note to this ticket.
+     */
+    public function addInternalNote(Model $author, string $body): TicketMessage
+    {
+        return $this->messages()->create([
+            'organization_id' => $this->organization_id,
+            'message_type' => TicketMessageType::INTERNAL_NOTE,
+            'author_type' => $author->getMorphClass(),
+            'author_id' => (string) $author->getKey(),
+            'body' => $body,
+        ]);
     }
 }
