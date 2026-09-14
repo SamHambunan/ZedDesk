@@ -34,4 +34,9 @@ class Team extends Model
     {
         return $this->hasMany(Ticket::class, 'assigned_team_id');
     }
+
+    public function ticketAssignments(): HasMany
+    {
+        return $this->hasMany(TicketAssignment::class, 'team_id');
+    }
 }
