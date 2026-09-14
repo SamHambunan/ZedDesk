@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\TicketStatus;
 use App\Exceptions\InvalidTicketTransitionException;
 use App\Models\Ticket;
+use App\Models\TicketMessage;
 
 class TicketStateMachine
 {
@@ -111,5 +112,79 @@ class TicketStateMachine
                 "Ticket #{$ticket->ticket_number} is closed. New conversation replies are rejected."
             );
         }
+    }
+
+    /**
+     * Handle lifecycle transitions and triggers upon message creation.
+     *
+     * @throws InvalidTicketTransitionException
+     */
+    public function handleMessageCreated(TicketMessage $message, TicketStatus|string|null $overrideStatus = null): Ticket
+    {
+        $ticket = $message->relationLoaded('ticket')
+            ? $message->ticket
+            : Ticket::withoutGlobalScopes()->findOrFail($message->ticket_id);
+
+        $this->assertCanReply($ticket);
+
+        // Internal notes never alter ticket status
+        if ($message->isInternalNote()) {
+            return $ticket;
+        }
+
+        // Public replies by customer
+        if ($message->isCustomerAuthor()) {
+            $currentStatus = $ticket->status instanceof TicketStatus
+                ? $ticket->status
+                : TicketStatus::from((string) $ticket->status);
+
+            // Customer reply to pending or resolved tickets reopens status to open
+            if (in_array($currentStatus, [TicketStatus::PENDING, TicketStatus::RESOLVED], true)) {
+                return $this->transitionTo($ticket, TicketStatus::OPEN);
+            }
+
+            return $ticket;
+        }
+
+        // Public replies by staff/agent
+        // Record first agent reply timestamp if not already recorded
+        if ($ticket->first_replied_at === null) {
+            $ticket->first_replied_at = now();
+            $ticket->save();
+        }
+
+        // Agent public reply defaults status to pending, with payload override option
+        $target = $overrideStatus ?? TicketStatus::PENDING;
+        $targetStatus = $target instanceof TicketStatus ? $target : TicketStatus::from((string) $target);
+
+        $currentStatus = $ticket->status instanceof TicketStatus
+            ? $ticket->status
+            : TicketStatus::from((string) $ticket->status);
+
+        if ($currentStatus === $targetStatus) {
+            return $ticket;
+        }
+
+        // When ticket is NEW, it must transition to OPEN first before target status
+        if ($currentStatus === TicketStatus::NEW) {
+            $this->transitionTo($ticket, TicketStatus::OPEN);
+            if ($targetStatus !== TicketStatus::OPEN) {
+                $this->transitionTo($ticket, $targetStatus);
+            }
+
+            return $ticket->refresh();
+        }
+
+        // When ticket is RESOLVED, it must reopen to OPEN first before transitioning to target status
+        if ($currentStatus === TicketStatus::RESOLVED) {
+            $this->transitionTo($ticket, TicketStatus::OPEN);
+            if ($targetStatus !== TicketStatus::OPEN) {
+                $this->transitionTo($ticket, $targetStatus);
+            }
+
+            return $ticket->refresh();
+        }
+
+        return $this->transitionTo($ticket, $targetStatus);
     }
 }
