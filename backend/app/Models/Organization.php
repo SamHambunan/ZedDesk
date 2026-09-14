@@ -16,6 +16,18 @@ class Organization extends Model
         'slug',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'ticket_counter' => 'integer',
+        ];
+    }
+
     public function organizationMembers(): HasMany
     {
         return $this->hasMany(OrganizationMember::class);
@@ -41,5 +53,10 @@ class Organization extends Model
     public function customers(): HasMany
     {
         return $this->hasMany(Customer::class);
+    }
+
+    public function tickets(): HasMany
+    {
+        return $this->hasMany(Ticket::class);
     }
 }
