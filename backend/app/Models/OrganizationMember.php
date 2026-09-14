@@ -45,4 +45,24 @@ class OrganizationMember extends Model
     {
         return $this->hasMany(Ticket::class, 'assigned_member_id');
     }
+
+    public function ticketAssignments(): HasMany
+    {
+        return $this->hasMany(TicketAssignment::class, 'member_id');
+    }
+
+    public function ticketsAssignedBy(): HasMany
+    {
+        return $this->hasMany(TicketAssignment::class, 'assigned_by_id');
+    }
+
+    /**
+     * Determine whether this organization member belongs to the given team.
+     */
+    public function belongsToTeam(Team|int|string $team): bool
+    {
+        $teamId = $team instanceof Team ? $team->id : $team;
+
+        return $this->teams()->where('team_id', $teamId)->exists();
+    }
 }

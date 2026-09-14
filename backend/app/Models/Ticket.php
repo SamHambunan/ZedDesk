@@ -134,6 +134,14 @@ class Ticket extends Model
     }
 
     /**
+     * Get all assignment history records for this ticket ordered chronologically.
+     */
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(TicketAssignment::class)->oldest();
+    }
+
+    /**
      * Get all conversation messages for this ticket ordered chronologically.
      */
     public function messages(): HasMany
