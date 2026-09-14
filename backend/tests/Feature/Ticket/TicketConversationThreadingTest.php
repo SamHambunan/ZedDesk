@@ -296,3 +296,40 @@ test('system rejects message creation on closed tickets', function () {
         ]);
     })->toThrow(InvalidTicketTransitionException::class);
 });
+
+test('agent public reply on resolved ticket reopens ticket and defaults to pending', function () {
+    $ticket = Ticket::create([
+        'organization_id' => $this->acmeOrg->id,
+        'customer_id' => $this->acmeCustomer->id,
+        'subject' => 'Resolved ticket needing agent follow-up',
+        'status' => TicketStatus::RESOLVED,
+        'resolved_at' => now()->subDay(),
+    ]);
+
+    $ticket->addPublicReply($this->agentMember, 'Revisiting this resolved issue.');
+    $ticket->refresh();
+
+    expect($ticket->status)->toBe(TicketStatus::PENDING)
+        ->and($ticket->resolved_at)->toBeNull();
+});
+
+test('invalid target status payload override throws InvalidTicketTransitionException', function () {
+    $ticket = Ticket::create([
+        'organization_id' => $this->acmeOrg->id,
+        'customer_id' => $this->acmeCustomer->id,
+        'subject' => 'Testing bad status payload',
+        'status' => TicketStatus::OPEN,
+    ]);
+
+    expect(function () use ($ticket) {
+        TicketMessage::create([
+            'organization_id' => $this->acmeOrg->id,
+            'ticket_id' => $ticket->id,
+            'message_type' => TicketMessageType::PUBLIC_REPLY,
+            'author_type' => OrganizationMember::class,
+            'author_id' => $this->agentMember->id,
+            'body' => 'Trying invalid status payload',
+            'target_status' => 'nonexistent_status',
+        ]);
+    })->toThrow(InvalidTicketTransitionException::class);
+});

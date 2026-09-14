@@ -246,7 +246,12 @@ test('ticket message query scopes strictly enforce customer and staff visibility
     expect($forCustomer)->toHaveCount(1)
         ->and($forCustomer->first()->id)->toBe($publicReply->id);
 
-    // Staff visible scope includes both public replies and internal notes
+    // Organization member visible scope includes both public replies and internal notes
+    $memberVisible = TicketMessage::memberVisible()->get();
+    expect($memberVisible)->toHaveCount(2)
+        ->and($memberVisible->pluck('id')->all())->toContain($publicReply->id, $internalNote->id);
+
+    // Staff visible scope alias includes both public replies and internal notes
     $staffVisible = TicketMessage::staffVisible()->get();
     expect($staffVisible)->toHaveCount(2)
         ->and($staffVisible->pluck('id')->all())->toContain($publicReply->id, $internalNote->id);
@@ -259,6 +264,12 @@ test('ticket message query scopes strictly enforce customer and staff visibility
     $internalNotesOnly = TicketMessage::internalNotes()->get();
     expect($internalNotesOnly)->toHaveCount(1)
         ->and($internalNotesOnly->first()->id)->toBe($internalNote->id);
+
+    // Author checks
+    expect($publicReply->isCustomerAuthor())->toBeTrue()
+        ->and($publicReply->isMemberAuthor())->toBeFalse()
+        ->and($internalNote->isCustomerAuthor())->toBeFalse()
+        ->and($internalNote->isMemberAuthor())->toBeTrue();
 });
 
 test('ticket message enforces automatic tenant query scoping', function () {

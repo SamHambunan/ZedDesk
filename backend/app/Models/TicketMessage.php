@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use App\Builders\TicketMessageBuilder;
-use App\Context\OrganizationContext;
 use App\Enums\TicketMessageType;
 use App\Enums\TicketStatus;
 use App\Exceptions\ImmutableMessageException;
+use App\Exceptions\InvalidTicketTransitionException;
 use App\Services\TicketStateMachine;
 use App\Traits\BelongsToOrganization;
 use DomainException;
@@ -67,40 +67,28 @@ class TicketMessage extends Model
     protected static function booted(): void
     {
         static::creating(function (TicketMessage $message) {
-            // 1. Automatic tenant scoping resolution
-            if (empty($message->organization_id)) {
-                if (! empty($message->ticket_id)) {
-                    $ticket = $message->relationLoaded('ticket')
-                        ? $message->ticket
-                        : Ticket::withoutGlobalScopes()->find($message->ticket_id);
-
-                    if ($ticket) {
-                        $message->organization_id = $ticket->organization_id;
-                    }
-                }
-
-                if (empty($message->organization_id) && OrganizationContext::hasCurrent()) {
-                    $message->organization_id = OrganizationContext::getCurrentId();
-                }
-            }
-
-            // 2. Validate ticket existence and tenant consistency
+            // Resolve ticket instance once
             $ticket = $message->relationLoaded('ticket')
                 ? $message->ticket
-                : Ticket::withoutGlobalScopes()->find($message->ticket_id);
+                : (! empty($message->ticket_id) ? Ticket::withoutGlobalScopes()->find($message->ticket_id) : null);
 
             if (! $ticket) {
                 throw new DomainException('Ticket message must belong to a valid ticket.');
             }
 
-            if (! empty($message->organization_id) && $message->organization_id !== $ticket->organization_id) {
-                throw new DomainException('Cross-tenant ticket message creation is rejected.');
+            // Automatic organization context resolution
+            if (empty($message->organization_id)) {
+                $message->organization_id = $ticket->organization_id;
             }
 
-            // 3. Reject replies on closed tickets
+            if ($message->organization_id !== $ticket->organization_id) {
+                throw new DomainException('Cross-organization ticket message creation is rejected.');
+            }
+
+            // Precondition: Reject replies on closed tickets
             app(TicketStateMachine::class)->assertCanReply($ticket);
 
-            // 4. Privacy: Customers cannot create internal notes
+            // Privacy boundary: Customers cannot create internal notes
             if ($message->isCustomerAuthor() && $message->isInternalNote()) {
                 throw new DomainException('Customers cannot create internal notes.');
             }
@@ -171,9 +159,9 @@ class TicketMessage extends Model
     }
 
     /**
-     * Scope query to messages visible to staff (public replies and internal notes).
+     * Scope query to messages visible to organization members (public replies and internal notes).
      */
-    public function scopeStaffVisible(Builder $query): Builder
+    public function scopeMemberVisible(Builder $query): Builder
     {
         return $query->whereIn('message_type', [
             TicketMessageType::PUBLIC_REPLY->value,
@@ -182,11 +170,19 @@ class TicketMessage extends Model
     }
 
     /**
-     * Alias for staff-visible scope.
+     * Alias for organization-member-visible scope (staff visibility).
+     */
+    public function scopeStaffVisible(Builder $query): Builder
+    {
+        return $this->scopeMemberVisible($query);
+    }
+
+    /**
+     * Alias for member/staff visible scope.
      */
     public function scopeForStaff(Builder $query): Builder
     {
-        return $this->scopeStaffVisible($query);
+        return $this->scopeMemberVisible($query);
     }
 
     /**
@@ -242,11 +238,42 @@ class TicketMessage extends Model
     }
 
     /**
-     * Determine whether the message author is an internal staff member (User or OrganizationMember).
+     * Determine whether the message author is an organization member or internal user.
+     */
+    public function isMemberAuthor(): bool
+    {
+        return ! $this->isCustomerAuthor();
+    }
+
+    /**
+     * Backward-compatible alias for isMemberAuthor.
      */
     public function isStaffAuthor(): bool
     {
-        return ! $this->isCustomerAuthor();
+        return $this->isMemberAuthor();
+    }
+
+    /**
+     * Normalize and validate target status override from creation payload.
+     *
+     * @throws InvalidTicketTransitionException
+     */
+    protected function normalizeTargetStatus(mixed $value): ?TicketStatus
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        if ($value instanceof TicketStatus) {
+            return $value;
+        }
+
+        $status = TicketStatus::tryFrom((string) $value);
+        if ($status === null) {
+            throw new InvalidTicketTransitionException("Invalid target status '{$value}' provided in message payload.");
+        }
+
+        return $status;
     }
 
     /**
@@ -254,11 +281,7 @@ class TicketMessage extends Model
      */
     public function setStatusAttribute(mixed $value): void
     {
-        if (! empty($value)) {
-            $this->targetStatusOverride = $value instanceof TicketStatus
-                ? $value
-                : TicketStatus::tryFrom((string) $value);
-        }
+        $this->targetStatusOverride = $this->normalizeTargetStatus($value);
     }
 
     /**
@@ -266,11 +289,7 @@ class TicketMessage extends Model
      */
     public function setTargetStatusAttribute(mixed $value): void
     {
-        if (! empty($value)) {
-            $this->targetStatusOverride = $value instanceof TicketStatus
-                ? $value
-                : TicketStatus::tryFrom((string) $value);
-        }
+        $this->targetStatusOverride = $this->normalizeTargetStatus($value);
     }
 
     /**

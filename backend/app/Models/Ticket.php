@@ -152,7 +152,7 @@ class Ticket extends Model
     }
 
     /**
-     * Get only private internal notes ordered chronologically.
+     * Get only internal notes ordered chronologically.
      */
     public function internalNotes(): HasMany
     {

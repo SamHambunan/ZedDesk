@@ -175,6 +175,16 @@ class TicketStateMachine
             return $ticket->refresh();
         }
 
+        // When ticket is RESOLVED, it must reopen to OPEN first before transitioning to target status
+        if ($currentStatus === TicketStatus::RESOLVED) {
+            $this->transitionTo($ticket, TicketStatus::OPEN);
+            if ($targetStatus !== TicketStatus::OPEN) {
+                $this->transitionTo($ticket, $targetStatus);
+            }
+
+            return $ticket->refresh();
+        }
+
         return $this->transitionTo($ticket, $targetStatus);
     }
 }
