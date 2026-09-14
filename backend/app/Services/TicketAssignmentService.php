@@ -20,7 +20,7 @@ class TicketAssignmentService
     ) {}
 
     /**
-     * Assign or route a ticket to a team, an organization member, or both.
+     * Assign a ticket to a team, an organization member, or both.
      *
      * @throws InvalidAssignmentException
      * @throws InvalidTicketTransitionException
@@ -38,17 +38,23 @@ class TicketAssignmentService
             );
         }
 
-        $teamModel = $team instanceof Team
-            ? $team
-            : (! empty($team) ? Team::withoutGlobalScopes()->find($team) : null);
+        $teamModel = match (true) {
+            $team instanceof Team => $team,
+            is_int($team) || (is_string($team) && $team !== '') => Team::withoutGlobalScopes()->findOrFail($team),
+            default => null,
+        };
 
-        $memberModel = $member instanceof OrganizationMember
-            ? $member
-            : (! empty($member) ? OrganizationMember::withoutGlobalScopes()->find($member) : null);
+        $memberModel = match (true) {
+            $member instanceof OrganizationMember => $member,
+            is_int($member) || (is_string($member) && $member !== '') => OrganizationMember::withoutGlobalScopes()->findOrFail($member),
+            default => null,
+        };
 
-        $assignedByModel = $assignedBy instanceof OrganizationMember
-            ? $assignedBy
-            : (! empty($assignedBy) ? OrganizationMember::withoutGlobalScopes()->find($assignedBy) : null);
+        $assignedByModel = match (true) {
+            $assignedBy instanceof OrganizationMember => $assignedBy,
+            is_int($assignedBy) || (is_string($assignedBy) && $assignedBy !== '') => OrganizationMember::withoutGlobalScopes()->findOrFail($assignedBy),
+            default => null,
+        };
 
         // Strict cross-tenant boundary validation
         if ($teamModel && $teamModel->organization_id !== $ticket->organization_id) {
@@ -63,32 +69,16 @@ class TicketAssignmentService
             throw new DomainException('Cross-organization assignment author is rejected.');
         }
 
-        // Dual-tier routing constraint: if both team and member are designated, member must belong to team
-        $targetTeamId = $team !== null ? $teamModel?->id : $ticket->assigned_team_id;
-        $targetMemberId = $member !== null ? $memberModel?->id : $ticket->assigned_member_id;
-
-        if ($targetTeamId && $targetMemberId) {
-            $isMemberInTeam = DB::table('team_members')
-                ->where('team_id', $targetTeamId)
-                ->where('organization_member_id', $targetMemberId)
-                ->exists();
-
-            if (! $isMemberInTeam) {
-                throw new InvalidAssignmentException(
-                    'The assigned member does not belong to the designated team.'
-                );
-            }
+        // Dual-tier assignment constraint: if both team and member are designated, member must belong to team
+        if ($teamModel && $memberModel && ! $teamModel->hasMember($memberModel)) {
+            throw new InvalidAssignmentException(
+                'The assigned organization member does not belong to the designated team.'
+            );
         }
 
-        return DB::transaction(function () use ($ticket, $teamModel, $memberModel, $assignedByModel, $team, $member) {
-            if ($team !== null) {
-                $ticket->assigned_team_id = $teamModel?->id;
-            }
-
-            if ($member !== null) {
-                $ticket->assigned_member_id = $memberModel?->id;
-            }
-
+        return DB::transaction(function () use ($ticket, $teamModel, $memberModel, $assignedByModel) {
+            $ticket->assigned_team_id = $teamModel?->id;
+            $ticket->assigned_member_id = $memberModel?->id;
             $ticket->save();
 
             /** @var TicketAssignment $assignment */
@@ -106,6 +96,19 @@ class TicketAssignmentService
     }
 
     /**
+     * Unassign a ticket from any team and organization member.
+     *
+     * @throws InvalidTicketTransitionException
+     * @throws DomainException
+     */
+    public function unassign(
+        Ticket $ticket,
+        OrganizationMember|int|string|null $assignedBy = null
+    ): TicketAssignment {
+        return $this->assign($ticket, team: null, member: null, assignedBy: $assignedBy);
+    }
+
+    /**
      * Claim an unassigned ticket for the given organization member.
      * Auto-advances ticket status from 'new' to 'open' and records first_replied_at.
      *
@@ -113,7 +116,7 @@ class TicketAssignmentService
      * @throws InvalidTicketTransitionException
      * @throws DomainException
      */
-    public function claim(Ticket $ticket, OrganizationMember|int|string $agent): TicketAssignment
+    public function claim(Ticket $ticket, OrganizationMember|int|string $member): TicketAssignment
     {
         if ($ticket->isClosed()) {
             throw new InvalidTicketTransitionException(
@@ -121,11 +124,11 @@ class TicketAssignmentService
             );
         }
 
-        $agentModel = $agent instanceof OrganizationMember
-            ? $agent
-            : OrganizationMember::withoutGlobalScopes()->findOrFail($agent);
+        $memberModel = $member instanceof OrganizationMember
+            ? $member
+            : OrganizationMember::withoutGlobalScopes()->findOrFail($member);
 
-        if ($agentModel->organization_id !== $ticket->organization_id) {
+        if ($memberModel->organization_id !== $ticket->organization_id) {
             throw new DomainException('Cross-organization ticket claiming is rejected.');
         }
 
@@ -136,20 +139,16 @@ class TicketAssignmentService
         }
 
         if ($ticket->assigned_team_id !== null) {
-            $isMemberInTeam = DB::table('team_members')
-                ->where('team_id', $ticket->assigned_team_id)
-                ->where('organization_member_id', $agentModel->id)
-                ->exists();
-
-            if (! $isMemberInTeam) {
+            $team = Team::withoutGlobalScopes()->find($ticket->assigned_team_id);
+            if ($team && ! $team->hasMember($memberModel)) {
                 throw new InvalidAssignmentException(
-                    'Agent is not a member of the designated team.'
+                    'Organization member is not a member of the designated team.'
                 );
             }
         }
 
-        return DB::transaction(function () use ($ticket, $agentModel) {
-            $ticket->assigned_member_id = $agentModel->id;
+        return DB::transaction(function () use ($ticket, $memberModel) {
+            $ticket->assigned_member_id = $memberModel->id;
 
             $currentStatus = $ticket->status instanceof TicketStatus
                 ? $ticket->status
@@ -165,8 +164,8 @@ class TicketAssignmentService
             $assignment = $ticket->assignments()->create([
                 'organization_id' => $ticket->organization_id,
                 'team_id' => $ticket->assigned_team_id,
-                'member_id' => $agentModel->id,
-                'assigned_by_id' => $agentModel->id,
+                'member_id' => $memberModel->id,
+                'assigned_by_id' => $memberModel->id,
             ]);
 
             TicketAssigned::dispatch($ticket, $assignment);

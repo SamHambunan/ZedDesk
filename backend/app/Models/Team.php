@@ -39,4 +39,14 @@ class Team extends Model
     {
         return $this->hasMany(TicketAssignment::class, 'team_id');
     }
+
+    /**
+     * Determine whether an organization member belongs to this team.
+     */
+    public function hasMember(OrganizationMember|int|string $member): bool
+    {
+        $memberId = $member instanceof OrganizationMember ? $member->id : $member;
+
+        return $this->members()->where('organization_member_id', $memberId)->exists();
+    }
 }

@@ -7,7 +7,6 @@ use App\Models\Team;
 use Closure;
 use Illuminate\Contracts\Validation\DataAwareRule;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Translation\PotentiallyTranslatedString;
 
 class MemberBelongsToTeam implements DataAwareRule, ValidationRule
@@ -46,22 +45,17 @@ class MemberBelongsToTeam implements DataAwareRule, ValidationRule
             return;
         }
 
-        $teamId = $this->team instanceof Team
-            ? $this->team->id
-            : ($this->team ?? ($this->data['assigned_team_id'] ?? $this->data['team_id'] ?? null));
+        $teamModel = $this->team instanceof Team
+            ? $this->team
+            : Team::withoutGlobalScopes()->find($this->team ?? ($this->data['assigned_team_id'] ?? $this->data['team_id'] ?? null));
 
-        if (empty($teamId)) {
+        if (! $teamModel) {
             return;
         }
 
         $memberId = $value instanceof OrganizationMember ? $value->id : $value;
 
-        $exists = DB::table('team_members')
-            ->where('team_id', $teamId)
-            ->where('organization_member_id', $memberId)
-            ->exists();
-
-        if (! $exists) {
+        if (! $teamModel->hasMember($memberId)) {
             $fail('The selected organization member is not a member of the designated team.');
         }
     }

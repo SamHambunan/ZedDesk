@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Rules\MemberBelongsToTeam;
 use App\Services\TicketAssignmentService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Validator;
@@ -381,23 +382,81 @@ test('claiming ticket across organizations is rejected', function () {
     })->toThrow(DomainException::class);
 });
 
-test('ticket model convenience assign and claim methods delegate to service', function () {
+test('reassigning ticket to new team without specifying member clears previous member and moves ticket to team pool', function () {
     Event::fake([TicketAssigned::class]);
 
-    $assignment = $this->acmeTicket->assign($this->billingTeam, $this->acmeMember1);
+    // Initial assignment to Billing Team & Member 1
+    $this->assignmentService->assign(
+        ticket: $this->acmeTicket,
+        team: $this->billingTeam,
+        member: $this->acmeMember1,
+        assignedBy: $this->acmeMember1
+    );
 
-    expect($this->acmeTicket->fresh()->assigned_member_id)->toBe($this->acmeMember1->id)
-        ->and($assignment)->toBeInstanceOf(TicketAssignment::class);
+    // Reassigning to Technical Support Team without specifying member (Member 1 is NOT in Technical Support)
+    $reassignment = $this->assignmentService->assign(
+        ticket: $this->acmeTicket,
+        team: $this->techTeam
+    );
 
-    $newTicket = Ticket::create([
-        'organization_id' => $this->acmeOrg->id,
-        'customer_id' => $this->acmeCustomer->id,
-        'subject' => 'Model claim test',
+    expect($this->acmeTicket->fresh()->assigned_team_id)->toBe($this->techTeam->id)
+        ->and($this->acmeTicket->fresh()->assigned_member_id)->toBeNull()
+        ->and($reassignment->team_id)->toBe($this->techTeam->id)
+        ->and($reassignment->member_id)->toBeNull();
+});
+
+test('unassigning ticket clears team and member pointers, appends audit record, and dispatches event', function () {
+    Event::fake([TicketAssigned::class]);
+
+    $this->assignmentService->assign(
+        ticket: $this->acmeTicket,
+        team: $this->billingTeam,
+        member: $this->acmeMember1,
+        assignedBy: $this->acmeMember1
+    );
+
+    $unassignment = $this->assignmentService->unassign(
+        ticket: $this->acmeTicket,
+        assignedBy: $this->acmeMember2
+    );
+
+    expect($this->acmeTicket->fresh()->assigned_team_id)->toBeNull()
+        ->and($this->acmeTicket->fresh()->assigned_member_id)->toBeNull()
+        ->and($unassignment->team_id)->toBeNull()
+        ->and($unassignment->member_id)->toBeNull()
+        ->and($unassignment->assigned_by_id)->toBe($this->acmeMember2->id);
+
+    $this->assertDatabaseHas('ticket_assignments', [
+        'id' => $unassignment->id,
+        'ticket_id' => $this->acmeTicket->id,
+        'team_id' => null,
+        'member_id' => null,
+        'assigned_by_id' => $this->acmeMember2->id,
     ]);
 
-    $claimAssignment = $newTicket->claim($this->acmeMember1);
+    Event::assertDispatched(TicketAssigned::class);
+});
 
-    expect($newTicket->fresh()->assigned_member_id)->toBe($this->acmeMember1->id)
-        ->and($newTicket->fresh()->status)->toBe(TicketStatus::OPEN)
-        ->and($claimAssignment)->toBeInstanceOf(TicketAssignment::class);
+test('assignment service throws ModelNotFoundException when non-existent team or member id is supplied', function () {
+    expect(function () {
+        $this->assignmentService->assign(
+            ticket: $this->acmeTicket,
+            team: 99999
+        );
+    })->toThrow(ModelNotFoundException::class);
+
+    expect(function () {
+        $this->assignmentService->assign(
+            ticket: $this->acmeTicket,
+            team: $this->billingTeam,
+            member: 99999
+        );
+    })->toThrow(ModelNotFoundException::class);
+});
+
+test('team and organization member domain models support hasMember and belongsToTeam checks', function () {
+    expect($this->billingTeam->hasMember($this->acmeMember1))->toBeTrue()
+        ->and($this->billingTeam->hasMember($this->acmeMember2))->toBeFalse()
+        ->and($this->acmeMember1->belongsToTeam($this->billingTeam))->toBeTrue()
+        ->and($this->acmeMember1->belongsToTeam($this->techTeam))->toBeFalse();
 });

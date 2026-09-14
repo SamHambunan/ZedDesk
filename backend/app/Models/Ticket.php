@@ -7,7 +7,6 @@ use App\Enums\TicketMessageType;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Exceptions\InvalidTicketTransitionException;
-use App\Services\TicketAssignmentService;
 use App\Services\TicketNumberGenerator;
 use App\Traits\BelongsToOrganization;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -197,24 +196,5 @@ class Ticket extends Model
             'author_id' => (string) $author->getKey(),
             'body' => $body,
         ]);
-    }
-
-    /**
-     * Assign or route this ticket to a team, an organization member, or both.
-     */
-    public function assign(
-        Team|int|string|null $team = null,
-        OrganizationMember|int|string|null $member = null,
-        OrganizationMember|int|string|null $assignedBy = null
-    ): TicketAssignment {
-        return app(TicketAssignmentService::class)->assign($this, $team, $member, $assignedBy);
-    }
-
-    /**
-     * Claim this unassigned ticket for the given organization member.
-     */
-    public function claim(OrganizationMember|int|string $agent): TicketAssignment
-    {
-        return app(TicketAssignmentService::class)->claim($this, $agent);
     }
 }
