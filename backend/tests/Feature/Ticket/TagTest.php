@@ -122,7 +122,7 @@ test('identical slug across different organizations is allowed', function () {
         ->and($acmeTag->organization_id)->not->toBe($betaTag->organization_id);
 });
 
-test('tag queries are automatically scoped by tenant context', function () {
+test('tag queries are automatically scoped by organization context', function () {
     Tag::create([
         'organization_id' => $this->acmeOrg->id,
         'name' => 'Acme Internal',

@@ -217,6 +217,24 @@ class Ticket extends Model
     }
 
     /**
+     * Ensure the ticket is not closed before mutating relationships or attributes.
+     *
+     * @throws InvalidTicketTransitionException
+     */
+    protected function ensureNotClosed(string $actionMessage): void
+    {
+        $status = $this->status instanceof TicketStatus ? $this->status->value : (string) $this->status;
+        $originalStatus = $this->getOriginal('status');
+        $originalStatusValue = $originalStatus instanceof TicketStatus ? $originalStatus->value : (string) $originalStatus;
+
+        if ($status === TicketStatus::CLOSED->value || $originalStatusValue === TicketStatus::CLOSED->value) {
+            throw new InvalidTicketTransitionException(
+                "Ticket #{$this->ticket_number} is closed and immutable. {$actionMessage}"
+            );
+        }
+    }
+
+    /**
      * Update the ticket's priority classification.
      *
      * @throws InvalidTicketTransitionException
@@ -224,6 +242,8 @@ class Ticket extends Model
      */
     public function updatePriority(TicketPriority|string $priority): self
     {
+        $this->ensureNotClosed('Priority updates are rejected.');
+
         $resolved = is_string($priority) ? TicketPriority::from($priority) : $priority;
 
         $this->update(['priority' => $resolved]);
@@ -248,11 +268,7 @@ class Ticket extends Model
      */
     public function attachTag(Tag|string $tag): self
     {
-        if ($this->status === TicketStatus::CLOSED || $this->getOriginal('status') === TicketStatus::CLOSED->value) {
-            throw new InvalidTicketTransitionException(
-                "Ticket #{$this->ticket_number} is closed and immutable. Tag changes are rejected."
-            );
-        }
+        $this->ensureNotClosed('Tag changes are rejected.');
 
         $tagModel = $tag instanceof Tag ? $tag : Tag::withoutGlobalScopes()->findOrFail($tag);
 
@@ -266,21 +282,22 @@ class Ticket extends Model
     }
 
     /**
-     * Detach a tag from this ticket.
+     * Detach a tag from this ticket within the same organization.
      *
+     * @throws DomainException
      * @throws InvalidTicketTransitionException
      */
     public function detachTag(Tag|string $tag): self
     {
-        if ($this->status === TicketStatus::CLOSED || $this->getOriginal('status') === TicketStatus::CLOSED->value) {
-            throw new InvalidTicketTransitionException(
-                "Ticket #{$this->ticket_number} is closed and immutable. Tag changes are rejected."
-            );
+        $this->ensureNotClosed('Tag changes are rejected.');
+
+        $tagModel = $tag instanceof Tag ? $tag : Tag::withoutGlobalScopes()->findOrFail($tag);
+
+        if ($tagModel->organization_id !== $this->organization_id) {
+            throw new DomainException('Cross-organization tag detachment is rejected.');
         }
 
-        $tagId = $tag instanceof Tag ? $tag->id : $tag;
-
-        $this->tags()->detach($tagId);
+        $this->tags()->detach($tagModel->id);
 
         return $this;
     }
@@ -295,11 +312,7 @@ class Ticket extends Model
      */
     public function syncTags(iterable $tags): self
     {
-        if ($this->status === TicketStatus::CLOSED || $this->getOriginal('status') === TicketStatus::CLOSED->value) {
-            throw new InvalidTicketTransitionException(
-                "Ticket #{$this->ticket_number} is closed and immutable. Tag changes are rejected."
-            );
-        }
+        $this->ensureNotClosed('Tag changes are rejected.');
 
         $tagIds = [];
         foreach ($tags as $tag) {

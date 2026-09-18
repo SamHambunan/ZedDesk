@@ -113,7 +113,7 @@ class AttachmentService
     }
 
     /**
-     * Stream an attachment file for download after verifying tenant authorization.
+     * Stream an attachment file for download after verifying organization member authorization.
      *
      * @throws HttpException
      */

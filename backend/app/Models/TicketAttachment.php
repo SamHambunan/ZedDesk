@@ -40,7 +40,7 @@ class TicketAttachment extends Model
     }
 
     /**
-     * Model boot lifecycle events enforcing tenant resolution and append-only immutability.
+     * Model boot lifecycle events enforcing organization resolution and append-only immutability.
      */
     protected static function booted(): void
     {

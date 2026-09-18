@@ -128,6 +128,11 @@ test('ticket rejects attaching tag from another organization', function () {
     ]);
 });
 
+test('ticket rejects detaching tag from another organization', function () {
+    expect(fn () => $this->acmeTicket->detachTag($this->betaTag))
+        ->toThrow(DomainException::class, 'Cross-organization tag detachment is rejected.');
+});
+
 test('closed ticket rejects tag attachment and detachment', function () {
     $this->acmeTicket->attachTag($this->acmeTag);
 
@@ -249,7 +254,7 @@ test('organization member can attach and detach tags on ticket via api', functio
     ]);
 });
 
-test('cross tenant tag attachment is rejected via api', function () {
+test('cross organization tag attachment is rejected via api', function () {
     Sanctum::actingAs($this->acmeUser);
 
     $response = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/tags", [
@@ -257,4 +262,29 @@ test('cross tenant tag attachment is rejected via api', function () {
     ]);
 
     $response->assertStatus(422);
+});
+
+test('cross organization tag detachment is rejected via api', function () {
+    Sanctum::actingAs($this->acmeUser);
+
+    $response = $this->deleteJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/tags/{$this->betaTag->id}");
+
+    $response->assertStatus(422);
+});
+
+test('tag attachment and detachment on closed ticket returns 422 via api', function () {
+    Sanctum::actingAs($this->acmeUser);
+
+    $this->acmeTicket->status = TicketStatus::CLOSED;
+    $this->acmeTicket->save();
+
+    // Attach attempt on closed ticket
+    $attachResponse = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/tags", [
+        'tag_id' => $this->acmeTag->id,
+    ]);
+    $attachResponse->assertStatus(422);
+
+    // Detach attempt on closed ticket
+    $detachResponse = $this->deleteJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/tags/{$this->acmeTag->id}");
+    $detachResponse->assertStatus(422);
 });

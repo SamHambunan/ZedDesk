@@ -103,16 +103,16 @@ test('unauthenticated request to streaming endpoint is rejected', function () {
     $response->assertStatus(401);
 });
 
-test('user from another organization is forbidden from downloading attachment', function () {
+test('user from another organization cannot download attachment', function () {
     Sanctum::actingAs($this->betaUser);
 
-    // Cross-tenant access attempted on Acme subdomain
+    // Cross-organization access attempted on Acme subdomain (rejected by membership middleware)
     $response = $this->getJson("http://acme.localhost/api/attachments/{$this->acmeAttachment->id}/download");
     $response->assertStatus(403);
 
-    // Cross-tenant access attempted on Beta subdomain
+    // Cross-organization access attempted on Beta subdomain (scoped out by organization query scope)
     $responseBeta = $this->getJson("http://beta.localhost/api/attachments/{$this->acmeAttachment->id}/download");
-    $responseBeta->assertStatus(403);
+    $responseBeta->assertStatus(404);
 });
 
 test('streaming endpoint returns 404 when attachment does not exist', function () {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Context\OrganizationContext;
+use App\Exceptions\InvalidTicketTransitionException;
 use App\Http\Controllers\Controller;
 use App\Models\Tag;
 use App\Models\Ticket;
@@ -91,7 +92,7 @@ class TagController extends Controller
 
         try {
             $ticket->attachTag($validated['tag_id']);
-        } catch (DomainException $e) {
+        } catch (DomainException|InvalidTicketTransitionException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
@@ -107,7 +108,11 @@ class TagController extends Controller
     {
         $ticket = Ticket::findOrFail($ticketId);
 
-        $ticket->detachTag($tagId);
+        try {
+            $ticket->detachTag($tagId);
+        } catch (DomainException|InvalidTicketTransitionException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json([
             'message' => 'Tag detached successfully.',
