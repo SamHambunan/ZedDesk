@@ -9,11 +9,14 @@ use App\Enums\TicketStatus;
 use App\Exceptions\InvalidTicketTransitionException;
 use App\Services\TicketNumberGenerator;
 use App\Traits\BelongsToOrganization;
+use DomainException;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Ticket extends Model
@@ -170,6 +173,21 @@ class Ticket extends Model
     }
 
     /**
+     * Get all attachments for this ticket across all conversation messages.
+     */
+    public function attachments(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            TicketAttachment::class,
+            TicketMessage::class,
+            'ticket_id',
+            'ticket_message_id',
+            'id',
+            'id'
+        );
+    }
+
+    /**
      * Add a public reply to this ticket.
      */
     public function addPublicReply(Model $author, string $body, TicketStatus|string|null $targetStatus = null): TicketMessage
@@ -196,5 +214,119 @@ class Ticket extends Model
             'author_id' => (string) $author->getKey(),
             'body' => $body,
         ]);
+    }
+
+    /**
+     * Ensure the ticket is not closed before mutating relationships or attributes.
+     *
+     * @throws InvalidTicketTransitionException
+     */
+    protected function ensureNotClosed(string $actionMessage): void
+    {
+        $status = $this->status instanceof TicketStatus ? $this->status->value : (string) $this->status;
+        $originalStatus = $this->getOriginal('status');
+        $originalStatusValue = $originalStatus instanceof TicketStatus ? $originalStatus->value : (string) $originalStatus;
+
+        if ($status === TicketStatus::CLOSED->value || $originalStatusValue === TicketStatus::CLOSED->value) {
+            throw new InvalidTicketTransitionException(
+                "Ticket #{$this->ticket_number} is closed and immutable. {$actionMessage}"
+            );
+        }
+    }
+
+    /**
+     * Update the ticket's priority classification.
+     *
+     * @throws InvalidTicketTransitionException
+     * @throws \ValueError
+     */
+    public function updatePriority(TicketPriority|string $priority): self
+    {
+        $this->ensureNotClosed('Priority updates are rejected.');
+
+        $resolved = is_string($priority) ? TicketPriority::from($priority) : $priority;
+
+        $this->update(['priority' => $resolved]);
+
+        return $this;
+    }
+
+    /**
+     * Get the tags associated with this ticket.
+     */
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class, 'ticket_tags', 'ticket_id', 'tag_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * Attach a tag to this ticket within the same organization.
+     *
+     * @throws DomainException
+     * @throws InvalidTicketTransitionException
+     */
+    public function attachTag(Tag|string $tag): self
+    {
+        $this->ensureNotClosed('Tag changes are rejected.');
+
+        $tagModel = $tag instanceof Tag ? $tag : Tag::withoutGlobalScopes()->findOrFail($tag);
+
+        if ($tagModel->organization_id !== $this->organization_id) {
+            throw new DomainException('Cross-organization tag assignment is rejected.');
+        }
+
+        $this->tags()->syncWithoutDetaching([$tagModel->id]);
+
+        return $this;
+    }
+
+    /**
+     * Detach a tag from this ticket within the same organization.
+     *
+     * @throws DomainException
+     * @throws InvalidTicketTransitionException
+     */
+    public function detachTag(Tag|string $tag): self
+    {
+        $this->ensureNotClosed('Tag changes are rejected.');
+
+        $tagModel = $tag instanceof Tag ? $tag : Tag::withoutGlobalScopes()->findOrFail($tag);
+
+        if ($tagModel->organization_id !== $this->organization_id) {
+            throw new DomainException('Cross-organization tag detachment is rejected.');
+        }
+
+        $this->tags()->detach($tagModel->id);
+
+        return $this;
+    }
+
+    /**
+     * Sync tags for this ticket within the same organization.
+     *
+     * @param  iterable<Tag|string>  $tags
+     *
+     * @throws DomainException
+     * @throws InvalidTicketTransitionException
+     */
+    public function syncTags(iterable $tags): self
+    {
+        $this->ensureNotClosed('Tag changes are rejected.');
+
+        $tagIds = [];
+        foreach ($tags as $tag) {
+            $tagModel = $tag instanceof Tag ? $tag : Tag::withoutGlobalScopes()->findOrFail($tag);
+
+            if ($tagModel->organization_id !== $this->organization_id) {
+                throw new DomainException('Cross-organization tag assignment is rejected.');
+            }
+
+            $tagIds[] = $tagModel->id;
+        }
+
+        $this->tags()->sync($tagIds);
+
+        return $this;
     }
 }

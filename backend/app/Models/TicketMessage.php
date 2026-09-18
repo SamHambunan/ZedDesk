@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class TicketMessage extends Model
@@ -140,6 +141,14 @@ class TicketMessage extends Model
     public function author(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * Get the attachments for this message.
+     */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(TicketAttachment::class, 'ticket_message_id');
     }
 
     /**
