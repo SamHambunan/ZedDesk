@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\Api\AttachmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\InvitationController;
 use App\Http\Controllers\Api\OrganizationController;
 use App\Http\Controllers\Api\OrganizationMemberController;
+use App\Http\Controllers\Api\TagController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\WorkspaceController;
 use Illuminate\Support\Facades\DB;
@@ -61,4 +63,14 @@ Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(functio
     Route::delete('/teams/{id}', [TeamController::class, 'destroy']);
     Route::post('/teams/{id}/members', [TeamController::class, 'addMember']);
     Route::delete('/teams/{id}/members/{memberId}', [TeamController::class, 'removeMember']);
+
+    Route::get('/tags', [TagController::class, 'index']);
+    Route::post('/tags', [TagController::class, 'store']);
+    Route::get('/tickets/{ticket}/tags', [TagController::class, 'ticketTags']);
+    Route::post('/tickets/{ticket}/tags', [TagController::class, 'attachToTicket']);
+    Route::delete('/tickets/{ticket}/tags/{tag}', [TagController::class, 'detachFromTicket']);
+
+    Route::get('/attachments/{id}/download', [AttachmentController::class, 'download']);
+    Route::get('/attachments/{id}', [AttachmentController::class, 'download']);
+    Route::post('/tickets/{ticket}/messages/{message}/attachments', [AttachmentController::class, 'upload']);
 });
