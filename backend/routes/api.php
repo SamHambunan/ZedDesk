@@ -84,6 +84,8 @@ Route::prefix('portal')->group(function () {
 
     Route::middleware('customer.token')->group(function () {
         Route::get('/tickets/{ticket}', [CustomerPortalController::class, 'show']);
+        Route::post('/tickets/{ticket}/reply', [CustomerPortalController::class, 'reply']);
+        Route::get('/tickets/{ticket}/attachments/{attachment}', [CustomerPortalController::class, 'downloadAttachment']);
         Route::get('/auth/verify', [CustomerPortalController::class, 'verify']);
     });
 });

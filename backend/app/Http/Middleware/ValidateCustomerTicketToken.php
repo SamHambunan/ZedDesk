@@ -69,7 +69,7 @@ class ValidateCustomerTicketToken
         }
 
         // 6. Validate ticket context
-        $ticketParam = $request->route('ticket');
+        $ticketParam = $request->route('ticket') ?? $request->route('uuid');
 
         if ($ticketParam !== null) {
             $ticket = $ticketParam instanceof Ticket
