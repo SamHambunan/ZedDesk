@@ -52,27 +52,13 @@ class CustomerPortalController extends Controller
             'attachments.*' => ['file', 'max:10240'],
         ]);
 
-        // Normalize and pre-validate any attachments before creating resources
-        $rawAttachments = $request->file('attachments');
-        /** @var array<UploadedFile> $files */
-        $files = [];
-        if ($rawAttachments instanceof UploadedFile) {
-            $files = [$rawAttachments];
-        } elseif (is_array($rawAttachments)) {
-            $files = $rawAttachments;
-        }
-
-        foreach ($files as $file) {
-            if ($file instanceof UploadedFile) {
-                try {
-                    $this->attachmentService->validateFile($file);
-                } catch (InvalidAttachmentException $e) {
-                    return response()->json([
-                        'message' => $e->getMessage(),
-                        'errors' => ['attachments' => [$e->getMessage()]],
-                    ], 422);
-                }
-            }
+        try {
+            $files = $this->extractAndValidateAttachments($request);
+        } catch (InvalidAttachmentException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'errors' => ['attachments' => [$e->getMessage()]],
+            ], 422);
         }
 
         return DB::transaction(function () use ($organization, $validated, $files, $request) {
@@ -181,7 +167,7 @@ class CustomerPortalController extends Controller
     {
         /** @var Ticket $ticket */
         $ticket = $request->attributes->get('ticket')
-            ?? Ticket::withoutGlobalScopes()->findOrFail($ticketId);
+            ?? Ticket::findOrFail($ticketId);
 
         $ticket->load(['customer', 'customerVisibleMessages.attachments']);
 
@@ -216,11 +202,11 @@ class CustomerPortalController extends Controller
 
         /** @var Ticket $ticketModel */
         $ticketModel = $request->attributes->get('ticket')
-            ?? Ticket::withoutGlobalScopes()->findOrFail($ticket);
+            ?? Ticket::findOrFail($ticket);
 
         /** @var Customer $customer */
         $customer = $request->attributes->get('customer')
-            ?? Customer::withoutGlobalScopes()->findOrFail($ticketModel->customer_id);
+            ?? Customer::findOrFail($ticketModel->customer_id);
 
         if ($ticketModel->isClosed()) {
             return response()->json([
@@ -243,27 +229,13 @@ class CustomerPortalController extends Controller
             ], 422);
         }
 
-        // Normalize and pre-validate any attachments before creating resources
-        $rawAttachments = $request->file('attachments');
-        /** @var array<UploadedFile> $files */
-        $files = [];
-        if ($rawAttachments instanceof UploadedFile) {
-            $files = [$rawAttachments];
-        } elseif (is_array($rawAttachments)) {
-            $files = $rawAttachments;
-        }
-
-        foreach ($files as $file) {
-            if ($file instanceof UploadedFile) {
-                try {
-                    $this->attachmentService->validateFile($file);
-                } catch (InvalidAttachmentException $e) {
-                    return response()->json([
-                        'message' => $e->getMessage(),
-                        'errors' => ['attachments' => [$e->getMessage()]],
-                    ], 422);
-                }
-            }
+        try {
+            $files = $this->extractAndValidateAttachments($request);
+        } catch (InvalidAttachmentException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'errors' => ['attachments' => [$e->getMessage()]],
+            ], 422);
         }
 
         try {
@@ -317,22 +289,47 @@ class CustomerPortalController extends Controller
     {
         /** @var Ticket $ticketModel */
         $ticketModel = $request->attributes->get('ticket')
-            ?? Ticket::withoutGlobalScopes()->findOrFail($ticket);
+            ?? Ticket::findOrFail($ticket);
 
         /** @var Customer $customer */
         $customer = $request->attributes->get('customer')
-            ?? Customer::withoutGlobalScopes()->findOrFail($ticketModel->customer_id);
+            ?? Customer::findOrFail($ticketModel->customer_id);
 
         /** @var TicketAttachment|null $attachmentModel */
-        $attachmentModel = TicketAttachment::withoutGlobalScopes()
-            ->where('id', $attachment)
-            ->first();
+        $attachmentModel = TicketAttachment::find($attachment);
 
         if (! $attachmentModel) {
             abort(404, 'Attachment not found.');
         }
 
         return $this->attachmentService->downloadForCustomer($attachmentModel, $customer, $ticketModel);
+    }
+
+    /**
+     * Extract and pre-validate uploaded files from request attachments.
+     *
+     * @return array<UploadedFile>
+     *
+     * @throws InvalidAttachmentException
+     */
+    protected function extractAndValidateAttachments(Request $request): array
+    {
+        $rawAttachments = $request->file('attachments');
+        /** @var array<UploadedFile> $files */
+        $files = [];
+        if ($rawAttachments instanceof UploadedFile) {
+            $files = [$rawAttachments];
+        } elseif (is_array($rawAttachments)) {
+            $files = $rawAttachments;
+        }
+
+        foreach ($files as $file) {
+            if ($file instanceof UploadedFile) {
+                $this->attachmentService->validateFile($file);
+            }
+        }
+
+        return $files;
     }
 
     /**

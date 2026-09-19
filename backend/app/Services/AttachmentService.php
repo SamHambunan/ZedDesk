@@ -137,19 +137,7 @@ class AttachmentService
             abort(404, 'Attachment file not found.');
         }
 
-        return response()->streamDownload(function () use ($attachment) {
-            $stream = Storage::disk($this->disk)->readStream($attachment->file_path);
-            if ($stream) {
-                fpassthru($stream);
-                if (is_resource($stream)) {
-                    fclose($stream);
-                }
-            }
-        }, $attachment->file_name, [
-            'Content-Type' => $attachment->mime_type,
-            'Content-Length' => (string) $attachment->file_size,
-            'Content-Disposition' => 'attachment; filename="'.$attachment->file_name.'"',
-        ]);
+        return $this->streamFile($attachment);
     }
 
     /**
@@ -173,7 +161,7 @@ class AttachmentService
         // 3. Attachment must belong to the specified ticket
         $message = $attachment->relationLoaded('message')
             ? $attachment->message
-            : TicketMessage::withoutGlobalScopes()->find($attachment->ticket_message_id);
+            : TicketMessage::find($attachment->ticket_message_id);
 
         if (! $message || $message->ticket_id !== $ticket->id) {
             abort(404, 'Attachment not found.');
@@ -189,6 +177,14 @@ class AttachmentService
             abort(404, 'Attachment file not found.');
         }
 
+        return $this->streamFile($attachment);
+    }
+
+    /**
+     * Helper to create a streamed HTTP download response for an attachment.
+     */
+    protected function streamFile(TicketAttachment $attachment): StreamedResponse
+    {
         return response()->streamDownload(function () use ($attachment) {
             $stream = Storage::disk($this->disk)->readStream($attachment->file_path);
             if ($stream) {
