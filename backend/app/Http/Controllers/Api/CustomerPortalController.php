@@ -88,7 +88,7 @@ class CustomerPortalController extends Controller
                 'priority' => TicketPriority::MEDIUM,
             ]);
 
-            // Create initial customer public message
+            // Create initial customer Public Reply
             $message = TicketMessage::create([
                 'organization_id' => $organization->id,
                 'ticket_id' => $ticket->id,

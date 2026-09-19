@@ -19,7 +19,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'resolve.organization' => ResolveOrganization::class,
             'ensure.organization_member' => EnsureOrganizationMember::class,
             'customer.token' => ValidateCustomerTicketToken::class,
-            'validate.customer_token' => ValidateCustomerTicketToken::class,
         ]);
 
         $middleware->api(prepend: [

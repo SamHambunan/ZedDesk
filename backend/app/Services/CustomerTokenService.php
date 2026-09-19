@@ -61,42 +61,60 @@ class CustomerTokenService
      *
      * @return array<string, mixed>|null
      */
-    public function verifyToken(string $token): ?array
+    /**
+     * Inspect and verify a signed token in a single pass.
+     *
+     * @return array{valid: bool, expired: bool, payload: ?array<string, mixed>}
+     */
+    public function inspectToken(string $token): array
     {
         $parts = explode('.', trim($token));
         if (count($parts) !== 2) {
-            return null;
+            return ['valid' => false, 'expired' => false, 'payload' => null];
         }
 
         [$encodedPayload, $signature] = $parts;
 
         $expectedSignature = hash_hmac('sha256', $encodedPayload, $this->getSigningKey());
         if (! hash_equals($expectedSignature, $signature)) {
-            return null;
+            return ['valid' => false, 'expired' => false, 'payload' => null];
         }
 
         $decodedJson = base64_decode(strtr($encodedPayload, '-_', '+/'), true);
         if ($decodedJson === false) {
-            return null;
+            return ['valid' => false, 'expired' => false, 'payload' => null];
         }
 
         try {
             $payload = json_decode($decodedJson, true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException) {
-            return null;
+            return ['valid' => false, 'expired' => false, 'payload' => null];
         }
 
         if (! is_array($payload) || ! isset($payload['customer_id'], $payload['organization_id'])) {
-            return null;
+            return ['valid' => false, 'expired' => false, 'payload' => null];
         }
 
         if (isset($payload['expires_at']) && $payload['expires_at'] !== null) {
             if (time() > (int) $payload['expires_at']) {
-                return null;
+                return ['valid' => false, 'expired' => true, 'payload' => $payload];
             }
         }
 
-        return $payload;
+        return ['valid' => true, 'expired' => false, 'payload' => $payload];
+    }
+
+    /**
+     * Verify and decode an HMAC-signed customer token.
+     * Returns the payload array if valid and not expired, null otherwise.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function verifyToken(string $token): ?array
+    {
+        $result = $this->inspectToken($token);
+
+        return $result['valid'] ? $result['payload'] : null;
     }
 
     /**
@@ -104,33 +122,9 @@ class CustomerTokenService
      */
     public function isExpired(string $token): bool
     {
-        $parts = explode('.', trim($token));
-        if (count($parts) !== 2) {
-            return false;
-        }
+        $result = $this->inspectToken($token);
 
-        [$encodedPayload, $signature] = $parts;
-        $expectedSignature = hash_hmac('sha256', $encodedPayload, $this->getSigningKey());
-        if (! hash_equals($expectedSignature, $signature)) {
-            return false;
-        }
-
-        $decodedJson = base64_decode(strtr($encodedPayload, '-_', '+/'), true);
-        if ($decodedJson === false) {
-            return false;
-        }
-
-        try {
-            $payload = json_decode($decodedJson, true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            return false;
-        }
-
-        if (is_array($payload) && isset($payload['expires_at']) && $payload['expires_at'] !== null) {
-            return time() > (int) $payload['expires_at'];
-        }
-
-        return false;
+        return $result['expired'];
     }
 
     /**
@@ -175,7 +169,7 @@ class CustomerTokenService
 
         $organization = $customer->organization;
 
-        $slug = $organization ? $organization->slug : 'acme';
+        $slug = $organization ? $organization->slug : 'portal';
 
         return "http://{$slug}.localhost:8000";
     }

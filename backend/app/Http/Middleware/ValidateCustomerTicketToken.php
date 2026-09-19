@@ -36,24 +36,22 @@ class ValidateCustomerTicketToken
             $token = $request->query('token') ?? $request->query('customer_token');
         }
 
-        if (empty($token) && str_starts_with($request->header('Authorization', ''), 'Bearer ')) {
-            $token = substr($request->header('Authorization'), 7);
-        }
-
         if (empty($token)) {
             return response()->json(['message' => 'Customer access token is required.'], 401);
         }
 
         // 3. Verify HMAC SHA-256 signature and expiration
-        $payload = $this->tokenService->verifyToken((string) $token);
+        $inspection = $this->tokenService->inspectToken((string) $token);
 
-        if ($payload === null) {
-            if ($this->tokenService->isExpired((string) $token)) {
+        if (! $inspection['valid']) {
+            if ($inspection['expired']) {
                 return response()->json(['message' => 'Customer access token has expired.'], 401);
             }
 
             return response()->json(['message' => 'Invalid or tampered customer token.'], 401);
         }
+
+        $payload = $inspection['payload'];
 
         // 4. Verify organization boundary
         if ((int) $payload['organization_id'] !== (int) $organization->id) {
@@ -70,23 +68,16 @@ class ValidateCustomerTicketToken
             return response()->json(['message' => 'Forbidden. Customer not found in this organization.'], 403);
         }
 
-        // 6. Validate ticket context if the route references a ticket
-        $ticketParam = $request->route('ticket')
-            ?? $request->route('uuid')
-            ?? $request->route('ticket_id')
-            ?? $request->route('id');
+        // 6. Validate ticket context
+        $ticketParam = $request->route('ticket');
 
         if ($ticketParam !== null) {
             $ticket = $ticketParam instanceof Ticket
                 ? $ticketParam
-                : Ticket::withoutGlobalScope(OrganizationScope::class)->where('id', $ticketParam)->first();
+                : Ticket::where('id', $ticketParam)->first();
 
             if (! $ticket) {
                 return response()->json(['message' => 'Ticket not found.'], 404);
-            }
-
-            if ((int) $ticket->organization_id !== (int) $organization->id) {
-                return response()->json(['message' => 'Forbidden. Ticket belongs to another organization.'], 403);
             }
 
             if ($ticket->customer_id !== $customer->id) {
@@ -99,6 +90,11 @@ class ValidateCustomerTicketToken
 
             $request->attributes->set('ticket', $ticket);
             app()->instance(Ticket::class, $ticket);
+        } elseif (! empty($payload['ticket_id'])) {
+            $scopedTicket = Ticket::where('id', $payload['ticket_id'])->first();
+            if (! $scopedTicket || $scopedTicket->customer_id !== $customer->id) {
+                return response()->json(['message' => 'Forbidden. Token ticket is invalid.'], 403);
+            }
         }
 
         // 7. Inject verified customer and payload into request attributes and container

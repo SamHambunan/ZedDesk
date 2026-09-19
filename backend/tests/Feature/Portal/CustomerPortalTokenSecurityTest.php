@@ -26,20 +26,20 @@ beforeEach(function () {
 
     $this->acmeCustomer = Customer::create([
         'organization_id' => $this->acmeOrg->id,
-        'email' => 'acme_user@example.com',
-        'name' => 'Acme User',
+        'email' => 'acme_customer@example.com',
+        'name' => 'Acme Customer',
     ]);
 
     $this->acmeCustomer2 = Customer::create([
         'organization_id' => $this->acmeOrg->id,
         'email' => 'other_acme@example.com',
-        'name' => 'Other Acme User',
+        'name' => 'Other Acme Customer',
     ]);
 
     $this->betaCustomer = Customer::create([
         'organization_id' => $this->betaOrg->id,
-        'email' => 'beta_user@example.com',
-        'name' => 'Beta User',
+        'email' => 'beta_customer@example.com',
+        'name' => 'Beta Customer',
     ]);
 
     $this->acmeTicket = Ticket::create([
@@ -196,18 +196,18 @@ test('customer cannot access ticket of another organization even if ticket ID is
     $response = $this->withHeader('X-Customer-Token', $acmeToken)
         ->getJson("http://acme.localhost/api/portal/tickets/{$this->betaTicket->id}");
 
-    // Strict 403 or 404
-    expect(in_array($response->status(), [403, 404], true))->toBeTrue();
+    // Strict 404 Not Found to prevent leaking foreign ticket existence
+    $response->assertStatus(404);
 });
 
-test('valid signed token in Authorization Bearer header allows access to customer ticket', function () {
+test('bearer token in Authorization header is rejected for customer access', function () {
     $token = $this->tokenService->generateToken($this->acmeCustomer, $this->acmeTicket);
 
+    // Customer tokens are strictly decoupled from Sanctum bearer tokens
     $response = $this->withHeader('Authorization', "Bearer {$token}")
         ->getJson("http://acme.localhost/api/portal/tickets/{$this->acmeTicket->id}");
 
-    $response->assertStatus(200)
-        ->assertJsonPath('ticket.id', $this->acmeTicket->id);
+    $response->assertStatus(401);
 });
 
 test('customer auth verify endpoint confirms authenticated customer identity', function () {
@@ -221,8 +221,8 @@ test('customer auth verify endpoint confirms authenticated customer identity', f
             'valid' => true,
             'customer' => [
                 'id' => $this->acmeCustomer->id,
-                'name' => 'Acme User',
-                'email' => 'acme_user@example.com',
+                'name' => 'Acme Customer',
+                'email' => 'acme_customer@example.com',
             ],
         ]);
 });
