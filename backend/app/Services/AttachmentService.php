@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\InvalidAttachmentException;
+use App\Models\Customer;
 use App\Models\OrganizationMember;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
@@ -136,6 +137,54 @@ class AttachmentService
             abort(404, 'Attachment file not found.');
         }
 
+        return $this->streamFile($attachment);
+    }
+
+    /**
+     * Stream an attachment file for download after verifying customer ownership and privacy boundaries.
+     *
+     * @throws HttpException
+     */
+    public function downloadForCustomer(TicketAttachment $attachment, Customer $customer, Ticket $ticket): StreamedResponse
+    {
+        // 1. Organization boundary check
+        if ((int) $attachment->organization_id !== (int) $customer->organization_id
+            || (int) $ticket->organization_id !== (int) $customer->organization_id) {
+            abort(403, 'Forbidden. Attachment belongs to another organization.');
+        }
+
+        // 2. Ticket customer ownership check
+        if ($ticket->customer_id !== $customer->id) {
+            abort(403, 'Forbidden. You do not have permission to access this ticket.');
+        }
+
+        // 3. Attachment must belong to the specified ticket
+        $message = $attachment->relationLoaded('message')
+            ? $attachment->message
+            : TicketMessage::find($attachment->ticket_message_id);
+
+        if (! $message || $message->ticket_id !== $ticket->id) {
+            abort(404, 'Attachment not found.');
+        }
+
+        // 4. Conversation privacy: customer cannot access attachments belonging to internal notes
+        if ($message->isInternalNote() || ! $message->isPublicReply()) {
+            abort(404, 'Attachment not found.');
+        }
+
+        // 5. File must exist on storage disk
+        if (! Storage::disk($this->disk)->exists($attachment->file_path)) {
+            abort(404, 'Attachment file not found.');
+        }
+
+        return $this->streamFile($attachment);
+    }
+
+    /**
+     * Helper to create a streamed HTTP download response for an attachment.
+     */
+    protected function streamFile(TicketAttachment $attachment): StreamedResponse
+    {
         return response()->streamDownload(function () use ($attachment) {
             $stream = Storage::disk($this->disk)->readStream($attachment->file_path);
             if ($stream) {

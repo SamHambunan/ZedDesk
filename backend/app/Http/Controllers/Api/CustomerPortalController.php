@@ -8,9 +8,11 @@ use App\Enums\TicketMessageType;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Exceptions\InvalidAttachmentException;
+use App\Exceptions\InvalidTicketTransitionException;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Ticket;
+use App\Models\TicketAttachment;
 use App\Models\TicketMessage;
 use App\Repositories\CustomerRepository;
 use App\Services\AttachmentService;
@@ -19,6 +21,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerPortalController extends Controller
 {
@@ -49,27 +52,13 @@ class CustomerPortalController extends Controller
             'attachments.*' => ['file', 'max:10240'],
         ]);
 
-        // Normalize and pre-validate any attachments before creating resources
-        $rawAttachments = $request->file('attachments');
-        /** @var array<UploadedFile> $files */
-        $files = [];
-        if ($rawAttachments instanceof UploadedFile) {
-            $files = [$rawAttachments];
-        } elseif (is_array($rawAttachments)) {
-            $files = $rawAttachments;
-        }
-
-        foreach ($files as $file) {
-            if ($file instanceof UploadedFile) {
-                try {
-                    $this->attachmentService->validateFile($file);
-                } catch (InvalidAttachmentException $e) {
-                    return response()->json([
-                        'message' => $e->getMessage(),
-                        'errors' => ['attachments' => [$e->getMessage()]],
-                    ], 422);
-                }
-            }
+        try {
+            $files = $this->extractAndValidateAttachments($request);
+        } catch (InvalidAttachmentException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'errors' => ['attachments' => [$e->getMessage()]],
+            ], 422);
         }
 
         return DB::transaction(function () use ($organization, $validated, $files, $request) {
@@ -178,7 +167,7 @@ class CustomerPortalController extends Controller
     {
         /** @var Ticket $ticket */
         $ticket = $request->attributes->get('ticket')
-            ?? Ticket::withoutGlobalScopes()->findOrFail($ticketId);
+            ?? Ticket::findOrFail($ticketId);
 
         $ticket->load(['customer', 'customerVisibleMessages.attachments']);
 
@@ -198,6 +187,149 @@ class CustomerPortalController extends Controller
             ],
             'messages' => $ticket->customerVisibleMessages,
         ], 200);
+    }
+
+    /**
+     * Post a customer public reply to an existing ticket.
+     */
+    public function reply(Request $request, string $ticket): JsonResponse
+    {
+        $organization = OrganizationContext::getCurrent() ?? $request->attributes->get('organization');
+
+        if (! $organization) {
+            return response()->json(['message' => 'Organization not found.'], 404);
+        }
+
+        /** @var Ticket $ticketModel */
+        $ticketModel = $request->attributes->get('ticket')
+            ?? Ticket::findOrFail($ticket);
+
+        /** @var Customer $customer */
+        $customer = $request->attributes->get('customer')
+            ?? Customer::findOrFail($ticketModel->customer_id);
+
+        if ($ticketModel->isClosed()) {
+            return response()->json([
+                'message' => "Ticket #{$ticketModel->ticket_number} is closed and immutable. New conversation replies are rejected.",
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'message' => ['required_without:body', 'nullable', 'string'],
+            'body' => ['required_without:message', 'nullable', 'string'],
+            'attachments' => ['nullable'],
+            'attachments.*' => ['file', 'max:10240'],
+        ]);
+
+        $body = $validated['message'] ?? $validated['body'] ?? null;
+        if (empty($body)) {
+            return response()->json([
+                'message' => 'The message body is required.',
+                'errors' => ['body' => ['The message body is required.']],
+            ], 422);
+        }
+
+        try {
+            $files = $this->extractAndValidateAttachments($request);
+        } catch (InvalidAttachmentException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'errors' => ['attachments' => [$e->getMessage()]],
+            ], 422);
+        }
+
+        try {
+            return DB::transaction(function () use ($organization, $ticketModel, $customer, $body, $files) {
+                $message = TicketMessage::create([
+                    'organization_id' => $organization->id,
+                    'ticket_id' => $ticketModel->id,
+                    'message_type' => TicketMessageType::PUBLIC_REPLY,
+                    'author_type' => Customer::class,
+                    'author_id' => $customer->id,
+                    'body' => $body,
+                ]);
+
+                $storedAttachments = [];
+                foreach ($files as $file) {
+                    if ($file instanceof UploadedFile) {
+                        $storedAttachments[] = $this->attachmentService->store($file, $message);
+                    }
+                }
+
+                $ticketModel->refresh();
+
+                return response()->json([
+                    'message' => 'Reply submitted successfully.',
+                    'reply' => [
+                        'id' => $message->id,
+                        'ticket_id' => $ticketModel->id,
+                        'body' => $message->body,
+                        'message_type' => $message->message_type instanceof TicketMessageType ? $message->message_type->value : $message->message_type,
+                        'created_at' => $message->created_at?->toISOString(),
+                        'attachments' => $storedAttachments,
+                    ],
+                    'ticket' => [
+                        'id' => $ticketModel->id,
+                        'ticket_number' => $ticketModel->ticket_number,
+                        'status' => $ticketModel->status instanceof TicketStatus ? $ticketModel->status->value : $ticketModel->status,
+                    ],
+                ], 201);
+            });
+        } catch (InvalidTicketTransitionException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Secure streaming download of a ticket attachment for customers.
+     */
+    public function downloadAttachment(Request $request, string $ticket, string $attachment): StreamedResponse
+    {
+        /** @var Ticket $ticketModel */
+        $ticketModel = $request->attributes->get('ticket')
+            ?? Ticket::findOrFail($ticket);
+
+        /** @var Customer $customer */
+        $customer = $request->attributes->get('customer')
+            ?? Customer::findOrFail($ticketModel->customer_id);
+
+        /** @var TicketAttachment|null $attachmentModel */
+        $attachmentModel = TicketAttachment::find($attachment);
+
+        if (! $attachmentModel) {
+            abort(404, 'Attachment not found.');
+        }
+
+        return $this->attachmentService->downloadForCustomer($attachmentModel, $customer, $ticketModel);
+    }
+
+    /**
+     * Extract and pre-validate uploaded files from request attachments.
+     *
+     * @return array<UploadedFile>
+     *
+     * @throws InvalidAttachmentException
+     */
+    protected function extractAndValidateAttachments(Request $request): array
+    {
+        $rawAttachments = $request->file('attachments');
+        /** @var array<UploadedFile> $files */
+        $files = [];
+        if ($rawAttachments instanceof UploadedFile) {
+            $files = [$rawAttachments];
+        } elseif (is_array($rawAttachments)) {
+            $files = $rawAttachments;
+        }
+
+        foreach ($files as $file) {
+            if ($file instanceof UploadedFile) {
+                $this->attachmentService->validateFile($file);
+            }
+        }
+
+        return $files;
     }
 
     /**
