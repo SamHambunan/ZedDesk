@@ -22,5 +22,9 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/backend
 
+# Copy composer files and install dependencies in image layer
+COPY backend/composer.json backend/composer.lock ./
+RUN composer install --no-interaction --no-scripts --prefer-dist --no-autoloader
+
 EXPOSE 9000
 CMD ["php-fpm"]
