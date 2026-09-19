@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Context\OrganizationContext;
+use App\Enums\TicketPriority;
 use App\Http\Controllers\Controller;
 use App\Models\OrganizationMember;
 use App\Models\Ticket;
@@ -47,9 +48,7 @@ class TicketController extends Controller
         }
 
         // 3. Dedicated queue filter shortcut: unassigned=true
-        $unassignedFilter = $request->boolean('unassigned')
-            || $request->input('unassigned') === 'true'
-            || $request->input('unassigned') === '1';
+        $unassignedFilter = $request->boolean('unassigned');
 
         // 4. Assigned to filter & shortcut
         if ($request->filled('assigned_to')) {
@@ -65,14 +64,6 @@ class TicketController extends Controller
                 foreach ($rawMembers as $item) {
                     if (is_numeric($item)) {
                         $memberIds[] = (int) $item;
-                    } elseif ($organization) {
-                        $foundId = OrganizationMember::withoutGlobalScopes()
-                            ->where('organization_id', $organization->id)
-                            ->where('user_id', $item)
-                            ->value('id');
-                        if ($foundId) {
-                            $memberIds[] = $foundId;
-                        }
                     }
                 }
 
@@ -88,17 +79,12 @@ class TicketController extends Controller
 
         // 5. Team filter
         if ($request->filled('team_id')) {
-            $teamId = $request->input('team_id');
-            if ($teamId === 'unassigned' || $teamId === 'none') {
-                $query->whereNull('assigned_team_id');
+            $teamIds = $this->extractArrayParameter($request->input('team_id'));
+            $numericTeamIds = array_values(array_filter($teamIds, fn ($id) => is_numeric($id)));
+            if (! empty($numericTeamIds)) {
+                $query->whereIn('assigned_team_id', $numericTeamIds);
             } else {
-                $teamIds = $this->extractArrayParameter($teamId);
-                $numericTeamIds = array_values(array_filter($teamIds, fn ($id) => is_numeric($id)));
-                if (! empty($numericTeamIds)) {
-                    $query->whereIn('assigned_team_id', $numericTeamIds);
-                } else {
-                    $query->whereRaw('1 = 0');
-                }
+                $query->whereRaw('1 = 0');
             }
         }
 
@@ -158,10 +144,6 @@ class TicketController extends Controller
                 'prev' => $paginator->previousPageUrl(),
                 'next' => $paginator->nextPageUrl(),
             ],
-            'current_page' => $paginator->currentPage(),
-            'per_page' => $paginator->perPage(),
-            'total' => $paginator->total(),
-            'last_page' => $paginator->lastPage(),
         ]);
     }
 
@@ -188,7 +170,7 @@ class TicketController extends Controller
     protected function applySorting($query, Request $request): void
     {
         $sortParam = $request->input('sort', 'created_at');
-        $sortDirection = strtolower($request->input('direction', $request->input('order', 'desc')));
+        $sortDirection = strtolower($request->input('direction', 'desc'));
 
         $sortField = 'created_at';
 
@@ -221,12 +203,17 @@ class TicketController extends Controller
         }
 
         if ($sortField === 'priority') {
+            $urgent = TicketPriority::URGENT->value;
+            $high = TicketPriority::HIGH->value;
+            $medium = TicketPriority::MEDIUM->value;
+            $low = TicketPriority::LOW->value;
+
             $query->orderByRaw("
                 CASE priority
-                    WHEN 'urgent' THEN 4
-                    WHEN 'high' THEN 3
-                    WHEN 'medium' THEN 2
-                    WHEN 'low' THEN 1
+                    WHEN '{$urgent}' THEN 4
+                    WHEN '{$high}' THEN 3
+                    WHEN '{$medium}' THEN 2
+                    WHEN '{$low}' THEN 1
                     ELSE 0
                 END {$sortDirection}
             ")->orderBy('tickets.id', 'desc');

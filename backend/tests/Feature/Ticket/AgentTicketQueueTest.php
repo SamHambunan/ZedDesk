@@ -92,7 +92,7 @@ test('ticket policy allows admin and agent members of the organization to view t
         ->and($policy->viewAny($this->betaAgentUser))->toBeFalse();
 });
 
-test('gate allows viewAny and view for authorized tenant members and rejects unauthorized', function () {
+test('gate allows viewAny and view for authorized organization members and rejects unauthorized', function () {
     OrganizationContext::setCurrent($this->acmeOrg);
 
     $acmeTicket = Ticket::create([
@@ -171,7 +171,7 @@ test('get api tickets rejects unauthenticated access with 401', function () {
     $response->assertStatus(401);
 });
 
-test('get api tickets rejects cross-tenant access with 403', function () {
+test('get api tickets rejects cross-organization access with 403', function () {
     Sanctum::actingAs($this->betaAgentUser);
 
     $response = $this->getJson('http://acme.localhost/api/tickets');
@@ -334,7 +334,7 @@ test('get api tickets filters by priority', function () {
         ->and($resp->json('data.0.id'))->toBe($tUrgent->id);
 });
 
-test('get api tickets filters by team_id and unassigned teams', function () {
+test('get api tickets filters by team_id', function () {
     $teamA = Team::create([
         'organization_id' => $this->acmeOrg->id,
         'name' => 'Tier 1 Support',
@@ -356,12 +356,6 @@ test('get api tickets filters by team_id and unassigned teams', function () {
         'subject' => 'Tier 2 Ticket',
         'assigned_team_id' => $teamB->id,
     ]);
-    $tNoTeam = Ticket::create([
-        'organization_id' => $this->acmeOrg->id,
-        'customer_id' => $this->acmeCustomer->id,
-        'subject' => 'Unrouted Ticket',
-        'assigned_team_id' => null,
-    ]);
 
     Sanctum::actingAs($this->acmeAgentUser);
 
@@ -370,12 +364,6 @@ test('get api tickets filters by team_id and unassigned teams', function () {
     $respA->assertStatus(200);
     expect($respA->json('data'))->toHaveCount(1)
         ->and($respA->json('data.0.id'))->toBe($tTeamA->id);
-
-    // Filter by team_id=unassigned
-    $respNoTeam = $this->getJson('http://acme.localhost/api/tickets?team_id=unassigned');
-    $respNoTeam->assertStatus(200);
-    expect($respNoTeam->json('data'))->toHaveCount(1)
-        ->and($respNoTeam->json('data.0.id'))->toBe($tNoTeam->id);
 });
 
 test('get api tickets filters by customer_id', function () {
@@ -503,7 +491,7 @@ test('dedicated queue filters assigned_to=me and unassigned return exact scoped 
         ->and($respAdmin->json('data.0.id'))->toBe($tAdmin->id);
 });
 
-test('compound filtering applies all criteria simultaneously and respects tenant boundary', function () {
+test('compound filtering applies all criteria simultaneously and respects organization boundary', function () {
     $team = Team::create([
         'organization_id' => $this->acmeOrg->id,
         'name' => 'High Priority Escapes',
@@ -551,7 +539,7 @@ test('compound filtering applies all criteria simultaneously and respects tenant
     ]);
     $wrongAssignee->attachTag($tag);
 
-    // Beta ticket that has IDENTICAL attributes in another tenant
+    // Beta ticket that has IDENTICAL attributes in another organization
     $betaTeam = Team::create([
         'organization_id' => $this->betaOrg->id,
         'name' => 'High Priority Escapes',
@@ -564,7 +552,7 @@ test('compound filtering applies all criteria simultaneously and respects tenant
     $betaTicket = Ticket::create([
         'organization_id' => $this->betaOrg->id,
         'customer_id' => $this->betaCustomer->id,
-        'subject' => 'Beta Tenant Identical Ticket',
+        'subject' => 'Beta Organization Identical Ticket',
         'status' => TicketStatus::OPEN,
         'priority' => TicketPriority::URGENT,
         'assigned_team_id' => $betaTeam->id,
@@ -599,6 +587,14 @@ test('compound filtering applies all criteria simultaneously and respects tenant
         ->and($returnedIds)->not->toContain($betaTicket->id);
 });
 
+test('get api tickets gracefully handles non-numeric assigned_to without database exception', function () {
+    Sanctum::actingAs($this->acmeAgentUser);
+
+    $response = $this->getJson('http://acme.localhost/api/tickets?assigned_to=00000000-0000-0000-0000-000000000000');
+    $response->assertStatus(200)
+        ->assertJsonPath('meta.total', 0);
+});
+
 test('compound index queries utilize indexes and perform efficiently', function () {
     // Populate batch of tickets for organization
     $records = [];
@@ -628,13 +624,16 @@ test('compound index queries utilize indexes and perform efficiently', function 
     expect($response->json('meta.total'))->toBeGreaterThanOrEqual(20)
         ->and($elapsedMs)->toBeLessThan(2000); // Sub-2-second execution over HTTP
 
-    // Verify PostgreSQL execution plan demonstrates index scan capability on compound indexes
-    $explainOutput = \Illuminate\Support\Facades\DB::select(
-        'EXPLAIN SELECT * FROM tickets WHERE organization_id = ? AND status = ?',
-        [$this->acmeOrg->id, 'open']
-    );
+    // Verify PostgreSQL execution plan strictly utilizes the compound index
+    $explainOutput = \Illuminate\Support\Facades\DB::transaction(function () {
+        \Illuminate\Support\Facades\DB::statement('SET LOCAL enable_seqscan = off');
+
+        return \Illuminate\Support\Facades\DB::select(
+            'EXPLAIN SELECT * FROM tickets WHERE organization_id = ? AND status = ?',
+            [$this->acmeOrg->id, 'open']
+        );
+    });
 
     $planString = implode(' ', array_map(fn ($row) => $row->{'QUERY PLAN'}, $explainOutput));
-    // Index scan or Bitmap Index Scan on tickets_organization_id_status_index
-    expect($planString)->toMatch('/(Index Scan|Bitmap Index Scan|Seq Scan)/i');
+    expect($planString)->toMatch('/(Index Scan|Bitmap Index Scan) using tickets_organization_id_/i');
 });
