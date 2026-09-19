@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AttachmentController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CustomerPortalController;
 use App\Http\Controllers\Api\InvitationController;
 use App\Http\Controllers\Api\OrganizationController;
 use App\Http\Controllers\Api\OrganizationMemberController;
@@ -75,4 +76,14 @@ Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(functio
 
     Route::get('/attachments/{id}/download', [AttachmentController::class, 'download']);
     Route::post('/tickets/{ticket}/messages/{message}/attachments', [AttachmentController::class, 'upload']);
+});
+
+Route::prefix('portal')->group(function () {
+    Route::post('/tickets', [CustomerPortalController::class, 'store']);
+    Route::post('/magic-link', [CustomerPortalController::class, 'magicLink']);
+
+    Route::middleware('customer.token')->group(function () {
+        Route::get('/tickets/{ticket}', [CustomerPortalController::class, 'show']);
+        Route::get('/auth/verify', [CustomerPortalController::class, 'verify']);
+    });
 });
