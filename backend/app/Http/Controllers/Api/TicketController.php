@@ -3,14 +3,24 @@
 namespace App\Http\Controllers\Api;
 
 use App\Context\OrganizationContext;
+use App\Enums\TicketMessageType;
 use App\Enums\TicketPriority;
+use App\Enums\TicketStatus;
+use App\Events\TicketMessageCreated;
+use App\Exceptions\InvalidAttachmentException;
+use App\Exceptions\InvalidTicketTransitionException;
 use App\Http\Controllers\Controller;
 use App\Models\OrganizationMember;
 use App\Models\Ticket;
+use App\Models\TicketMessage;
+use App\Services\AttachmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Enum;
 
 class TicketController extends Controller
 {
@@ -150,7 +160,6 @@ class TicketController extends Controller
     /**
      * Normalize comma-separated strings or arrays into a clean array of strings.
      *
-     * @param  mixed  $value
      * @return array<string>
      */
     protected function extractArrayParameter(mixed $value): array
@@ -221,5 +230,216 @@ class TicketController extends Controller
             $query->orderBy("tickets.{$sortField}", $sortDirection)
                 ->orderBy('tickets.id', 'desc');
         }
+    }
+
+    /**
+     * Display the specified ticket with hydrated details, customer profile, tags,
+     * conversation timeline, attachments, and assignment audit log.
+     */
+    public function show(Request $request, string $ticketId): JsonResponse
+    {
+        $ticket = Ticket::findOrFail($ticketId);
+
+        Gate::authorize('view', $ticket);
+
+        $ticket->load([
+            'customer',
+            'assignedTeam',
+            'assignedMember.user',
+            'tags',
+            'messages.attachments',
+            'assignments.team',
+            'assignments.member.user',
+            'assignments.assignedBy.user',
+            'attachments',
+        ]);
+
+        $ticket->loadMorph('messages.author', [
+            OrganizationMember::class => ['user'],
+        ]);
+
+        $ticketData = [
+            'id' => $ticket->id,
+            'ticket_number' => $ticket->ticket_number,
+            'subject' => $ticket->subject,
+            'status' => $ticket->status instanceof TicketStatus ? $ticket->status->value : $ticket->status,
+            'priority' => $ticket->priority instanceof TicketPriority ? $ticket->priority->value : $ticket->priority,
+            'assigned_team_id' => $ticket->assigned_team_id,
+            'assigned_member_id' => $ticket->assigned_member_id,
+            'first_replied_at' => $ticket->first_replied_at?->toISOString(),
+            'resolved_at' => $ticket->resolved_at?->toISOString(),
+            'closed_at' => $ticket->closed_at?->toISOString(),
+            'created_at' => $ticket->created_at?->toISOString(),
+            'updated_at' => $ticket->updated_at?->toISOString(),
+            'customer' => $ticket->customer,
+            'assigned_team' => $ticket->assignedTeam,
+            'assigned_member' => $ticket->assignedMember,
+            'tags' => $ticket->tags,
+            'messages' => $ticket->messages,
+            'attachments' => $ticket->attachments,
+            'ticket_assignments' => $ticket->assignments,
+            'assignments' => $ticket->assignments,
+        ];
+
+        return response()->json([
+            'data' => $ticketData,
+            'ticket' => [
+                'id' => $ticket->id,
+                'ticket_number' => $ticket->ticket_number,
+                'subject' => $ticket->subject,
+                'status' => $ticket->status instanceof TicketStatus ? $ticket->status->value : $ticket->status,
+                'priority' => $ticket->priority instanceof TicketPriority ? $ticket->priority->value : $ticket->priority,
+                'assigned_team_id' => $ticket->assigned_team_id,
+                'assigned_member_id' => $ticket->assigned_member_id,
+                'first_replied_at' => $ticket->first_replied_at?->toISOString(),
+                'resolved_at' => $ticket->resolved_at?->toISOString(),
+                'closed_at' => $ticket->closed_at?->toISOString(),
+                'created_at' => $ticket->created_at?->toISOString(),
+                'updated_at' => $ticket->updated_at?->toISOString(),
+            ],
+            'customer' => $ticket->customer,
+            'messages' => $ticket->messages,
+            'ticket_assignments' => $ticket->assignments,
+            'assignments' => $ticket->assignments,
+            'tags' => $ticket->tags,
+            'attachments' => $ticket->attachments,
+        ]);
+    }
+
+    /**
+     * Create a new Ticket Message (Public Reply or Internal Note) in the conversation thread.
+     */
+    public function storeMessage(Request $request, string $ticketId, AttachmentService $attachmentService): JsonResponse
+    {
+        $ticket = Ticket::findOrFail($ticketId);
+
+        Gate::authorize('create', [TicketMessage::class, $ticket]);
+
+        if ($ticket->isClosed()) {
+            return response()->json([
+                'message' => "Ticket #{$ticket->ticket_number} is closed and immutable. New conversation replies are rejected.",
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'message_type' => ['required', new Enum(TicketMessageType::class)],
+            'body' => ['required', 'string'],
+            'status' => ['nullable', new Enum(TicketStatus::class)],
+            'target_status' => ['nullable', new Enum(TicketStatus::class)],
+            'attachments' => ['nullable'],
+            'attachments.*' => ['file', 'max:10240'],
+        ]);
+
+        $body = $validated['body'];
+        $messageType = $validated['message_type'];
+
+        // Pre-validate any attachments
+        try {
+            $files = $this->extractAndValidateAttachments($request, $attachmentService);
+        } catch (InvalidAttachmentException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'errors' => ['attachments' => [$e->getMessage()]],
+            ], 422);
+        }
+
+        $organization = OrganizationContext::getCurrent() ?? $request->attributes->get('organization');
+
+        /** @var OrganizationMember|null $currentMember */
+        $currentMember = $request->attributes->get('organization_member');
+        if (! $currentMember && $organization && $request->user()) {
+            $currentMember = OrganizationMember::withoutGlobalScopes()
+                ->where('organization_id', $ticket->organization_id)
+                ->where('user_id', $request->user()->id)
+                ->first();
+        }
+
+        if (! $currentMember) {
+            return response()->json(['message' => 'Forbidden. You are not an Organization Member of this Organization.'], 403);
+        }
+
+        // Internal notes never accept or persist target status transitions
+        $rawStatusOverride = $request->input('target_status') ?? $request->input('status');
+        $statusOverride = ($messageType === TicketMessageType::INTERNAL_NOTE->value) ? null : $rawStatusOverride;
+
+        try {
+            return DB::transaction(function () use ($ticket, $currentMember, $messageType, $body, $statusOverride, $files, $attachmentService) {
+                $messageData = [
+                    'organization_id' => $ticket->organization_id,
+                    'ticket_id' => $ticket->id,
+                    'message_type' => $messageType,
+                    'author_type' => OrganizationMember::class,
+                    'author_id' => $currentMember->id,
+                    'body' => $body,
+                ];
+
+                if (! empty($statusOverride)) {
+                    $messageData['target_status'] = $statusOverride;
+                }
+
+                $message = TicketMessage::create($messageData);
+
+                $storedAttachments = [];
+                foreach ($files as $file) {
+                    if ($file instanceof UploadedFile) {
+                        $storedAttachments[] = $attachmentService->store($file, $message);
+                    }
+                }
+
+                $freshTicket = $ticket->fresh();
+
+                TicketMessageCreated::dispatch($message, $freshTicket);
+
+                return response()->json([
+                    'message' => 'Ticket message created successfully.',
+                    'data' => [
+                        'id' => $message->id,
+                        'ticket_id' => $ticket->id,
+                        'message_type' => $message->message_type instanceof TicketMessageType ? $message->message_type->value : $message->message_type,
+                        'body' => $message->body,
+                        'author' => $currentMember->load('user'),
+                        'created_at' => $message->created_at?->toISOString(),
+                        'attachments' => $storedAttachments,
+                    ],
+                    'message_record' => $message->load(['attachments', 'author.user']),
+                    'ticket' => [
+                        'id' => $freshTicket->id,
+                        'ticket_number' => $freshTicket->ticket_number,
+                        'status' => $freshTicket->status instanceof TicketStatus ? $freshTicket->status->value : $freshTicket->status,
+                    ],
+                ], 201);
+            });
+        } catch (InvalidTicketTransitionException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Extract and pre-validate uploaded files from request attachments.
+     *
+     * @return array<UploadedFile>
+     *
+     * @throws InvalidAttachmentException
+     */
+    protected function extractAndValidateAttachments(Request $request, AttachmentService $attachmentService): array
+    {
+        $rawAttachments = $request->file('attachments');
+        /** @var array<UploadedFile> $files */
+        $files = [];
+        if ($rawAttachments instanceof UploadedFile) {
+            $files = [$rawAttachments];
+        } elseif (is_array($rawAttachments)) {
+            $files = $rawAttachments;
+        }
+
+        foreach ($files as $file) {
+            if ($file instanceof UploadedFile) {
+                $attachmentService->validateFile($file);
+            }
+        }
+
+        return $files;
     }
 }
