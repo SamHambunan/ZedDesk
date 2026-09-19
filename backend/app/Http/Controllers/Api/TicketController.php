@@ -20,7 +20,6 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 
 class TicketController extends Controller
@@ -278,6 +277,7 @@ class TicketController extends Controller
             'tags' => $ticket->tags,
             'messages' => $ticket->messages,
             'attachments' => $ticket->attachments,
+            'ticket_assignments' => $ticket->assignments,
             'assignments' => $ticket->assignments,
         ];
 
@@ -299,6 +299,7 @@ class TicketController extends Controller
             ],
             'customer' => $ticket->customer,
             'messages' => $ticket->messages,
+            'ticket_assignments' => $ticket->assignments,
             'assignments' => $ticket->assignments,
             'tags' => $ticket->tags,
             'attachments' => $ticket->attachments,
@@ -306,7 +307,7 @@ class TicketController extends Controller
     }
 
     /**
-     * Post a new public reply or internal note to the ticket conversation thread.
+     * Create a new Ticket Message (Public Reply or Internal Note) in the conversation thread.
      */
     public function storeMessage(Request $request, string $ticketId, AttachmentService $attachmentService): JsonResponse
     {
@@ -321,25 +322,16 @@ class TicketController extends Controller
         }
 
         $validated = $request->validate([
-            'message_type' => ['nullable', 'string', Rule::in(['public_reply', 'internal_note'])],
-            'type' => ['nullable', 'string', Rule::in(['public_reply', 'internal_note'])],
-            'body' => ['required_without:message', 'nullable', 'string'],
-            'message' => ['required_without:body', 'nullable', 'string'],
-            'status' => ['nullable', 'string', new Enum(TicketStatus::class)],
-            'target_status' => ['nullable', 'string', new Enum(TicketStatus::class)],
+            'message_type' => ['required', new Enum(TicketMessageType::class)],
+            'body' => ['required', 'string'],
+            'status' => ['nullable', new Enum(TicketStatus::class)],
+            'target_status' => ['nullable', new Enum(TicketStatus::class)],
             'attachments' => ['nullable'],
             'attachments.*' => ['file', 'max:10240'],
         ]);
 
-        $body = $validated['body'] ?? $validated['message'] ?? null;
-        if (empty($body)) {
-            return response()->json([
-                'message' => 'The message body is required.',
-                'errors' => ['body' => ['The message body is required.']],
-            ], 422);
-        }
-
-        $messageType = $validated['message_type'] ?? $validated['type'] ?? TicketMessageType::PUBLIC_REPLY->value;
+        $body = $validated['body'];
+        $messageType = $validated['message_type'];
 
         // Pre-validate any attachments
         try {
@@ -366,7 +358,9 @@ class TicketController extends Controller
             return response()->json(['message' => 'Forbidden. You are not an Organization Member of this Organization.'], 403);
         }
 
-        $statusOverride = $request->input('status') ?? $request->input('target_status');
+        // Internal notes never accept or persist target status transitions
+        $rawStatusOverride = $request->input('target_status') ?? $request->input('status');
+        $statusOverride = ($messageType === TicketMessageType::INTERNAL_NOTE->value) ? null : $rawStatusOverride;
 
         try {
             return DB::transaction(function () use ($ticket, $currentMember, $messageType, $body, $statusOverride, $files, $attachmentService) {
@@ -397,7 +391,7 @@ class TicketController extends Controller
                 TicketMessageCreated::dispatch($message, $freshTicket);
 
                 return response()->json([
-                    'message' => 'Message posted successfully.',
+                    'message' => 'Ticket message created successfully.',
                     'data' => [
                         'id' => $message->id,
                         'ticket_id' => $ticket->id,

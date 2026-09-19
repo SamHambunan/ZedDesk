@@ -14,17 +14,17 @@ class TicketMessagePolicy
     /**
      * Determine whether the user can author messages on the given ticket.
      */
-    public function create(User $user, Ticket|TicketMessage $ticket): bool
+    public function create(User $user, Ticket|TicketMessage|null $ticket = null): bool
     {
-        $ticketModel = $ticket instanceof TicketMessage ? $ticket->ticket : $ticket;
+        $organization = OrganizationContext::getCurrent();
 
-        if (! $ticketModel) {
+        if (! $organization) {
             return false;
         }
 
-        $organization = OrganizationContext::getCurrent();
+        $ticketModel = $ticket instanceof TicketMessage ? $ticket->ticket : $ticket;
 
-        if (! $organization || $ticketModel->organization_id !== $organization->id) {
+        if ($ticketModel && $ticketModel->organization_id !== $organization->id) {
             return false;
         }
 

@@ -228,6 +228,7 @@ test('get api tickets uuid returns full conversation timeline including internal
 
     $assignments = $response->json('data.assignments');
     expect($assignments)->toHaveCount(1)
+        ->and($response->json('data.ticket_assignments'))->toHaveCount(1)
         ->and($assignments[0]['id'])->toBe($assignment->id)
         ->and($assignments[0]['team']['name'])->toBe('Support Tier 1')
         ->and($assignments[0]['member']['user']['email'])->toBe('agent@acme.test')
@@ -416,8 +417,98 @@ test('agent message post rejects cross-organization access with 403', function (
 
     $response = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
         'message_type' => 'public_reply',
-        'body' => 'Cross-tenant reply attempt',
+        'body' => 'Cross-organization message attempt',
     ]);
 
     $response->assertStatus(403);
+});
+
+test('agent can post internal note with file attachments without altering ticket status', function () {
+    Event::fake([TicketMessageCreated::class]);
+
+    Sanctum::actingAs($this->acmeAgentUser);
+
+    $file = UploadedFile::fake()->create('internal_log.txt', 200, 'text/plain');
+
+    expect($this->acmeTicket->status)->toBe(TicketStatus::OPEN);
+
+    $response = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
+        'message_type' => 'internal_note',
+        'body' => 'Investigating server diagnostics attached.',
+        'attachments' => [$file],
+    ]);
+
+    $response->assertStatus(201)
+        ->assertJsonPath('data.message_type', 'internal_note')
+        ->assertJsonCount(1, 'data.attachments');
+
+    $this->acmeTicket->refresh();
+    expect($this->acmeTicket->status)->toBe(TicketStatus::OPEN);
+
+    $message = TicketMessage::where('ticket_id', $this->acmeTicket->id)
+        ->where('message_type', TicketMessageType::INTERNAL_NOTE->value)
+        ->first();
+
+    expect($message)->not->toBeNull()
+        ->and($message->attachments)->toHaveCount(1)
+        ->and($message->attachments[0]->file_name)->toBe('internal_log.txt');
+});
+
+test('internal note never accepts or persists target status override', function () {
+    Event::fake([TicketMessageCreated::class]);
+
+    Sanctum::actingAs($this->acmeAgentUser);
+
+    expect($this->acmeTicket->status)->toBe(TicketStatus::OPEN);
+
+    $response = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
+        'message_type' => 'internal_note',
+        'body' => 'Internal note attempting to specify target status override',
+        'status' => 'resolved',
+        'target_status' => 'resolved',
+    ]);
+
+    $response->assertStatus(201)
+        ->assertJsonPath('data.message_type', 'internal_note');
+
+    $this->acmeTicket->refresh();
+    expect($this->acmeTicket->status)->toBe(TicketStatus::OPEN);
+
+    $message = TicketMessage::where('ticket_id', $this->acmeTicket->id)
+        ->where('message_type', TicketMessageType::INTERNAL_NOTE->value)
+        ->first();
+
+    expect($message->target_status)->toBeNull();
+});
+
+test('ticket message policy supports creation checks with null ticket or class target', function () {
+    OrganizationContext::setCurrent($this->acmeOrg);
+
+    $policy = new TicketMessagePolicy;
+
+    expect($policy->create($this->acmeAgentUser, null))->toBeTrue()
+        ->and($policy->create($this->betaAgentUser, null))->toBeFalse()
+        ->and(Gate::forUser($this->acmeAgentUser)->allows('create', TicketMessage::class))->toBeTrue()
+        ->and(Gate::forUser($this->betaAgentUser)->allows('create', TicketMessage::class))->toBeFalse();
+});
+
+test('customer cannot access agent ticket workspace or post agent messages', function () {
+    $customerUser = User::create([
+        'name' => 'Unprivileged User',
+        'email' => 'unprivileged@customer.test',
+        'password' => bcrypt('password'),
+    ]);
+
+    Sanctum::actingAs($customerUser);
+
+    // Cannot view agent ticket detail
+    $showResponse = $this->getJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}");
+    $showResponse->assertStatus(403);
+
+    // Cannot post via agent messages endpoint
+    $postResponse = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
+        'message_type' => 'public_reply',
+        'body' => 'Attempting post as external customer user',
+    ]);
+    $postResponse->assertStatus(403);
 });
