@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Middleware\EnsureOrganizationMember;
+use App\Http\Middleware\ResolveOrganization;
+use App\Http\Middleware\ValidateCustomerTicketToken;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -13,12 +16,14 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
-            'resolve.organization' => \App\Http\Middleware\ResolveOrganization::class,
-            'ensure.organization_member' => \App\Http\Middleware\EnsureOrganizationMember::class,
+            'resolve.organization' => ResolveOrganization::class,
+            'ensure.organization_member' => EnsureOrganizationMember::class,
+            'customer.token' => ValidateCustomerTicketToken::class,
+            'validate.customer_token' => ValidateCustomerTicketToken::class,
         ]);
 
         $middleware->api(prepend: [
-            \App\Http\Middleware\ResolveOrganization::class,
+            ResolveOrganization::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
