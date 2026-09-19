@@ -21,6 +21,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./backend:/var/www/backend
+      - backend_vendor:/var/www/backend/vendor
     environment:
       APP_ENV: local
       APP_KEY: base64:49Dxr4bsMuVoxE7lt/tD/xsd3iCz1DhiZSsBHkZXjiM=
@@ -105,4 +106,6 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  backend_vendor:
     driver: local
