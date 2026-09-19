@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\OrganizationController;
 use App\Http\Controllers\Api\OrganizationMemberController;
 use App\Http\Controllers\Api\TagController;
 use App\Http\Controllers\Api\TeamController;
+use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\TicketPriorityController;
 use App\Http\Controllers\Api\WorkspaceController;
 use Illuminate\Support\Facades\DB;
@@ -66,6 +67,7 @@ Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(functio
     Route::post('/teams/{id}/members', [TeamController::class, 'addMember']);
     Route::delete('/teams/{id}/members/{memberId}', [TeamController::class, 'removeMember']);
 
+    Route::get('/tickets', [TicketController::class, 'index']);
     Route::patch('/tickets/{ticket}/priority', [TicketPriorityController::class, 'update']);
 
     Route::get('/tags', [TagController::class, 'index']);
