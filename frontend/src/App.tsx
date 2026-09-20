@@ -6,6 +6,8 @@ import { WorkspaceShell } from './components/workspace'
 import { TeamsView, TeamManagementView } from './components/teams'
 import { MembersView } from './components/members'
 import { PublicInvitationView } from './components/invitations'
+import { CustomerPortalView } from './components/portal'
+import { TicketQueueView } from './components/tickets'
 import { useWorkspace } from './hooks/useWorkspace'
 import { getApiBaseUrl, getCentralHubUrl, getOrganizationUrl, getSubdomain } from './utils/url'
 
@@ -98,6 +100,9 @@ function AppInner({
   const isInvitationRoute = activePath.startsWith('/invitations/')
   const invitationToken = isInvitationRoute ? activePath.replace(/^\/invitations\//, '').split('/')[0] : null
 
+  // Customer Portal Route Check: /portal or /portal/*
+  const isPortalRoute = activePath === '/portal' || activePath.startsWith('/portal/')
+
   // Public Invitation State
   const [publicInvitation, setPublicInvitation] = useState<PublicInvitation | null>(null)
   const [loadingInvitation, setLoadingInvitation] = useState<boolean>(Boolean(invitationToken))
@@ -111,7 +116,7 @@ function AppInner({
   const [isAccepting, setIsAccepting] = useState(false)
 
   // Workspace Shell Invitations State
-  const [workspaceView, setWorkspaceView] = useState<'overview' | 'invitations' | 'members' | 'teams' | 'team-management'>('overview')
+  const [workspaceView, setWorkspaceView] = useState<'overview' | 'invitations' | 'members' | 'teams' | 'team-management' | 'tickets'>('overview')
   const [workspaceInvitations, setWorkspaceInvitations] = useState<InvitationItem[]>([])
   const [loadingWorkspaceInvitations, setLoadingWorkspaceInvitations] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
@@ -802,6 +807,11 @@ function AppInner({
     localStorage.removeItem('zeddesk_user')
   }
 
+  // --- RENDER CUSTOMER PORTAL ---
+  if (isPortalRoute) {
+    return <CustomerPortalView apiUrl={apiUrl} subdomain={subdomain} />
+  }
+
   // --- RENDER PUBLIC INVITATION ACCEPTANCE SCREEN ---
   if (isInvitationRoute) {
     return (
@@ -840,7 +850,8 @@ function AppInner({
             view === 'invitations' ||
             view === 'members' ||
             view === 'teams' ||
-            view === 'team-management'
+            view === 'team-management' ||
+            view === 'tickets'
           ) {
             setWorkspaceView(view)
           }
@@ -930,6 +941,10 @@ function AppInner({
                 onAddMember={handleAddMemberToTeam}
                 onRemoveMember={handleRemoveMemberFromTeam}
               />
+            )}
+
+            {!loadingWorkspace && workspaceData && workspaceView === 'tickets' && (
+              <TicketQueueView apiUrl={apiUrl} token={token} />
             )}
 
       </WorkspaceShell>
