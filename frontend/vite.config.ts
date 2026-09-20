@@ -9,6 +9,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
+    fsModuleCache: true,
   },
   server: {
     host: '0.0.0.0',
