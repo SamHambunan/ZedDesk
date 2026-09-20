@@ -6,6 +6,7 @@ use App\Context\OrganizationContext;
 use App\Enums\TicketMessageType;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
+use App\Events\TicketCreated;
 use App\Exceptions\InvalidTicketTransitionException;
 use App\Services\TicketNumberGenerator;
 use App\Traits\BelongsToOrganization;
@@ -80,6 +81,10 @@ class Ticket extends Model
             if (empty($ticket->ticket_number) && ! empty($ticket->organization_id)) {
                 $ticket->ticket_number = app(TicketNumberGenerator::class)->generate($ticket->organization_id);
             }
+        });
+
+        static::created(function (Ticket $ticket) {
+            TicketCreated::dispatch($ticket);
         });
 
         static::updating(function (Ticket $ticket) {

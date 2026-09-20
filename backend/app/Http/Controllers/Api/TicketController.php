@@ -7,6 +7,7 @@ use App\Enums\TicketMessageType;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Events\TicketMessageCreated;
+use App\Exceptions\InvalidAssignmentException;
 use App\Exceptions\InvalidAttachmentException;
 use App\Exceptions\InvalidTicketTransitionException;
 use App\Http\Controllers\Controller;
@@ -14,12 +15,16 @@ use App\Models\OrganizationMember;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
 use App\Services\AttachmentService;
+use App\Services\TicketAssignmentService;
+use App\Services\TicketStateMachine;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 
 class TicketController extends Controller
@@ -441,5 +446,165 @@ class TicketController extends Controller
         }
 
         return $files;
+    }
+
+    /**
+     * Assign the ticket to a team, organization member, or both.
+     */
+    public function assign(Request $request, string $ticketId, TicketAssignmentService $assignmentService): JsonResponse
+    {
+        $ticket = Ticket::findOrFail($ticketId);
+
+        Gate::authorize('update', $ticket);
+
+        $orgId = OrganizationContext::getCurrentId() ?? $ticket->organization_id;
+
+        $validated = $request->validate([
+            'team_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('teams', 'id')->where('organization_id', $orgId),
+            ],
+            'member_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('organization_members', 'id')->where('organization_id', $orgId),
+            ],
+            'assigned_team_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('teams', 'id')->where('organization_id', $orgId),
+            ],
+            'assigned_member_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('organization_members', 'id')->where('organization_id', $orgId),
+            ],
+        ]);
+
+        $teamId = $validated['team_id'] ?? $validated['assigned_team_id'] ?? null;
+        $memberId = $validated['member_id'] ?? $validated['assigned_member_id'] ?? null;
+
+        /** @var OrganizationMember|null $currentMember */
+        $currentMember = $request->attributes->get('organization_member');
+        if (! $currentMember && $request->user()) {
+            $currentMember = OrganizationMember::withoutGlobalScopes()
+                ->where('organization_id', $ticket->organization_id)
+                ->where('user_id', $request->user()->id)
+                ->first();
+        }
+
+        try {
+            $assignment = $assignmentService->assign(
+                ticket: $ticket,
+                team: $teamId,
+                member: $memberId,
+                assignedBy: $currentMember
+            );
+        } catch (InvalidAssignmentException|InvalidTicketTransitionException|DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'message' => 'Ticket assigned successfully.',
+            'data' => $ticket->fresh(['assignedTeam', 'assignedMember.user', 'assignments']),
+            'assignment' => $assignment,
+        ]);
+    }
+
+    /**
+     * Claim an unassigned ticket for the authenticated organization member.
+     */
+    public function claim(Request $request, string $ticketId, TicketAssignmentService $assignmentService): JsonResponse
+    {
+        $ticket = Ticket::findOrFail($ticketId);
+
+        Gate::authorize('update', $ticket);
+
+        /** @var OrganizationMember|null $currentMember */
+        $currentMember = $request->attributes->get('organization_member');
+        if (! $currentMember && $request->user()) {
+            $currentMember = OrganizationMember::withoutGlobalScopes()
+                ->where('organization_id', $ticket->organization_id)
+                ->where('user_id', $request->user()->id)
+                ->first();
+        }
+
+        if (! $currentMember) {
+            return response()->json(['message' => 'Forbidden. You are not an Organization Member of this Organization.'], 403);
+        }
+
+        try {
+            $assignment = $assignmentService->claim(
+                ticket: $ticket,
+                member: $currentMember
+            );
+        } catch (InvalidAssignmentException|InvalidTicketTransitionException|DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'message' => 'Ticket claimed successfully.',
+            'data' => $ticket->fresh(['assignedTeam', 'assignedMember.user', 'assignments']),
+            'assignment' => $assignment,
+        ]);
+    }
+
+    /**
+     * Update the status of a ticket using the lifecycle state machine.
+     */
+    public function updateStatus(Request $request, string $ticketId, TicketStateMachine $stateMachine): JsonResponse
+    {
+        $ticket = Ticket::findOrFail($ticketId);
+
+        Gate::authorize('update', $ticket);
+
+        $validated = $request->validate([
+            'status' => ['required', new Enum(TicketStatus::class)],
+        ]);
+
+        try {
+            $stateMachine->transitionTo($ticket, $validated['status']);
+        } catch (InvalidTicketTransitionException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'message' => 'Ticket status updated successfully.',
+            'data' => $ticket->fresh(),
+        ]);
+    }
+
+    /**
+     * Soft-delete a ticket (restricted to Admins).
+     */
+    public function destroy(string $ticketId): JsonResponse
+    {
+        $ticket = Ticket::findOrFail($ticketId);
+
+        Gate::authorize('delete', $ticket);
+
+        $ticket->delete();
+
+        return response()->json([
+            'message' => 'Ticket deleted successfully.',
+        ]);
+    }
+
+    /**
+     * Restore a soft-deleted ticket (restricted to Admins).
+     */
+    public function restore(string $ticketId): JsonResponse
+    {
+        $ticket = Ticket::withTrashed()->findOrFail($ticketId);
+
+        Gate::authorize('restore', $ticket);
+
+        $ticket->restore();
+
+        return response()->json([
+            'message' => 'Ticket restored successfully.',
+            'data' => $ticket->fresh(),
+        ]);
     }
 }
