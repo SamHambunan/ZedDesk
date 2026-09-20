@@ -119,9 +119,9 @@ test('database seeder populates acme and beta organizations with users, teams, c
         ->and($allAcmeMessages->where('message_type', TicketMessageType::INTERNAL_NOTE)->count())->toBeGreaterThan(0);
 
     $hasCustomerAuthor = $allAcmeMessages->contains(fn ($m) => $m->author_type === Customer::class);
-    $hasStaffAuthor = $allAcmeMessages->contains(fn ($m) => $m->author_type === OrganizationMember::class);
+    $hasMemberAuthor = $allAcmeMessages->contains(fn ($m) => $m->author_type === OrganizationMember::class);
     expect($hasCustomerAuthor)->toBeTrue()
-        ->and($hasStaffAuthor)->toBeTrue();
+        ->and($hasMemberAuthor)->toBeTrue();
 
     // Verify Sample Attachment
     $attachment = TicketAttachment::withoutGlobalScopes()->where('organization_id', $acmeOrg->id)->first();
@@ -148,7 +148,19 @@ test('database seeder populates acme and beta organizations with users, teams, c
     expect($betaTags)->toHaveCount(4);
 
     $betaTickets = Ticket::withoutGlobalScopes()->where('organization_id', $betaOrg->id)->get();
-    expect($betaTickets)->toHaveCount(4);
+    expect($betaTickets)->toHaveCount(5);
+
+    $betaStatuses = $betaTickets->map(fn (Ticket $t) => $t->status instanceof TicketStatus ? $t->status->value : (string) $t->status)->unique()->values()->all();
+    expect($betaStatuses)->toContain(TicketStatus::NEW->value)
+        ->and($betaStatuses)->toContain(TicketStatus::OPEN->value)
+        ->and($betaStatuses)->toContain(TicketStatus::PENDING->value)
+        ->and($betaStatuses)->toContain(TicketStatus::RESOLVED->value)
+        ->and($betaStatuses)->toContain(TicketStatus::CLOSED->value);
+
+    $betaAttachment = TicketAttachment::withoutGlobalScopes()->where('organization_id', $betaOrg->id)->first();
+    expect($betaAttachment)->not->toBeNull()
+        ->and($betaAttachment->file_name)->toBe('slack_webhook_spec.pdf');
+    expect(Storage::disk($disk)->exists($betaAttachment->file_path))->toBeTrue();
 });
 
 test('database seeder runs idempotently without duplicating records', function () {
@@ -175,7 +187,7 @@ test('database seeder runs idempotently without duplicating records', function (
         ->and($teamMemberCount1)->toBe(5)
         ->and($customerCount1)->toBe(6)
         ->and($tagCount1)->toBe(8)
-        ->and($ticketCount1)->toBe(9);
+        ->and($ticketCount1)->toBe(10);
 
     // Second run
     Artisan::call('db:seed');

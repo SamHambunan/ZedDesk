@@ -64,37 +64,26 @@ export const TicketQueueView: React.FC<TicketQueueViewProps> = ({ apiUrl, token 
     fetchTickets()
   }, [apiUrl, token, statusFilter])
 
-  const getStatusBadgeClass = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'new':
-        return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-      case 'open':
-        return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-      case 'pending':
-        return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-      case 'resolved':
-        return 'bg-purple-500/20 text-purple-400 border-purple-500/30'
-      case 'closed':
-        return 'bg-gray-500/20 text-gray-400 border-gray-500/30'
-      default:
-        return 'bg-surface-subpanel text-text-muted border-border-subtle'
-    }
+  const STATUS_BADGE_CLASSES: Record<string, string> = {
+    new: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    open: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    pending: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+    resolved: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+    closed: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
   }
 
-  const getPriorityBadgeClass = (priority: string) => {
-    switch (priority.toLowerCase()) {
-      case 'urgent':
-        return 'text-red-400 font-semibold'
-      case 'high':
-        return 'text-amber-400 font-medium'
-      case 'medium':
-        return 'text-blue-400'
-      case 'low':
-        return 'text-text-muted'
-      default:
-        return 'text-text-secondary'
-    }
+  const PRIORITY_BADGE_CLASSES: Record<string, string> = {
+    urgent: 'text-red-400 font-semibold',
+    high: 'text-amber-400 font-medium',
+    medium: 'text-blue-400',
+    low: 'text-text-muted',
   }
+
+  const getStatusBadgeClass = (status: string) =>
+    STATUS_BADGE_CLASSES[status.toLowerCase()] ?? 'bg-surface-subpanel text-text-muted border-border-subtle'
+
+  const getPriorityBadgeClass = (priority: string) =>
+    PRIORITY_BADGE_CLASSES[priority.toLowerCase()] ?? 'text-text-secondary'
 
   return (
     <div className="space-y-6" data-testid="tickets-queue-view">

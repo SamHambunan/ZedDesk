@@ -367,7 +367,7 @@ class DatabaseSeeder extends Seeder
 
         // ---------------------------------------------------------------------
         // Ticket 2: High Priority Bug (Status: OPEN, Priority: HIGH)
-        // Team routing & Agent assigned, rich conversation with internal notes
+        // Team and Agent assigned, rich conversation with internal notes
         // ---------------------------------------------------------------------
         $subject2 = 'Database query timeout on batch report export';
         $ticket2 = Ticket::withoutGlobalScopes()
@@ -396,7 +396,7 @@ class DatabaseSeeder extends Seeder
             ]);
 
             // 2. Chronological Assignment History:
-            // First routed to Support Tier 1 by Admin
+            // First assigned to Support Tier 1 by Admin
             $assignmentService->assign(
                 ticket: $ticket2,
                 team: $teams['Support Tier 1'],
@@ -422,7 +422,7 @@ class DatabaseSeeder extends Seeder
                 'target_status' => TicketStatus::OPEN,
             ]);
 
-            // 4. Agent private internal note
+            // 4. Agent internal note
             $ticket2->messages()->create([
                 'organization_id' => $org->id,
                 'message_type' => TicketMessageType::INTERNAL_NOTE,
@@ -631,7 +631,7 @@ class DatabaseSeeder extends Seeder
     }
 
     /**
-     * Seed sample tickets for secondary tenant Beta Corporation.
+     * Seed sample tickets for secondary organization Beta Corporation.
      *
      * @param  array<string, Team>  $teams
      * @param  array<string, Customer>  $customers
@@ -647,6 +647,7 @@ class DatabaseSeeder extends Seeder
     ): void {
         $assignmentService = app(TicketAssignmentService::class);
         $stateMachine = app(TicketStateMachine::class);
+        $disk = config('filesystems.attachments_disk', 'private');
 
         // 1. Beta Ticket: Urgent Gateway Timeout (Status: OPEN, Priority: URGENT)
         $subject1 = 'Critical: Payment gateway webhook timeout';
@@ -689,9 +690,18 @@ class DatabaseSeeder extends Seeder
                 'body' => 'We are escalating to upstream gateway engineering immediately.',
                 'target_status' => TicketStatus::OPEN,
             ]);
+
+            $ticket1->messages()->create([
+                'organization_id' => $org->id,
+                'message_type' => TicketMessageType::INTERNAL_NOTE,
+                'author_type' => OrganizationMember::class,
+                'author_id' => $adminMember->id,
+                'body' => 'Escalated incident to upstream gateway provider with priority pager.',
+            ]);
         }
 
         // 2. Beta Ticket: New Webhook Integration Request (Status: NEW, Priority: LOW)
+        // Unassigned queue ticket with sample attachment
         $subject2 = 'Webhook integration request for Slack alerts';
         $ticket2 = Ticket::withoutGlobalScopes()
             ->where('organization_id', $org->id)
@@ -709,17 +719,32 @@ class DatabaseSeeder extends Seeder
 
             $ticket2->tags()->syncWithoutDetaching([$tags['feature-request']->id]);
 
-            $ticket2->messages()->create([
+            $msg2 = $ticket2->messages()->create([
                 'organization_id' => $org->id,
                 'message_type' => TicketMessageType::PUBLIC_REPLY,
                 'author_type' => Customer::class,
                 'author_id' => $customers['fiona.gallagher@example.com']->id,
-                'body' => 'Could you provide documentation on configuring outbound webhooks to Slack channels for ticket events?',
+                'body' => 'Could you provide documentation on configuring outbound webhooks to Slack channels for ticket events? Specification attached.',
+            ]);
+
+            $betaAttachmentId = (string) Str::uuid();
+            $betaFilePath = "tenants/{$org->id}/tickets/{$ticket2->id}/attachments/{$betaAttachmentId}.pdf";
+            $betaPdfContent = "%PDF-1.4\n%Beta Slack Webhook Specification\nOutbound Webhook Format.\n%%EOF";
+            Storage::disk($disk)->put($betaFilePath, $betaPdfContent);
+
+            TicketAttachment::create([
+                'id' => $betaAttachmentId,
+                'organization_id' => $org->id,
+                'ticket_message_id' => $msg2->id,
+                'file_name' => 'slack_webhook_spec.pdf',
+                'file_path' => $betaFilePath,
+                'mime_type' => 'application/pdf',
+                'file_size' => strlen($betaPdfContent),
             ]);
         }
 
-        // 3. Beta Ticket: TLS Warning (Status: RESOLVED, Priority: HIGH)
-        $subject3 = 'TLS certificate expiration warning on custom domain';
+        // 3. Beta Ticket: Billing Allocation Review (Status: PENDING, Priority: MEDIUM)
+        $subject3 = 'Enterprise seat allocation and billing review';
         $ticket3 = Ticket::withoutGlobalScopes()
             ->where('organization_id', $org->id)
             ->where('subject', $subject3)
@@ -730,11 +755,11 @@ class DatabaseSeeder extends Seeder
                 'organization_id' => $org->id,
                 'customer_id' => $customers['evan.wright@example.com']->id,
                 'subject' => $subject3,
-                'priority' => TicketPriority::HIGH,
+                'priority' => TicketPriority::MEDIUM,
                 'status' => TicketStatus::NEW,
             ]);
 
-            $ticket3->tags()->syncWithoutDetaching([$tags['security']->id]);
+            $ticket3->tags()->syncWithoutDetaching([$tags['billing']->id]);
 
             $assignmentService->assign(
                 ticket: $ticket3,
@@ -748,7 +773,7 @@ class DatabaseSeeder extends Seeder
                 'message_type' => TicketMessageType::PUBLIC_REPLY,
                 'author_type' => Customer::class,
                 'author_id' => $customers['evan.wright@example.com']->id,
-                'body' => 'Our monitoring reports our custom domain TLS certificate expires in 3 days.',
+                'body' => 'Can we review our team tier license limits for Q4?',
             ]);
 
             $ticket3->messages()->create([
@@ -756,13 +781,21 @@ class DatabaseSeeder extends Seeder
                 'message_type' => TicketMessageType::PUBLIC_REPLY,
                 'author_type' => OrganizationMember::class,
                 'author_id' => $agentMember->id,
-                'body' => 'Automated Let’s Encrypt renewal has completed and the certificate is renewed for another 90 days.',
-                'target_status' => TicketStatus::RESOLVED,
+                'body' => 'I have pulled your seat usage report. Could you confirm the expected headcount addition?',
+                'target_status' => TicketStatus::PENDING,
+            ]);
+
+            $ticket3->messages()->create([
+                'organization_id' => $org->id,
+                'message_type' => TicketMessageType::INTERNAL_NOTE,
+                'author_type' => OrganizationMember::class,
+                'author_id' => $agentMember->id,
+                'body' => 'Reviewing subscription plan pricing matrix for volume discount tier.',
             ]);
         }
 
-        // 4. Beta Ticket: Annual Contract (Status: CLOSED, Priority: MEDIUM)
-        $subject4 = 'Annual contract renewal documentation';
+        // 4. Beta Ticket: TLS Warning (Status: RESOLVED, Priority: HIGH)
+        $subject4 = 'TLS certificate expiration warning on custom domain';
         $ticket4 = Ticket::withoutGlobalScopes()
             ->where('organization_id', $org->id)
             ->where('subject', $subject4)
@@ -771,13 +804,13 @@ class DatabaseSeeder extends Seeder
         if (! $ticket4) {
             $ticket4 = Ticket::create([
                 'organization_id' => $org->id,
-                'customer_id' => $customers['fiona.gallagher@example.com']->id,
+                'customer_id' => $customers['evan.wright@example.com']->id,
                 'subject' => $subject4,
-                'priority' => TicketPriority::MEDIUM,
+                'priority' => TicketPriority::HIGH,
                 'status' => TicketStatus::NEW,
             ]);
 
-            $ticket4->tags()->syncWithoutDetaching([$tags['billing']->id]);
+            $ticket4->tags()->syncWithoutDetaching([$tags['security']->id]);
 
             $assignmentService->assign(
                 ticket: $ticket4,
@@ -790,11 +823,54 @@ class DatabaseSeeder extends Seeder
                 'organization_id' => $org->id,
                 'message_type' => TicketMessageType::PUBLIC_REPLY,
                 'author_type' => Customer::class,
+                'author_id' => $customers['evan.wright@example.com']->id,
+                'body' => 'Our monitoring reports our custom domain TLS certificate expires in 3 days.',
+            ]);
+
+            $ticket4->messages()->create([
+                'organization_id' => $org->id,
+                'message_type' => TicketMessageType::PUBLIC_REPLY,
+                'author_type' => OrganizationMember::class,
+                'author_id' => $agentMember->id,
+                'body' => 'Automated Let’s Encrypt renewal has completed and the certificate is renewed for another 90 days.',
+                'target_status' => TicketStatus::RESOLVED,
+            ]);
+        }
+
+        // 5. Beta Ticket: Annual Contract (Status: CLOSED, Priority: LOW)
+        $subject5 = 'Annual contract renewal documentation';
+        $ticket5 = Ticket::withoutGlobalScopes()
+            ->where('organization_id', $org->id)
+            ->where('subject', $subject5)
+            ->first();
+
+        if (! $ticket5) {
+            $ticket5 = Ticket::create([
+                'organization_id' => $org->id,
+                'customer_id' => $customers['fiona.gallagher@example.com']->id,
+                'subject' => $subject5,
+                'priority' => TicketPriority::LOW,
+                'status' => TicketStatus::NEW,
+            ]);
+
+            $ticket5->tags()->syncWithoutDetaching([$tags['billing']->id]);
+
+            $assignmentService->assign(
+                ticket: $ticket5,
+                team: $teams['Beta Support'],
+                member: $agentMember,
+                assignedBy: $agentMember
+            );
+
+            $ticket5->messages()->create([
+                'organization_id' => $org->id,
+                'message_type' => TicketMessageType::PUBLIC_REPLY,
+                'author_type' => Customer::class,
                 'author_id' => $customers['fiona.gallagher@example.com']->id,
                 'body' => 'Please email the signed enterprise service agreement copy for fiscal year 2026.',
             ]);
 
-            $ticket4->messages()->create([
+            $ticket5->messages()->create([
                 'organization_id' => $org->id,
                 'message_type' => TicketMessageType::PUBLIC_REPLY,
                 'author_type' => OrganizationMember::class,
@@ -803,8 +879,16 @@ class DatabaseSeeder extends Seeder
                 'target_status' => TicketStatus::RESOLVED,
             ]);
 
-            $ticket4->refresh();
-            $stateMachine->transitionTo($ticket4, TicketStatus::CLOSED);
+            $ticket5->messages()->create([
+                'organization_id' => $org->id,
+                'message_type' => TicketMessageType::INTERNAL_NOTE,
+                'author_type' => OrganizationMember::class,
+                'author_id' => $agentMember->id,
+                'body' => 'Archived countersigned PDF in legal repository.',
+            ]);
+
+            $ticket5->refresh();
+            $stateMachine->transitionTo($ticket5, TicketStatus::CLOSED);
         }
     }
 }

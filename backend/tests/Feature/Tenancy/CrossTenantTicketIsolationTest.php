@@ -80,8 +80,8 @@ test('organization B users only see organization B tickets and cannot count or l
         expect($ticketIds)->not->toContain($acmeId);
     }
 
-    // Total count in meta must strictly match Beta's ticket count (4), never 9
-    expect($response->json('meta.total'))->toBe(4);
+    // Total count in meta must strictly match Beta's ticket count (5), never 10
+    expect($response->json('meta.total'))->toBe(5);
 });
 
 test('organization B user cannot view organization A ticket by ID from beta host', function () {
@@ -116,7 +116,7 @@ test('organization B user cannot post messages to organization A ticket', functi
     $betaHostResponse = $this->withHeader('Authorization', 'Bearer '.$this->betaAgentToken)
         ->postJson("http://beta.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
             'message_type' => TicketMessageType::PUBLIC_REPLY->value,
-            'body' => 'Hostile cross-tenant injection attempt',
+            'body' => 'Hostile cross-organization injection attempt',
         ]);
     $betaHostResponse->assertStatus(404);
 
@@ -124,7 +124,7 @@ test('organization B user cannot post messages to organization A ticket', functi
     $acmeHostResponse = $this->withHeader('Authorization', 'Bearer '.$this->betaAgentToken)
         ->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
             'message_type' => TicketMessageType::PUBLIC_REPLY->value,
-            'body' => 'Hostile cross-tenant injection attempt',
+            'body' => 'Hostile cross-organization injection attempt',
         ]);
     $acmeHostResponse->assertStatus(403);
 });
@@ -236,7 +236,7 @@ test('customer token cannot access another customer ticket within the same organ
 test('customer ticket creation via portal strictly scopes to host organization', function () {
     $response = $this->postJson('http://beta.localhost/api/portal/tickets', [
         'name' => 'George Newcomer',
-        'email' => 'george@beta-client.test',
+        'email' => 'george@beta-customer.test',
         'subject' => 'Inquiry for Beta Support',
         'message' => 'Please help with onboarding integration.',
         'priority' => TicketPriority::HIGH->value,
@@ -309,25 +309,34 @@ test('customer cannot download attachment from another organization or internal 
     expect(in_array($crossDownloadResponse->status(), [403, 404], true))->toBeTrue();
 
     // 2. Customer cannot download attachment belonging to an internal note
-    $internalMsg = $this->acmeTicket->messages()->where('message_type', TicketMessageType::INTERNAL_NOTE->value)->first();
-    if ($internalMsg) {
-        $internalAttachmentId = (string) Str::uuid();
-        $internalFilePath = "tenants/{$this->acmeOrg->id}/tickets/{$this->acmeTicket->id}/attachments/{$internalAttachmentId}.pdf";
-        Storage::disk($disk)->put($internalFilePath, 'Staff confidential note attachment');
+    $ticketWithNote = Ticket::withoutGlobalScopes()
+        ->where('organization_id', $this->acmeOrg->id)
+        ->whereHas('messages', fn ($q) => $q->where('message_type', TicketMessageType::INTERNAL_NOTE->value))
+        ->firstOrFail();
 
-        $internalAttachment = TicketAttachment::create([
-            'id' => $internalAttachmentId,
-            'organization_id' => $this->acmeOrg->id,
-            'ticket_message_id' => $internalMsg->id,
-            'file_name' => 'internal_note.pdf',
-            'file_path' => $internalFilePath,
-            'mime_type' => 'application/pdf',
-            'file_size' => 36,
-        ]);
+    $internalMsg = $ticketWithNote->messages()
+        ->where('message_type', TicketMessageType::INTERNAL_NOTE->value)
+        ->firstOrFail();
 
-        $internalDownloadResponse = $this->withHeader('X-Customer-Token', $acmeToken)
-            ->get("http://acme.localhost/api/portal/tickets/{$this->acmeTicket->id}/attachments/{$internalAttachment->id}");
+    $internalAttachmentId = (string) Str::uuid();
+    $internalFilePath = "tenants/{$this->acmeOrg->id}/tickets/{$ticketWithNote->id}/attachments/{$internalAttachmentId}.pdf";
+    Storage::disk($disk)->put($internalFilePath, 'Internal confidential note attachment');
 
-        $internalDownloadResponse->assertStatus(404);
-    }
+    $internalAttachment = TicketAttachment::create([
+        'id' => $internalAttachmentId,
+        'organization_id' => $this->acmeOrg->id,
+        'ticket_message_id' => $internalMsg->id,
+        'file_name' => 'internal_note.pdf',
+        'file_path' => $internalFilePath,
+        'mime_type' => 'application/pdf',
+        'file_size' => 36,
+    ]);
+
+    $customerWithNote = Customer::withoutGlobalScopes()->findOrFail($ticketWithNote->customer_id);
+    $customerTokenForNoteTicket = $this->tokenService->generateToken($customerWithNote, $ticketWithNote);
+
+    $internalDownloadResponse = $this->withHeader('X-Customer-Token', $customerTokenForNoteTicket)
+        ->get("http://acme.localhost/api/portal/tickets/{$ticketWithNote->id}/attachments/{$internalAttachment->id}");
+
+    $internalDownloadResponse->assertStatus(404);
 });
