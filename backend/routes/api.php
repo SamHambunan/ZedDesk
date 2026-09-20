@@ -70,7 +70,12 @@ Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(functio
     Route::get('/tickets', [TicketController::class, 'index']);
     Route::get('/tickets/{ticket}', [TicketController::class, 'show']);
     Route::post('/tickets/{ticket}/messages', [TicketController::class, 'storeMessage']);
+    Route::post('/tickets/{ticket}/assign', [TicketController::class, 'assign']);
+    Route::post('/tickets/{ticket}/claim', [TicketController::class, 'claim']);
+    Route::patch('/tickets/{ticket}/status', [TicketController::class, 'updateStatus']);
     Route::patch('/tickets/{ticket}/priority', [TicketPriorityController::class, 'update']);
+    Route::delete('/tickets/{ticket}', [TicketController::class, 'destroy']);
+    Route::post('/tickets/{ticket}/restore', [TicketController::class, 'restore']);
 
     Route::get('/tags', [TagController::class, 'index']);
     Route::post('/tags', [TagController::class, 'store']);
