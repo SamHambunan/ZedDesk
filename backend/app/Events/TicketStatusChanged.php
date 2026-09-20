@@ -14,7 +14,7 @@ class TicketStatusChanged
 
     public function __construct(
         public Ticket $ticket,
-        public TicketStatus|string|null $previousStatus = null,
-        public TicketStatus|string|null $newStatus = null
+        public ?TicketStatus $previousStatus = null,
+        public ?TicketStatus $newStatus = null
     ) {}
 }

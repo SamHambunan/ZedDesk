@@ -16,16 +16,7 @@ class TicketPolicy
      */
     public function viewAny(User $user, ?Organization $organization = null): bool
     {
-        $organization = $organization ?? OrganizationContext::getCurrent();
-
-        if (! $organization) {
-            return false;
-        }
-
-        $member = OrganizationMember::withoutGlobalScopes()
-            ->where('organization_id', $organization->id)
-            ->where('user_id', $user->id)
-            ->first();
+        $member = $this->resolveMember($user, $organization ?? OrganizationContext::getCurrent());
 
         if (! $member) {
             return false;
@@ -69,10 +60,7 @@ class TicketPolicy
             return false;
         }
 
-        $member = OrganizationMember::withoutGlobalScopes()
-            ->where('organization_id', $organization->id)
-            ->where('user_id', $user->id)
-            ->first();
+        $member = $this->resolveMember($user, $organization);
 
         if (! $member) {
             return false;
@@ -89,5 +77,20 @@ class TicketPolicy
     public function restore(User $user, Ticket $ticket): bool
     {
         return $this->delete($user, $ticket);
+    }
+
+    /**
+     * Resolve the organization membership for a user in the target organization.
+     */
+    protected function resolveMember(User $user, ?Organization $organization): ?OrganizationMember
+    {
+        if (! $organization) {
+            return null;
+        }
+
+        return OrganizationMember::withoutGlobalScopes()
+            ->where('organization_id', $organization->id)
+            ->where('user_id', $user->id)
+            ->first();
     }
 }

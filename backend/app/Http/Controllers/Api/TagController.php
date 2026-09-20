@@ -10,6 +10,7 @@ use App\Models\Ticket;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -80,6 +81,9 @@ class TagController extends Controller
     public function attachToTicket(Request $request, string $ticketId): JsonResponse
     {
         $ticket = Ticket::findOrFail($ticketId);
+
+        Gate::authorize('update', $ticket);
+
         $orgId = OrganizationContext::getCurrentId();
 
         $validated = $request->validate([
@@ -107,6 +111,8 @@ class TagController extends Controller
     public function detachFromTicket(string $ticketId, string $tagId): JsonResponse
     {
         $ticket = Ticket::findOrFail($ticketId);
+
+        Gate::authorize('update', $ticket);
 
         try {
             $ticket->detachTag($tagId);

@@ -138,8 +138,8 @@ test('ticket status transition dispatches TicketStatusChanged domain event', fun
 
     Event::assertDispatched(TicketStatusChanged::class, function (TicketStatusChanged $event) use ($ticket) {
         return $event->ticket->id === $ticket->id
-            && $event->previousStatus === TicketStatus::NEW->value
-            && $event->newStatus === TicketStatus::OPEN->value;
+            && $event->previousStatus === TicketStatus::NEW
+            && $event->newStatus === TicketStatus::OPEN;
     });
 });
 
@@ -568,7 +568,7 @@ test('tags can be attached and detached within the same organization only', func
     $ticket = Ticket::create([
         'organization_id' => $this->acmeOrg->id,
         'customer_id' => $this->acmeCustomer->id,
-        'subject' => 'Ticket for tags routing test',
+        'subject' => 'Ticket for tags assignment test',
         'status' => TicketStatus::OPEN,
     ]);
 
@@ -601,6 +601,49 @@ test('tags can be attached and detached within the same organization only', func
     $detachRes = $this->deleteJson("http://acme.localhost/api/tickets/{$ticket->id}/tags/{$acmeTag->id}");
     $detachRes->assertStatus(200);
     expect($ticket->fresh()->tags->pluck('id'))->not->toContain($acmeTag->id);
+});
+
+test('assigning member only preserves existing assigned team', function () {
+    Sanctum::actingAs($this->acmeAgentUser);
+
+    $ticket = Ticket::create([
+        'organization_id' => $this->acmeOrg->id,
+        'customer_id' => $this->acmeCustomer->id,
+        'subject' => 'Preserve team assignment test',
+        'status' => TicketStatus::OPEN,
+        'assigned_team_id' => $this->supportTeam->id,
+    ]);
+
+    $response = $this->postJson("http://acme.localhost/api/tickets/{$ticket->id}/assign", [
+        'member_id' => $this->acmeAgentMember->id,
+    ]);
+
+    $response->assertStatus(200)
+        ->assertJsonPath('data.assigned_team_id', $this->supportTeam->id)
+        ->assertJsonPath('data.assigned_member_id', $this->acmeAgentMember->id);
+
+    expect($ticket->fresh()->assigned_team_id)->toBe($this->supportTeam->id)
+        ->and($ticket->fresh()->assigned_member_id)->toBe($this->acmeAgentMember->id);
+});
+
+test('agent can update ticket priority via api conforming to policy', function () {
+    Sanctum::actingAs($this->acmeAgentUser);
+
+    $ticket = Ticket::create([
+        'organization_id' => $this->acmeOrg->id,
+        'customer_id' => $this->acmeCustomer->id,
+        'subject' => 'Priority update test',
+        'priority' => TicketPriority::LOW,
+    ]);
+
+    $response = $this->patchJson("http://acme.localhost/api/tickets/{$ticket->id}/priority", [
+        'priority' => 'urgent',
+    ]);
+
+    $response->assertStatus(200)
+        ->assertJsonPath('data.priority', 'urgent');
+
+    expect($ticket->fresh()->priority)->toBe(TicketPriority::URGENT);
 });
 
 test('customer portal intake dispatches TicketCreated domain event', function () {

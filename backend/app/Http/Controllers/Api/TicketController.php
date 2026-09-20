@@ -37,15 +37,7 @@ class TicketController extends Controller
         Gate::authorize('viewAny', Ticket::class);
 
         $organization = OrganizationContext::getCurrent() ?? $request->attributes->get('organization');
-
-        /** @var OrganizationMember|null $currentMember */
-        $currentMember = $request->attributes->get('organization_member');
-        if (! $currentMember && $organization && $request->user()) {
-            $currentMember = OrganizationMember::withoutGlobalScopes()
-                ->where('organization_id', $organization->id)
-                ->where('user_id', $request->user()->id)
-                ->first();
-        }
+        $currentMember = $this->resolveCurrentMember($request, $organization?->id);
 
         $query = Ticket::query()
             ->with(['customer', 'assignedTeam', 'assignedMember.user', 'tags']);
@@ -348,16 +340,7 @@ class TicketController extends Controller
             ], 422);
         }
 
-        $organization = OrganizationContext::getCurrent() ?? $request->attributes->get('organization');
-
-        /** @var OrganizationMember|null $currentMember */
-        $currentMember = $request->attributes->get('organization_member');
-        if (! $currentMember && $organization && $request->user()) {
-            $currentMember = OrganizationMember::withoutGlobalScopes()
-                ->where('organization_id', $ticket->organization_id)
-                ->where('user_id', $request->user()->id)
-                ->first();
-        }
+        $currentMember = $this->resolveCurrentMember($request, $ticket->organization_id);
 
         if (! $currentMember) {
             return response()->json(['message' => 'Forbidden. You are not an Organization Member of this Organization.'], 403);
@@ -470,29 +453,12 @@ class TicketController extends Controller
                 'integer',
                 Rule::exists('organization_members', 'id')->where('organization_id', $orgId),
             ],
-            'assigned_team_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('teams', 'id')->where('organization_id', $orgId),
-            ],
-            'assigned_member_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('organization_members', 'id')->where('organization_id', $orgId),
-            ],
         ]);
 
-        $teamId = $validated['team_id'] ?? $validated['assigned_team_id'] ?? null;
-        $memberId = $validated['member_id'] ?? $validated['assigned_member_id'] ?? null;
+        $teamId = $request->has('team_id') ? $validated['team_id'] : $ticket->assigned_team_id;
+        $memberId = $request->has('member_id') ? $validated['member_id'] : $ticket->assigned_member_id;
 
-        /** @var OrganizationMember|null $currentMember */
-        $currentMember = $request->attributes->get('organization_member');
-        if (! $currentMember && $request->user()) {
-            $currentMember = OrganizationMember::withoutGlobalScopes()
-                ->where('organization_id', $ticket->organization_id)
-                ->where('user_id', $request->user()->id)
-                ->first();
-        }
+        $currentMember = $this->resolveCurrentMember($request, $ticket->organization_id);
 
         try {
             $assignment = $assignmentService->assign(
@@ -521,14 +487,7 @@ class TicketController extends Controller
 
         Gate::authorize('update', $ticket);
 
-        /** @var OrganizationMember|null $currentMember */
-        $currentMember = $request->attributes->get('organization_member');
-        if (! $currentMember && $request->user()) {
-            $currentMember = OrganizationMember::withoutGlobalScopes()
-                ->where('organization_id', $ticket->organization_id)
-                ->where('user_id', $request->user()->id)
-                ->first();
-        }
+        $currentMember = $this->resolveCurrentMember($request, $ticket->organization_id);
 
         if (! $currentMember) {
             return response()->json(['message' => 'Forbidden. You are not an Organization Member of this Organization.'], 403);
@@ -606,5 +565,26 @@ class TicketController extends Controller
             'message' => 'Ticket restored successfully.',
             'data' => $ticket->fresh(),
         ]);
+    }
+
+    /**
+     * Resolve the active organization member from request context or database fallback.
+     */
+    protected function resolveCurrentMember(Request $request, ?string $organizationId = null): ?OrganizationMember
+    {
+        $currentMember = $request->attributes->get('organization_member');
+        if ($currentMember instanceof OrganizationMember) {
+            return $currentMember;
+        }
+
+        $orgId = $organizationId ?? OrganizationContext::getCurrentId() ?? $request->attributes->get('organization')?->id;
+        if (! $orgId || ! $request->user()) {
+            return null;
+        }
+
+        return OrganizationMember::withoutGlobalScopes()
+            ->where('organization_id', $orgId)
+            ->where('user_id', $request->user()->id)
+            ->first();
     }
 }

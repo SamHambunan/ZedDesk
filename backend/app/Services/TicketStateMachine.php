@@ -90,7 +90,11 @@ class TicketStateMachine
         $ticket->status = TicketStatus::from($targetValue);
         $ticket->save();
 
-        TicketStatusChanged::dispatch($ticket, $currentValue, $targetValue);
+        TicketStatusChanged::dispatch(
+            $ticket,
+            TicketStatus::from($currentValue),
+            TicketStatus::from($targetValue)
+        );
 
         return $ticket;
     }

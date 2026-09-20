@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Ticket;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rules\Enum;
 
 class TicketPriorityController extends Controller
@@ -18,6 +19,8 @@ class TicketPriorityController extends Controller
     public function update(Request $request, string $ticketId): JsonResponse
     {
         $ticket = Ticket::findOrFail($ticketId);
+
+        Gate::authorize('update', $ticket);
 
         $validated = $request->validate([
             'priority' => ['required', new Enum(TicketPriority::class)],
