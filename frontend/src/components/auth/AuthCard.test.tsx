@@ -74,6 +74,20 @@ describe('AuthCard Component', () => {
     expect(screen.getByLabelText(/hide password/i)).toBeInTheDocument()
   })
 
+  it('toggles confirm password visibility in registration form', async () => {
+    const user = userEvent.setup()
+    render(<AuthCard {...defaultProps} activeTab="register" regPasswordConfirm="SecretConfirm123" />)
+
+    const confirmInput = screen.getByLabelText(/confirm password/i)
+    expect(confirmInput).toHaveAttribute('type', 'password')
+
+    const toggleButtons = screen.getAllByLabelText(/show password/i)
+    // The second toggle button is for confirm password
+    await user.click(toggleButtons[toggleButtons.length - 1])
+
+    expect(confirmInput).toHaveAttribute('type', 'text')
+  })
+
   it('displays error alerts when loginError or regError is present', () => {
     const { rerender } = render(<AuthCard {...defaultProps} loginError="Invalid credentials" />)
     expect(screen.getByRole('alert')).toHaveTextContent('Invalid credentials')

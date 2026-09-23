@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Mail, Lock, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { authContentData } from '../../data/mockData'
+import { validateLoginForm, isValidEmail, type LoginFormErrors } from './authValidation'
 
 export interface AuthLoginFormProps {
   readonly email: string
@@ -27,25 +28,12 @@ export const AuthLoginForm: React.FC<AuthLoginFormProps> = ({
   onToggleShowPassword,
   className = '',
 }) => {
-  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({})
+  const [fieldErrors, setFieldErrors] = useState<LoginFormErrors>({})
   const [touched, setTouched] = useState<{ email?: boolean; password?: boolean }>({})
-
-  const validate = () => {
-    const errs: { email?: string; password?: string } = {}
-    if (!email.trim()) {
-      errs.email = 'Email is required.'
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      errs.email = 'Please enter a valid email address.'
-    }
-    if (!password) {
-      errs.password = 'Password is required.'
-    }
-    return errs
-  }
 
   const handleBlur = (field: 'email' | 'password') => {
     setTouched((prev) => ({ ...prev, [field]: true }))
-    const errs = validate()
+    const errs = validateLoginForm(email, password)
     setFieldErrors((prev) => ({
       ...prev,
       [field]: errs[field],
@@ -57,7 +45,7 @@ export const AuthLoginForm: React.FC<AuthLoginFormProps> = ({
     if (fieldErrors.email || touched.email) {
       if (!val.trim()) {
         setFieldErrors((prev) => ({ ...prev, email: 'Email is required.' }))
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim())) {
+      } else if (!isValidEmail(val)) {
         setFieldErrors((prev) => ({ ...prev, email: 'Please enter a valid email address.' }))
       } else {
         setFieldErrors((prev) => ({ ...prev, email: undefined }))
@@ -70,6 +58,8 @@ export const AuthLoginForm: React.FC<AuthLoginFormProps> = ({
     if (fieldErrors.password || touched.password) {
       if (!val) {
         setFieldErrors((prev) => ({ ...prev, password: 'Password is required.' }))
+      } else if (val.length < 8) {
+        setFieldErrors((prev) => ({ ...prev, password: 'Password must be at least 8 characters.' }))
       } else {
         setFieldErrors((prev) => ({ ...prev, password: undefined }))
       }
@@ -79,7 +69,7 @@ export const AuthLoginForm: React.FC<AuthLoginFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setTouched({ email: true, password: true })
-    const errs = validate()
+    const errs = validateLoginForm(email, password)
     setFieldErrors(errs)
     if (Object.keys(errs).length === 0) {
       onSubmit(e)

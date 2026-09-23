@@ -100,8 +100,10 @@ export const AuthCard: React.FC<AuthCardProps> = ({
               error={regError}
               isLoading={isRegistering}
               onSubmit={onRegisterSubmit}
-              showPassword={showConfirmPassword}
-              onToggleShowPassword={toggleConfirmPasswordVisibility}
+              showPassword={showPassword}
+              onToggleShowPassword={togglePasswordVisibility}
+              showPasswordConfirm={showConfirmPassword}
+              onToggleShowPasswordConfirm={toggleConfirmPasswordVisibility}
             />
           )}
         </div>

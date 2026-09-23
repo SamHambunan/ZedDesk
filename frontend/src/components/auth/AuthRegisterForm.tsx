@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Mail, Lock, User as UserIcon, Shield, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { authContentData } from '../../data/mockData'
+import { validateRegisterForm, isValidEmail, type RegisterFormErrors } from './authValidation'
 
 export interface AuthRegisterFormProps {
   readonly name: string
@@ -16,6 +17,8 @@ export interface AuthRegisterFormProps {
   readonly onSubmit: (e: React.FormEvent) => void
   readonly showPassword?: boolean
   readonly onToggleShowPassword?: () => void
+  readonly showPasswordConfirm?: boolean
+  readonly onToggleShowPasswordConfirm?: () => void
   readonly className?: string
 }
 
@@ -33,14 +36,11 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
   onSubmit,
   showPassword = false,
   onToggleShowPassword,
+  showPasswordConfirm = false,
+  onToggleShowPasswordConfirm,
   className = '',
 }) => {
-  const [fieldErrors, setFieldErrors] = useState<{
-    name?: string
-    email?: string
-    password?: string
-    passwordConfirm?: string
-  }>({})
+  const [fieldErrors, setFieldErrors] = useState<RegisterFormErrors>({})
   const [touched, setTouched] = useState<{
     name?: boolean
     email?: boolean
@@ -48,42 +48,9 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
     passwordConfirm?: boolean
   }>({})
 
-  const validate = () => {
-    const errs: {
-      name?: string
-      email?: string
-      password?: string
-      passwordConfirm?: string
-    } = {}
-
-    if (!name.trim()) {
-      errs.name = 'Full name is required.'
-    }
-
-    if (!email.trim()) {
-      errs.email = 'Email is required.'
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      errs.email = 'Please enter a valid email address.'
-    }
-
-    if (!password) {
-      errs.password = 'Password is required.'
-    } else if (password.length < 8) {
-      errs.password = 'Password must be at least 8 characters.'
-    }
-
-    if (!passwordConfirm) {
-      errs.passwordConfirm = 'Please confirm your password.'
-    } else if (password !== passwordConfirm) {
-      errs.passwordConfirm = 'Passwords do not match.'
-    }
-
-    return errs
-  }
-
   const handleBlur = (field: 'name' | 'email' | 'password' | 'passwordConfirm') => {
     setTouched((prev) => ({ ...prev, [field]: true }))
-    const errs = validate()
+    const errs = validateRegisterForm(name, email, password, passwordConfirm)
     setFieldErrors((prev) => ({
       ...prev,
       [field]: errs[field],
@@ -105,7 +72,7 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
     if (fieldErrors.email || touched.email) {
       if (!val.trim()) {
         setFieldErrors((prev) => ({ ...prev, email: 'Email is required.' }))
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim())) {
+      } else if (!isValidEmail(val)) {
         setFieldErrors((prev) => ({ ...prev, email: 'Please enter a valid email address.' }))
       } else {
         setFieldErrors((prev) => ({ ...prev, email: undefined }))
@@ -116,7 +83,7 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
   const handlePasswordChange = (val: string) => {
     onPasswordChange(val)
     if (fieldErrors.password || fieldErrors.passwordConfirm || touched.password) {
-      const errs = validate()
+      const errs = validateRegisterForm(name, email, val, passwordConfirm)
       setFieldErrors((prev) => ({
         ...prev,
         password: errs.password,
@@ -141,7 +108,7 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setTouched({ name: true, email: true, password: true, passwordConfirm: true })
-    const errs = validate()
+    const errs = validateRegisterForm(name, email, password, passwordConfirm)
     setFieldErrors(errs)
     if (Object.keys(errs).length === 0) {
       onSubmit(e)
@@ -297,7 +264,7 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
             <Shield className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#525866] pointer-events-none" />
             <input
               id="signup-confirm"
-              type="password"
+              type={showPasswordConfirm ? 'text' : 'password'}
               required
               minLength={8}
               placeholder={authContentData.signup.confirmPasswordPlaceholder}
@@ -306,12 +273,26 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
               onBlur={() => handleBlur('passwordConfirm')}
               aria-invalid={confirmHasError}
               aria-describedby={confirmHasError ? 'signup-confirm-error' : undefined}
-              className={`w-full h-10 bg-[#121316] rounded px-3 py-2 pl-9 text-xs text-[#F1F3F7] placeholder-[#525866] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] transition-all font-mono ${
+              className={`w-full h-10 bg-[#121316] rounded px-3 py-2 pl-9 pr-10 text-xs text-[#F1F3F7] placeholder-[#525866] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] transition-all font-mono ${
                 confirmHasError
                   ? 'border border-[#EF4444] focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]'
                   : 'border border-[#282A33] focus:outline-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B]'
               }`}
             />
+            {onToggleShowPasswordConfirm && (
+              <button
+                type="button"
+                aria-label={showPasswordConfirm ? 'Hide password' : 'Show password'}
+                onClick={onToggleShowPasswordConfirm}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#525866] hover:text-[#F1F3F7] transition-colors focus:outline-none cursor-pointer"
+              >
+                {showPasswordConfirm ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
+            )}
           </div>
           {confirmHasError && (
             <p id="signup-confirm-error" role="alert" className="text-[11px] text-[#EF4444] font-medium mt-1">
@@ -328,7 +309,7 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
         aria-label="Register"
         className="w-full h-10 mt-2 bg-[#F59E0B] hover:bg-[#D97706] active:bg-[#B45309] text-[#0F1012] font-semibold text-xs rounded shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <span>{isLoading ? 'Creating Account...' : 'Create Global Account'}</span>
+        <span>{isLoading ? 'Registering...' : 'Register User'}</span>
         <ArrowRight className="w-3.5 h-3.5" />
       </button>
     </form>
