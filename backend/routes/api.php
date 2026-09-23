@@ -46,6 +46,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/organizations', [OrganizationController::class, 'index']);
     Route::post('/organizations', [OrganizationController::class, 'store']);
+    Route::get('/organizations/check-slug', [OrganizationController::class, 'checkSlug']);
+    Route::get('/user/invitations', [InvitationController::class, 'userInvitations']);
 });
 
 Route::get('/invitations/{token}', [InvitationController::class, 'show']);

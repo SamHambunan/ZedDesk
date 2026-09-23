@@ -24,13 +24,13 @@ export const OrganizationGrid: React.FC<OrganizationGridProps> = ({
         {hubContentData.organizations.title}
       </h1>
 
-      <div data-testid="org-grid-list" className="grid grid-cols-1 gap-4">
+      <div data-testid="org-grid-list" className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {isLoading ? (
-          <div className="bg-surface-subpanel border border-border-subtle rounded-xl p-8 text-center text-text-secondary font-body-default">
+          <div className="col-span-full bg-surface-subpanel border border-border-subtle rounded-xl p-8 text-center text-text-secondary font-body-default">
             Loading workspaces...
           </div>
         ) : organizations.length === 0 ? (
-          <div className="bg-surface-subpanel border border-border-subtle rounded-xl p-8 text-center text-text-secondary font-body-default">
+          <div className="col-span-full bg-surface-subpanel border border-border-subtle rounded-xl p-8 text-center text-text-secondary font-body-default">
             No workspaces found. Create your first organization below to get started.
           </div>
         ) : (
@@ -49,7 +49,7 @@ export const OrganizationGrid: React.FC<OrganizationGridProps> = ({
             type="button"
             onClick={onCreateNew}
             aria-label="+ Create New Organization"
-            className="w-full bg-surface-panel border border-dashed border-border-prominent rounded-xl p-5 flex items-center justify-center gap-2 text-text-secondary hover:text-text-primary hover:border-accent-glow/50 hover:bg-surface-subpanel/50 transition-all mt-2 group cursor-pointer"
+            className="col-span-full bg-surface-panel border border-dashed border-border-prominent rounded-xl p-5 flex items-center justify-center gap-2 text-text-secondary hover:text-text-primary hover:border-accent-glow/50 hover:bg-surface-subpanel/50 transition-all group cursor-pointer"
           >
             <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
             <span className="font-title-md text-title-md font-medium">

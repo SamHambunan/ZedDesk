@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 import { CreateOrganizationModal } from './CreateOrganizationModal'
@@ -138,5 +138,50 @@ describe('CreateOrganizationModal', () => {
     )
 
     expect(screen.getByRole('alert')).toHaveTextContent('The slug has already been taken.')
+  })
+
+  it('checks slug availability against backend when apiUrl is provided', async () => {
+    const user = userEvent.setup()
+    const originalFetch = global.fetch
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/organizations/check-slug') && url.includes('taken-org')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            available: false,
+            message: 'This subdomain is already taken.',
+          }),
+        } as Response)
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          available: true,
+          message: 'Subdomain is valid and available',
+        }),
+      } as Response)
+    })
+
+    try {
+      render(
+        <CreateOrganizationModal
+          isOpen={true}
+          onClose={vi.fn()}
+          onSubmit={vi.fn()}
+          apiUrl="http://localhost:8000"
+          token="test-token"
+        />
+      )
+
+      const slugInput = screen.getByLabelText(/workspace subdomain url/i)
+      await user.type(slugInput, 'taken-org')
+
+      await waitFor(() => {
+        expect(screen.getByText('This subdomain is already taken.')).toBeInTheDocument()
+      })
+      expect(screen.getByRole('button', { name: /create organization & launch/i })).toBeDisabled()
+    } finally {
+      global.fetch = originalFetch
+    }
   })
 })

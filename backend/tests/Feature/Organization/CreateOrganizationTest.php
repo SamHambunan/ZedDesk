@@ -122,3 +122,58 @@ test('organization creation fails when slug is already taken', function () {
     $response->assertStatus(422)
         ->assertJsonValidationErrors(['slug']);
 });
+
+test('check slug endpoint verifies availability and returns proper messages', function () {
+    $user = User::factory()->create();
+    $token = $user->createToken('test_token')->plainTextToken;
+
+    Organization::create([
+        'name' => 'Existing Org',
+        'slug' => 'taken-slug',
+    ]);
+
+    // Available slug
+    $res1 = $this->withHeader('Authorization', "Bearer {$token}")
+        ->getJson('/api/organizations/check-slug?slug=fresh-slug');
+    $res1->assertStatus(200)
+        ->assertJson(['available' => true]);
+
+    // Taken slug
+    $res2 = $this->withHeader('Authorization', "Bearer {$token}")
+        ->getJson('/api/organizations/check-slug?slug=taken-slug');
+    $res2->assertStatus(200)
+        ->assertJson(['available' => false, 'message' => 'This subdomain is already taken.']);
+
+    // Reserved slug
+    $res3 = $this->withHeader('Authorization', "Bearer {$token}")
+        ->getJson('/api/organizations/check-slug?slug=admin');
+    $res3->assertStatus(200)
+        ->assertJson(['available' => false, 'message' => 'This subdomain is reserved by the system.']);
+});
+
+test('user invitations endpoint returns pending invitations for authenticated user email', function () {
+    $user = User::factory()->create(['email' => 'member@example.com']);
+    $token = $user->createToken('test_token')->plainTextToken;
+
+    $org = Organization::create([
+        'name' => 'Target Org',
+        'slug' => 'target-org',
+    ]);
+
+    \App\Models\Invitation::create([
+        'organization_id' => $org->id,
+        'email' => 'member@example.com',
+        'role' => 'agent',
+        'token' => \Illuminate\Support\Str::random(64),
+        'expires_at' => now()->addDays(7),
+        'invited_by_user_id' => $user->id,
+    ]);
+
+    $res = $this->withHeader('Authorization', "Bearer {$token}")
+        ->getJson('/api/user/invitations');
+
+    $res->assertStatus(200)
+        ->assertJsonStructure(['invitations' => [['id', 'organizationName', 'role', 'token']]]);
+    expect($res->json('invitations.0.organizationName'))->toBe('Target Org');
+});
+

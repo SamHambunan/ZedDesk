@@ -1,6 +1,7 @@
 import React from 'react'
 import { ArrowRight } from 'lucide-react'
 import { hubContentData } from '../../data/mockData'
+import { getOrganizationUrl } from '../../utils/url'
 
 export interface HubOrganizationItem {
   readonly id: number
@@ -33,19 +34,15 @@ export const OrganizationCard: React.FC<OrganizationCardProps> = ({
     }
 
     if (typeof window !== 'undefined') {
-      const port = window.location.port ? `:${window.location.port}` : ':5173'
-      const protocol = window.location.protocol || 'http:'
       const currentToken = localStorage.getItem('zeddesk_token')
-      const tokenParam = currentToken ? `?token=${encodeURIComponent(currentToken)}` : ''
-      const targetUrl = `${protocol}//${organization.slug}.localhost${port}/overview${tokenParam}`
-      window.location.href = targetUrl
+      window.location.href = getOrganizationUrl(organization.slug, currentToken, '/overview')
     }
   }
 
   return (
     <div
       data-testid={`org-card-${organization.slug}`}
-      className={`bg-surface-subpanel border border-border-prominent rounded-xl p-5 shadow-keylight flex items-center justify-between group hover:border-accent-glow/50 transition-colors ${className}`}
+      className={`bg-surface-subpanel border border-border-prominent rounded-xl p-5 shadow-keylight flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:border-accent-glow/50 transition-colors ${className}`}
     >
       <div className="flex items-center gap-4">
         {/* Org Avatar Box */}
@@ -80,11 +77,10 @@ export const OrganizationCard: React.FC<OrganizationCardProps> = ({
       </div>
 
       {/* Right: Agent Count in JetBrains Mono tabular figures & Launch Action */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-6 justify-between sm:justify-end">
         <div className="flex flex-col items-end shrink-0">
           <span
             className="font-mono-data text-mono-data text-text-primary font-semibold tabular-nums font-['JetBrains_Mono',monospace]"
-            style={{ fontVariantNumeric: 'tabular-nums' }}
           >
             {count}
           </span>

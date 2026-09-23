@@ -9,7 +9,7 @@ import { AuthCard } from '../auth/AuthCard'
 import { CreateOrganizationModal } from './CreateOrganizationModal'
 import { Input } from '../ui/Input'
 import { Button } from '../ui/Button'
-import { getApiBaseUrl } from '../../utils/url'
+import { getApiBaseUrl, getOrganizationUrl } from '../../utils/url'
 
 export interface CentralHubUser {
   readonly id: number
@@ -122,9 +122,7 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
 
   // Pending Invitations & Alert Banner State
   const [isBannerDismissed, setIsBannerDismissed] = useState(false)
-  const [pendingInvitations, setPendingInvitations] = useState<readonly PendingInvitationItem[]>(
-    () => initialInvitations ?? []
-  )
+  const [dismissedInviteIds, setDismissedInviteIds] = useState<Set<number | string>>(() => new Set())
 
   // Organization Switcher State
   const [selectedOrgSlug, setSelectedOrgSlug] = useState('')
@@ -179,6 +177,41 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
     staleTime: 0,
     gcTime: 0,
   })
+
+  // User Invitations Query via TanStack Query
+  const { data: fetchedInvitations } = useQuery<PendingInvitationItem[]>({
+    queryKey: ['user-invitations', token, resolvedApiUrl],
+    queryFn: async () => {
+      if (!token) return []
+      try {
+        const res = await fetch(`${resolvedApiUrl}/api/user/invitations`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        })
+        if (!res.ok) return []
+        const data = await res.json()
+        if (!Array.isArray(data)) return []
+        return data.map((inv: { id: number | string; role?: string; organization?: { name?: string }; inviter?: { name?: string }; created_at?: string }) => ({
+          id: inv.id,
+          organizationName: inv.organization?.name || 'Organization',
+          role: inv.role,
+          inviterName: inv.inviter?.name,
+          invitedAt: inv.created_at,
+        }))
+      } catch {
+        return []
+      }
+    },
+    enabled: Boolean(token && initialInvitations === undefined),
+    staleTime: 0,
+    gcTime: 0,
+  })
+
+  const effectiveInvitations: readonly PendingInvitationItem[] = (
+    initialInvitations ?? fetchedInvitations ?? []
+  ).filter((inv) => !dismissedInviteIds.has(inv.id))
 
   // Map raw organizations to HubOrganizationItem
   const mappedOrgs: HubOrganizationItem[] = organizations.map((org) => ({
@@ -395,6 +428,7 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
         localStorage.removeItem('user')
       }
       queryClient.removeQueries({ queryKey: ['organizations'] })
+      queryClient.removeQueries({ queryKey: ['user-invitations'] })
       if (onLogout) {
         onLogout()
       }
@@ -403,11 +437,8 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
 
   const handleLaunchWorkspace = (org: HubOrganizationItem) => {
     if (typeof window !== 'undefined') {
-      const port = window.location.port ? `:${window.location.port}` : ':5173'
-      const protocol = window.location.protocol || 'http:'
       const currentToken = token || localStorage.getItem('zeddesk_token')
-      const tokenParam = currentToken ? `?token=${encodeURIComponent(currentToken)}` : ''
-      window.location.href = `${protocol}//${org.slug}.localhost${port}/overview${tokenParam}`
+      window.location.href = getOrganizationUrl(org.slug, currentToken, '/overview')
     }
   }
 
@@ -472,15 +503,15 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
       <main className="flex-1 overflow-auto py-8">
         <div className="max-w-6xl mx-auto px-margin-mobile md:px-margin-desktop flex flex-col gap-6">
           {/* Dismissible Cadmium Amber alert banner at the top of Central Hub */}
-          {!isBannerDismissed && pendingInvitations.length > 0 && (
+          {!isBannerDismissed && effectiveInvitations.length > 0 && (
             <PendingInvitesBanner
-              invitations={pendingInvitations}
+              invitations={effectiveInvitations}
               onDismiss={() => setIsBannerDismissed(true)}
               onAccept={(inv) => {
-                setPendingInvitations((prev) => prev.filter((i) => i.id !== inv.id))
+                setDismissedInviteIds((prev) => new Set(prev).add(inv.id))
               }}
               onDecline={(inv) => {
-                setPendingInvitations((prev) => prev.filter((i) => i.id !== inv.id))
+                setDismissedInviteIds((prev) => new Set(prev).add(inv.id))
               }}
             />
           )}
@@ -585,6 +616,8 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
         isSubmitting={createOrgMutation.isPending}
         error={createOrgError}
         onClearError={() => setCreateOrgError(null)}
+        apiUrl={resolvedApiUrl}
+        token={token}
       />
       {/* Baseline Telemetry for Test Harness */}
       <div style={{ display: 'none' }} aria-hidden="true">

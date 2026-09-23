@@ -384,6 +384,52 @@ describe('CentralHubView (Seam 2)', () => {
     expect(screen.queryByRole('region', { name: /pending invitations/i })).not.toBeInTheDocument()
   })
 
+  it('fetches pending invitations for authenticated user from /api/user/invitations and renders banner', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.endsWith('/api/health')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ status: 'ok', services: { database: 'connected', redis: 'connected' } }),
+        } as Response)
+      }
+
+      if (url.endsWith('/api/organizations')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { id: 10, name: 'Acme Support', slug: 'acme', role: 'admin', agents_count: 14 },
+          ],
+        } as Response)
+      }
+
+      if (url.endsWith('/api/user/invitations')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            {
+              id: 42,
+              email: 'alex@example.com',
+              role: 'agent',
+              organization: { id: 2, name: 'Umbrella Corp', slug: 'umbrella' },
+            },
+          ],
+        } as Response)
+      }
+
+      return Promise.reject(new Error(`Unhandled URL: ${url}`))
+    })
+
+    renderView('valid-token', { id: 1, name: 'Alex Vance', email: 'alex@example.com' })
+
+    await waitFor(() => {
+      expect(screen.getByText('Alex Vance')).toBeInTheDocument()
+      expect(screen.getByText(/Umbrella Corp/i)).toBeInTheDocument()
+    })
+
+    const banner = screen.getByRole('region', { name: /pending invitations/i })
+    expect(banner).toBeInTheDocument()
+  })
+
   it('calls POST /api/logout and clears session state when user logs out', async () => {
     const user = userEvent.setup()
     let logoutCalled = false
