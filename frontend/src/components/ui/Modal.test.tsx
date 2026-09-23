@@ -101,4 +101,54 @@ describe('Modal Primitive', () => {
     await user.tab({ shift: true })
     expect(submitBtn).toHaveFocus()
   })
+
+  describe('Modal Compound Components', () => {
+    it('renders compound modal hierarchy with shared context and triggers onOpenChange on close', async () => {
+      const user = userEvent.setup()
+      const handleOpenChange = vi.fn()
+
+      render(
+        <Modal.Root open={true} onOpenChange={handleOpenChange}>
+          <Modal.Header>
+            <Modal.Title>Compound Title</Modal.Title>
+            <Modal.Description>Compound Description</Modal.Description>
+            <Modal.CloseButton />
+          </Modal.Header>
+          <Modal.Body>
+            <p>Compound Body Content</p>
+          </Modal.Body>
+          <Modal.Footer>
+            <button type="button">Cancel</button>
+            <button type="submit">Confirm</button>
+          </Modal.Footer>
+        </Modal.Root>
+      )
+
+      const dialog = screen.getByRole('dialog')
+      expect(dialog).toBeInTheDocument()
+      expect(screen.getByText('Compound Title')).toBeInTheDocument()
+      expect(screen.getByText('Compound Description')).toBeInTheDocument()
+      expect(screen.getByText('Compound Body Content')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Confirm' })).toBeInTheDocument()
+
+      const closeBtn = screen.getByRole('button', { name: /close/i })
+      await user.click(closeBtn)
+      expect(handleOpenChange).toHaveBeenCalledWith(false)
+    })
+
+    it('does not render compound modal when open is false', () => {
+      render(
+        <Modal.Root open={false} onOpenChange={vi.fn()}>
+          <Modal.Header>
+            <Modal.Title>Hidden Title</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>Hidden Content</Modal.Body>
+        </Modal.Root>
+      )
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.queryByText('Hidden Content')).not.toBeInTheDocument()
+    })
+  })
 })
+

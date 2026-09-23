@@ -47,7 +47,11 @@ describe('CentralHubView (Seam 2)', () => {
     })
   })
 
-  const renderView = (initialToken?: string, initialUser?: { id: number; name: string; email: string }) => {
+  const renderView = (
+    initialToken?: string,
+    initialUser?: { id: number; name: string; email: string },
+    initialInvitations?: any[]
+  ) => {
     if (initialToken) {
       localStorage.setItem('zeddesk_token', initialToken)
     }
@@ -57,10 +61,11 @@ describe('CentralHubView (Seam 2)', () => {
 
     return render(
       <QueryClientProvider client={queryClient}>
-        <CentralHubView />
+        <CentralHubView initialInvitations={initialInvitations} />
       </QueryClientProvider>
     )
   }
+
 
   it('renders unauthenticated state on Industrial Graphite canvas (#0F1012) with focused 480px AuthCard and segmented tabs', () => {
     const { container } = renderView()
@@ -299,7 +304,84 @@ describe('CentralHubView (Seam 2)', () => {
     const launchButton = screen.getByRole('button', { name: /launch workspace for acme support/i })
     await user.click(launchButton)
 
-    expect(window.location.href).toContain('http://acme.localhost:5173')
+    expect(window.location.href).toContain('http://acme.localhost:5173/overview')
+  })
+
+  it('renders empty state when authenticated user has no organizations', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.endsWith('/api/health')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ status: 'ok', services: { database: 'connected', redis: 'connected' } }),
+        } as Response)
+      }
+
+      if (url.endsWith('/api/organizations')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [],
+        } as Response)
+      }
+
+      return Promise.reject(new Error(`Unhandled URL: ${url}`))
+    })
+
+    renderView('valid-token', { id: 1, name: 'Alex Vance', email: 'alex@example.com' })
+
+    await waitFor(() => {
+      expect(screen.getByText('Alex Vance')).toBeInTheDocument()
+      expect(screen.getByText(/no workspaces found/i)).toBeInTheDocument()
+    })
+  })
+
+  it('renders dismissible Cadmium Amber alert banner at the top of Central Hub when pending invitations exist', async () => {
+    const user = userEvent.setup()
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.endsWith('/api/health')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ status: 'ok', services: { database: 'connected', redis: 'connected' } }),
+        } as Response)
+      }
+
+      if (url.endsWith('/api/organizations')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { id: 10, name: 'Acme Support', slug: 'acme', role: 'admin', agents_count: 14 },
+          ],
+        } as Response)
+      }
+
+      return Promise.reject(new Error(`Unhandled URL: ${url}`))
+    })
+
+    const pendingInvites = [
+      {
+        id: 99,
+        organizationName: 'Initech Systems',
+        role: 'agent',
+      },
+    ]
+
+    renderView('valid-token', { id: 1, name: 'Alex Vance', email: 'alex@example.com' }, pendingInvites)
+
+    await waitFor(() => {
+      expect(screen.getByText('Alex Vance')).toBeInTheDocument()
+    })
+
+    // Banner is rendered at top
+    const banner = screen.getByRole('region', { name: /pending invitations/i })
+    expect(banner).toBeInTheDocument()
+    expect(banner.className).toMatch(/sentiment-warning|F59E0B/)
+    expect(within(banner).getByText(/Initech Systems/i)).toBeInTheDocument()
+
+    // Dismiss banner
+    const dismissBtn = within(banner).getByRole('button', { name: /dismiss/i })
+    await user.click(dismissBtn)
+
+    expect(screen.queryByRole('region', { name: /pending invitations/i })).not.toBeInTheDocument()
   })
 
   it('calls POST /api/logout and clears session state when user logs out', async () => {
