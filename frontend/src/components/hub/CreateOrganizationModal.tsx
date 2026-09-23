@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Building2, Rocket, Info } from 'lucide-react'
 import { createOrgModalData } from '../../data/mockData'
 import { SubdomainPreviewBox } from './SubdomainPreviewBox'
@@ -16,6 +16,8 @@ export interface CreateOrganizationModalProps {
   readonly isSubmitting?: boolean
   readonly error?: string | null
   readonly onClearError?: () => void
+  readonly apiUrl?: string
+  readonly token?: string | null
   readonly className?: string
 }
 
@@ -26,11 +28,17 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
   isSubmitting = false,
   error = null,
   onClearError,
+  apiUrl,
+  token,
   className = '',
 }) => {
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false)
+  const [backendValidation, setBackendValidation] = useState<{
+    status?: 'valid' | 'invalid'
+    message?: string
+  } | null>(null)
 
   const validation = useSubdomainValidation(slug)
 
@@ -41,11 +49,55 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
       setName('')
       setSlug('')
       setIsSlugManuallyEdited(false)
+      setBackendValidation(null)
     }
   }
 
+  // Live asynchronous backend availability check
+  useEffect(() => {
+    if (!validation.isValid || !slug.trim() || !apiUrl) {
+      return
+    }
+
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      try {
+        const headers: Record<string, string> = { Accept: 'application/json' }
+        if (token) headers['Authorization'] = `Bearer ${token}`
+
+        const res = await fetch(`${apiUrl}/api/organizations/check-slug?slug=${encodeURIComponent(slug.trim())}`, {
+          headers,
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (!cancelled) {
+            if (data.available === false) {
+              setBackendValidation({
+                status: 'invalid',
+                message: data.message || 'This subdomain is already taken.',
+              })
+            } else {
+              setBackendValidation({
+                status: 'valid',
+                message: data.message || 'Subdomain is valid and available',
+              })
+            }
+          }
+        }
+      } catch {
+        // Fallback gracefully on network error or offline environment
+      }
+    }, 200)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [slug, validation.isValid, apiUrl, token])
+
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (error && onClearError) onClearError()
+    setBackendValidation(null)
     const newName = e.target.value
     setName(newName)
     if (!isSlugManuallyEdited) {
@@ -55,13 +107,20 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
 
   const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (error && onClearError) onClearError()
+    setBackendValidation(null)
     setIsSlugManuallyEdited(true)
     setSlug(sanitizeSubdomainInput(e.target.value))
   }
 
+  const effectiveBackendValidation =
+    !validation.isValid || !slug.trim() || !apiUrl ? null : backendValidation
+  const effectiveStatus = effectiveBackendValidation?.status ?? validation.status
+  const effectiveMessage = effectiveBackendValidation?.message ?? validation.message
+  const isAvailable = validation.isValid && effectiveBackendValidation?.status !== 'invalid'
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!validation.isValid || !name.trim() || isSubmitting) return
+    if (!isAvailable || !name.trim() || isSubmitting) return
     onSubmit({ name: name.trim(), slug: slug.trim() })
   }
 
@@ -139,8 +198,8 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
             {/* Subdomain Preview */}
             <SubdomainPreviewBox
               slug={slug}
-              status={validation.status}
-              validationMessage={validation.message}
+              status={effectiveStatus}
+              validationMessage={effectiveMessage}
             />
           </div>
 
@@ -173,7 +232,7 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
           </button>
           <button
             type="submit"
-            disabled={isSubmitting || !validation.isValid || !name.trim()}
+            disabled={isSubmitting || !isAvailable || !name.trim()}
             className="h-8 px-4 bg-primary-container text-white font-label-regular text-label-regular rounded shadow-keylight-primary hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all focus:outline-none focus:ring-2 focus:ring-accent-glow focus:ring-offset-2 focus:ring-offset-surface-subpanel flex items-center gap-2 cursor-pointer"
           >
             <span>

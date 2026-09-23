@@ -302,4 +302,27 @@ class InvitationController extends Controller
 
         return $invitation;
     }
+
+    public function userInvitations(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['invitations' => []]);
+        }
+
+        $invitations = Invitation::withoutGlobalScopes()
+            ->with('organization')
+            ->whereRaw('LOWER(email) = ?', [strtolower($user->email)])
+            ->pending()
+            ->latest()
+            ->get()
+            ->map(fn (Invitation $invitation) => [
+                'id' => $invitation->id,
+                'organizationName' => $invitation->organization ? $invitation->organization->name : '',
+                'role' => $invitation->role instanceof Role ? $invitation->role->value : (string) $invitation->role,
+                'token' => $invitation->token,
+            ]);
+
+        return response()->json(['invitations' => $invitations]);
+    }
 }

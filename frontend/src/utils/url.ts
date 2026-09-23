@@ -68,10 +68,10 @@ export function getCentralHubUrl(): string {
   return `${protocol}//${baseHost}${port}`
 }
 
-export function getOrganizationUrl(slug: string, token?: string | null): string {
+export function getOrganizationUrl(slug: string, token?: string | null, path: string = ''): string {
   const rawHost = typeof window !== 'undefined' && window.location?.hostname ? window.location.hostname : 'localhost'
   const host = rawHost.split(':')[0]
-  const port = typeof window !== 'undefined' && window.location?.port ? `:${window.location.port}` : ''
+  const port = typeof window !== 'undefined' && window.location?.port ? `:${window.location.port}` : ':5173'
   const protocol = typeof window !== 'undefined' && window.location?.protocol ? window.location.protocol : 'http:'
 
   // Strip existing subdomains to prevent nested subdomains (e.g. beta.acme.localhost)
@@ -85,6 +85,8 @@ export function getOrganizationUrl(slug: string, token?: string | null): string 
     }
   }
 
+  const normalizedPath = path ? (path.startsWith('/') ? path : `/${path}`) : ''
   const tokenParam = token ? `?token=${encodeURIComponent(token)}` : ''
-  return `${protocol}//${slug}.${baseHost}${port}${tokenParam}`
+  return `${protocol}//${slug}.${baseHost}${port}${normalizedPath}${tokenParam}`
 }
+

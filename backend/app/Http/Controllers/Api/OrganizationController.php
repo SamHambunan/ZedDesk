@@ -74,4 +74,37 @@ class OrganizationController extends Controller
             'role' => Role::ADMIN->value,
         ], 201);
     }
+
+    public function checkSlug(Request $request): JsonResponse
+    {
+        $slug = strtolower(trim((string) $request->query('slug', '')));
+
+        if (! $slug || strlen($slug) < 3 || strlen($slug) > 63) {
+            return response()->json([
+                'available' => false,
+                'message' => 'Subdomain must be between 3 and 63 characters.',
+            ]);
+        }
+
+        if (in_array($slug, self::RESERVED_SLUGS, true)) {
+            return response()->json([
+                'available' => false,
+                'message' => 'This subdomain is reserved by the system.',
+            ]);
+        }
+
+        if (! preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug)) {
+            return response()->json([
+                'available' => false,
+                'message' => 'Subdomain must contain only lowercase alphanumeric characters and hyphens.',
+            ]);
+        }
+
+        $exists = Organization::where('slug', $slug)->exists();
+
+        return response()->json([
+            'available' => ! $exists,
+            'message' => $exists ? 'This subdomain is already taken.' : 'Subdomain is valid and available',
+        ]);
+    }
 }
