@@ -1,21 +1,24 @@
 import React from 'react'
 import { LifeBuoy, History } from 'lucide-react'
 import { Badge } from '../ui/Badge'
+import { Button } from '../ui/Button'
 
 export interface CustomerPortalLayoutProps {
   subdomain?: string | null
+  organizationName?: string | null
   onOpenHistory?: () => void
   children: React.ReactNode
 }
 
 export const CustomerPortalLayout: React.FC<CustomerPortalLayoutProps> = ({
   subdomain,
+  organizationName,
   onOpenHistory,
   children,
 }) => {
-  const orgDisplayName = subdomain
-    ? `${subdomain.charAt(0).toUpperCase() + subdomain.slice(1)}`
-    : 'ZedDesk'
+  const orgDisplayName =
+    organizationName ||
+    (subdomain ? `${subdomain.charAt(0).toUpperCase() + subdomain.slice(1)}` : 'ZedDesk')
 
   return (
     <div className="min-h-screen bg-surface-canvas text-text-primary flex flex-col font-sans selection:bg-accent-indigo-glow selection:text-white">
@@ -41,15 +44,16 @@ export const CustomerPortalLayout: React.FC<CustomerPortalLayoutProps> = ({
             </Badge>
           </div>
 
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="compact"
             data-testid="portal-find-tickets-btn"
             onClick={onOpenHistory}
-            className="h-8 px-3 rounded-lg bg-surface-subpanel hover:bg-surface-container-high border border-border-prominent text-text-primary text-xs font-medium transition-colors inline-flex items-center gap-1.5 shadow-keylight"
+            leftIcon={<History className="w-3.5 h-3.5 text-accent-indigo-glow" />}
           >
-            <History className="w-3.5 h-3.5 text-accent-indigo-glow" />
-            <span>Find My Tickets</span>
-          </button>
+            Find My Tickets
+          </Button>
         </div>
       </header>
 

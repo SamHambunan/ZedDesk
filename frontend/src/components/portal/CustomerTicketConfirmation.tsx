@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { CheckCircle2, Copy, Check, ExternalLink, RefreshCw } from 'lucide-react'
+import { Button } from '../ui/Button'
 
 export interface CustomerTicketConfirmationProps {
   ticketNumber: number
@@ -42,7 +43,6 @@ export const CustomerTicketConfirmation: React.FC<CustomerTicketConfirmationProp
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      // Fallback
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
@@ -102,28 +102,17 @@ export const CustomerTicketConfirmation: React.FC<CustomerTicketConfirmationProp
               value={fullAccessUrl}
               className="flex-1 h-9 px-3 bg-surface-canvas border border-border-subtle rounded-lg text-xs font-mono text-text-muted truncate focus:outline-none"
             />
-            <button
+            <Button
               type="button"
+              variant={copied ? 'secondary' : 'primary'}
+              size="compact"
               data-testid="portal-copy-link-btn"
               onClick={handleCopyLink}
-              className={`h-9 px-4 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 transition-colors border ${
-                copied
-                  ? 'bg-sentiment-positive/10 border-sentiment-positive/40 text-sentiment-positive'
-                  : 'bg-primary-container hover:bg-primary-dark text-white border-transparent shadow-keylight-primary'
-              }`}
+              leftIcon={copied ? <Check className="w-3.5 h-3.5 text-sentiment-positive" /> : <Copy className="w-3.5 h-3.5" />}
+              className={copied ? 'border-sentiment-positive/40 text-sentiment-positive' : ''}
             >
-              {copied ? (
-                <>
-                  <Check className="w-3.5 h-3.5" />
-                  <span>Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>Copy Link</span>
-                </>
-              )}
-            </button>
+              {copied ? 'Copied!' : 'Copy Link'}
+            </Button>
           </div>
 
           <div className="pt-2 flex flex-col gap-1">
@@ -139,15 +128,16 @@ export const CustomerTicketConfirmation: React.FC<CustomerTicketConfirmationProp
       </div>
 
       <div className="flex flex-col sm:flex-row items-center gap-3">
-        <button
+        <Button
           type="button"
+          variant="secondary"
           data-testid="portal-submit-another"
           onClick={onReset}
-          className="w-full h-10 bg-surface-subpanel hover:bg-surface-canvas border border-border-subtle text-text-primary text-label-md font-medium rounded-lg transition-colors inline-flex items-center justify-center gap-2"
+          className="w-full h-10"
+          leftIcon={<RefreshCw className="w-4 h-4 text-text-muted" />}
         >
-          <RefreshCw className="w-4 h-4 text-text-muted" />
-          <span>Submit Another Inquiry</span>
-        </button>
+          Submit Another Inquiry
+        </Button>
 
         <a
           href={fullAccessUrl}

@@ -55,7 +55,7 @@ describe('Customer Support Portal Shell & Public Ticket Intake', () => {
     // Introduction
     expect(screen.getByRole('heading', { name: /Submit a Support Request/i })).toBeInTheDocument()
     expect(
-      screen.getByText(/Describe your inquiry or issue below and our support agents will assist you promptly/i)
+      screen.getByText(/Describe your inquiry below and our support agents will assist you promptly/i)
     ).toBeInTheDocument()
 
     // Find My Tickets navigation
@@ -318,5 +318,48 @@ describe('Customer Support Portal Shell & Public Ticket Intake', () => {
     )
 
     expect(screen.getByRole('heading', { name: /Find My Tickets/i })).toBeInTheDocument()
+  })
+
+  it('renders high-density skeleton loading state when isLoading is true', () => {
+    renderWithClient(
+      <CustomerPortalView apiUrl="http://acme.localhost:8000" subdomain="acme" isLoading />
+    )
+
+    expect(screen.getByTestId('portal-skeleton')).toBeInTheDocument()
+    expect(screen.queryByTestId('portal-submit-btn')).not.toBeInTheDocument()
+  })
+
+  it('renders custom organization name branding when provided', () => {
+    renderWithClient(
+      <CustomerPortalView
+        apiUrl="http://acme.localhost:8000"
+        subdomain="acme"
+        organizationName="Acme Technologies Inc"
+      />
+    )
+
+    expect(screen.getByText('Acme Technologies Inc')).toBeInTheDocument()
+  })
+
+  it('synchronizes browser URL when closing Find My Tickets modal opened via /portal/history', async () => {
+    const user = userEvent.setup()
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState')
+
+    window.history.pushState({}, '', '/portal/history')
+
+    renderWithClient(
+      <CustomerPortalView
+        apiUrl="http://acme.localhost:8000"
+        subdomain="acme"
+        pathname="/portal/history"
+      />
+    )
+
+    expect(screen.getByRole('heading', { name: /Find My Tickets/i })).toBeInTheDocument()
+
+    const cancelBtn = screen.getByRole('button', { name: /Cancel/i })
+    await user.click(cancelBtn)
+
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/portal')
   })
 })

@@ -10,6 +10,8 @@ export interface CustomerPortalViewProps {
   readonly apiUrl: string
   readonly subdomain?: string | null
   readonly pathname?: string
+  readonly organizationName?: string | null
+  readonly isLoading?: boolean
 }
 
 export interface TicketSuccessState {
@@ -24,6 +26,8 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({
   apiUrl,
   subdomain,
   pathname,
+  organizationName,
+  isLoading = false,
 }) => {
   const [successData, setSuccessData] = useState<TicketSuccessState | null>(null)
   const [historyModalOverride, setHistoryModalOverride] = useState<boolean | null>(null)
@@ -55,9 +59,17 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({
     submitTicketMutation.reset()
   }
 
+  const handleCloseHistoryModal = () => {
+    setHistoryModalOverride(false)
+    if (typeof window !== 'undefined' && window.location.pathname === '/portal/history') {
+      window.history.replaceState({}, '', '/portal')
+    }
+  }
+
   return (
     <CustomerPortalLayout
       subdomain={subdomain}
+      organizationName={organizationName}
       onOpenHistory={() => setHistoryModalOverride(true)}
     >
       {successData ? (
@@ -73,13 +85,14 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({
         <CustomerIntakeForm
           onSubmit={handleSubmit}
           isSubmitting={submitTicketMutation.isPending}
+          isLoading={isLoading}
           error={submitTicketMutation.error ? submitTicketMutation.error.message : null}
         />
       )}
 
       <FindMyTicketsModal
         isOpen={isHistoryModalOpen}
-        onClose={() => setHistoryModalOverride(false)}
+        onClose={handleCloseHistoryModal}
         apiUrl={apiUrl}
       />
     </CustomerPortalLayout>

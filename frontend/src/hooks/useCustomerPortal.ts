@@ -1,11 +1,13 @@
 import { useMutation } from '@tanstack/react-query'
 
+export type TicketPriorityType = 'low' | 'medium' | 'high' | 'urgent'
+
 export interface CreateTicketPayload {
   name: string
   email: string
   subject: string
   message: string
-  priority?: string
+  priority?: TicketPriorityType
   attachments?: File[]
 }
 
@@ -18,7 +20,7 @@ export interface TicketSubmissionResponse {
     ticket_number: number
     subject: string
     status: string
-    priority?: string
+    priority?: TicketPriorityType
     created_at?: string
   }
   customer: {
@@ -45,6 +47,18 @@ export interface MagicLinkResponse {
   url?: string
 }
 
+function extractPortalErrorMessage(data: unknown, fallback: string): string {
+  if (data && typeof data === 'object') {
+    const errorObj = data as { message?: string; errors?: Record<string, string[]> }
+    if (errorObj.errors) {
+      const messages = Object.values(errorObj.errors).flat()
+      if (messages.length > 0) return messages.join(', ')
+    }
+    if (errorObj.message) return errorObj.message
+  }
+  return fallback
+}
+
 export function useSubmitTicketMutation(apiUrl: string) {
   return useMutation<TicketSubmissionResponse, Error, CreateTicketPayload>({
     mutationFn: async (payload) => {
@@ -67,7 +81,6 @@ export function useSubmitTicketMutation(apiUrl: string) {
         method: 'POST',
         headers: {
           Accept: 'application/json',
-          // Note: Content-Type is omitted so the browser/fetch automatically sets multipart boundary
         },
         body: formData,
       })
@@ -75,11 +88,7 @@ export function useSubmitTicketMutation(apiUrl: string) {
       const data = await res.json().catch(() => ({}))
 
       if (!res.ok) {
-        let errorMsg = data?.message
-        if (data?.errors) {
-          errorMsg = Object.values(data.errors).flat().join(', ')
-        }
-        throw new Error(errorMsg || 'Failed to submit support request.')
+        throw new Error(extractPortalErrorMessage(data, 'Failed to submit support request.'))
       }
 
       return data as TicketSubmissionResponse
@@ -104,11 +113,7 @@ export function useMagicLinkMutation(apiUrl: string) {
       const data = await res.json().catch(() => ({}))
 
       if (!res.ok) {
-        let errorMsg = data?.message
-        if (data?.errors) {
-          errorMsg = Object.values(data.errors).flat().join(', ')
-        }
-        throw new Error(errorMsg || 'Failed to send magic link.')
+        throw new Error(extractPortalErrorMessage(data, 'Failed to send magic link.'))
       }
 
       return data as MagicLinkResponse

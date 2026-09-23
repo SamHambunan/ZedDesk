@@ -1,11 +1,15 @@
 import React, { useState } from 'react'
-import { AlertCircle, Loader2, Send } from 'lucide-react'
+import { AlertCircle, Send } from 'lucide-react'
 import { CustomerFileDropzone } from './CustomerFileDropzone'
-import type { CreateTicketPayload } from '../../hooks/useCustomerPortal'
+import { CustomerPortalSkeleton } from './CustomerPortalSkeleton'
+import { Button } from '../ui/Button'
+import type { CreateTicketPayload, TicketPriorityType } from '../../hooks/useCustomerPortal'
+import { validateEmail } from '../../utils/validation'
 
 export interface CustomerIntakeFormProps {
   onSubmit: (payload: CreateTicketPayload) => Promise<void>
   isSubmitting: boolean
+  isLoading?: boolean
   error?: string | null
 }
 
@@ -19,15 +23,20 @@ export interface FormErrors {
 export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
   onSubmit,
   isSubmitting,
+  isLoading = false,
   error,
 }) => {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [subject, setSubject] = useState('')
-  const [priority, setPriority] = useState('medium')
+  const [priority, setPriority] = useState<TicketPriorityType>('medium')
   const [message, setMessage] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({})
+
+  if (isLoading) {
+    return <CustomerPortalSkeleton />
+  }
 
   const validate = (): boolean => {
     const errors: FormErrors = {}
@@ -36,13 +45,9 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
       errors.name = 'Please provide your full name.'
     }
 
-    if (!email.trim()) {
-      errors.email = 'Please provide your email address.'
-    } else {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(email.trim())) {
-        errors.email = 'Please provide a valid email address.'
-      }
+    const emailErr = validateEmail(email)
+    if (emailErr) {
+      errors.email = emailErr
     }
 
     if (!subject.trim()) {
@@ -82,7 +87,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
           Submit a Support Request
         </h1>
         <p className="text-body-sm text-text-secondary mt-1.5 leading-relaxed">
-          Describe your inquiry or issue below and our support agents will assist you promptly.
+          Describe your inquiry below and our support agents will assist you promptly.
         </p>
       </header>
 
@@ -208,7 +213,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
               data-testid="portal-ticket-priority"
               disabled={isSubmitting}
               value={priority}
-              onChange={(e) => setPriority(e.target.value)}
+              onChange={(e) => setPriority(e.target.value as TicketPriorityType)}
               className="w-full h-10 px-3 bg-surface-canvas border border-border-subtle rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-accent-indigo-glow transition-colors"
             >
               <option value="low">Low</option>
@@ -238,7 +243,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
               setMessage(e.target.value)
               if (fieldErrors.message) setFieldErrors((prev) => ({ ...prev, message: undefined }))
             }}
-            placeholder="Describe your issue or inquiry in detail..."
+            placeholder="Describe your inquiry in detail..."
             className={`w-full p-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-accent-indigo-glow transition-colors ${
               fieldErrors.message ? 'border-sentiment-negative' : 'border-border-subtle'
             }`}
@@ -259,24 +264,18 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
 
         {/* Submit Button */}
         <div className="pt-2">
-          <button
+          <Button
             type="submit"
+            variant="primary"
+            size="lg"
             data-testid="portal-submit-btn"
+            isLoading={isSubmitting}
             disabled={isSubmitting}
-            className="w-full h-11 bg-primary-container hover:bg-primary-dark text-white font-medium text-label-md rounded-lg shadow-keylight-primary transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full h-11"
+            leftIcon={<Send className="w-4 h-4" />}
           >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Submitting Request...</span>
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4" />
-                <span>Submit Support Request</span>
-              </>
-            )}
-          </button>
+            {isSubmitting ? 'Submitting Request...' : 'Submit Support Request'}
+          </Button>
         </div>
       </form>
     </div>
