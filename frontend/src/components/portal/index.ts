@@ -1,1 +1,6 @@
 export * from './CustomerPortalView'
+export * from './CustomerPortalLayout'
+export * from './CustomerIntakeForm'
+export * from './CustomerFileDropzone'
+export * from './CustomerTicketConfirmation'
+export * from './FindMyTicketsModal'

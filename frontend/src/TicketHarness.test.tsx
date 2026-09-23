@@ -20,7 +20,21 @@ describe('Stage 2.8 Functional Test Harness: Customer Submission & Agent Queue',
 
     global.fetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
       if (url.includes('/api/portal/tickets') && options?.method === 'POST') {
-        const body = JSON.parse(options.body as string)
+        let body: Record<string, unknown> = {}
+        if (typeof options?.body === 'string') {
+          try {
+            body = JSON.parse(options.body)
+          } catch {
+            body = {}
+          }
+        } else if (options?.body instanceof FormData) {
+          body = {
+            name: options.body.get('name'),
+            email: options.body.get('email'),
+            subject: options.body.get('subject'),
+            priority: options.body.get('priority'),
+          }
+        }
         return Promise.resolve({
           ok: true,
           status: 201,
