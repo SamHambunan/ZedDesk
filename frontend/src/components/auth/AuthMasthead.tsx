@@ -1,5 +1,4 @@
 import React from 'react'
-import { Sparkles } from 'lucide-react'
 import { authContentData } from '../../data/mockData'
 
 export interface AuthMastheadProps {
