@@ -15,11 +15,11 @@ export const AuthFooter: React.FC<AuthFooterProps> = ({
 }) => {
   return (
     <footer className={`text-center space-y-2 pb-8 ${className}`}>
-      <div className="flex items-center justify-center gap-2 text-text-muted font-mono-data text-mono-data">
-        <Lock className="w-3.5 h-3.5" />
+      <div className="flex items-center justify-center gap-2 text-[#8890A0] font-mono text-xs">
+        <Lock className="w-3.5 h-3.5 text-[#F59E0B]" />
         <span>{sessionText}</span>
       </div>
-      <p className="font-body-compact text-body-compact text-text-muted/60 max-w-xs mx-auto">
+      <p className="text-[11px] text-[#525866] max-w-xs mx-auto">
         {architectureText}
       </p>
     </footer>
@@ -27,4 +27,3 @@ export const AuthFooter: React.FC<AuthFooterProps> = ({
 }
 
 export default AuthFooter
-

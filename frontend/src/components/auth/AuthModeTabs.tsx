@@ -13,13 +13,14 @@ export const AuthModeTabs: React.FC<AuthModeTabsProps> = ({
   activeTab,
   onTabChange,
   signinLabel = authContentData.tabs.signin,
-  signupLabel = authContentData.tabs.signup,
+  signupLabel = 'Register',
   className = '',
 }) => {
   return (
     <div
       role="tablist"
-      className={`flex border-b border-border-subtle bg-surface-panel/50 ${className}`}
+      aria-label="Authentication Mode"
+      className={`grid grid-cols-2 p-1 bg-[#121316] border border-[#282A33] rounded mb-5 ${className}`}
     >
       <button
         type="button"
@@ -28,10 +29,10 @@ export const AuthModeTabs: React.FC<AuthModeTabsProps> = ({
         aria-selected={activeTab === 'login'}
         aria-label="Log In"
         onClick={() => onTabChange('login')}
-        className={`flex-1 py-4 text-center font-title-md text-title-md transition-colors ${
+        className={`py-1.5 text-xs font-medium rounded transition-colors cursor-pointer select-none ${
           activeTab === 'login'
-            ? 'text-text-primary border-b-2 border-accent-glow bg-surface-subpanel/50'
-            : 'text-text-secondary border-b-2 border-transparent hover:text-text-primary'
+            ? 'bg-[#1E2026] text-[#F1F3F7] shadow-sm font-semibold'
+            : 'text-[#8890A0] hover:text-[#F1F3F7]'
         }`}
       >
         {signinLabel}
@@ -43,10 +44,10 @@ export const AuthModeTabs: React.FC<AuthModeTabsProps> = ({
         aria-selected={activeTab === 'register'}
         aria-label="Register"
         onClick={() => onTabChange('register')}
-        className={`flex-1 py-4 text-center font-title-md text-title-md transition-colors ${
+        className={`py-1.5 text-xs font-medium rounded transition-colors cursor-pointer select-none ${
           activeTab === 'register'
-            ? 'text-text-primary border-b-2 border-accent-glow bg-surface-subpanel/50'
-            : 'text-text-secondary border-b-2 border-transparent hover:text-text-primary'
+            ? 'bg-[#1E2026] text-[#F1F3F7] shadow-sm font-semibold'
+            : 'text-[#8890A0] hover:text-[#F1F3F7]'
         }`}
       >
         {signupLabel}

@@ -409,11 +409,10 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
   // If unauthenticated, render Kinetic Operational Dark AuthCard
   if (!token || !user) {
     return (
-      <div className={`min-h-screen bg-canvas-base flex flex-col justify-center items-center p-margin-mobile md:p-margin-desktop antialiased selection:bg-accent-glow/30 selection:text-text-primary ${className}`}>
-        {/* Ambient Glow */}
+      <div className={`min-h-screen bg-[#0F1012] flex flex-col justify-center items-center p-4 md:p-6 antialiased selection:bg-[#F59E0B]/30 selection:text-white ${className}`}>
+        {/* Subtle Ambient Glow */}
         <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden">
-          <div className="absolute w-[800px] h-[800px] bg-accent-glow/5 rounded-full blur-3xl opacity-50 mix-blend-screen" />
-          <div className="absolute w-[600px] h-[600px] bg-[#38BDF8]/5 rounded-full blur-3xl opacity-30 mix-blend-screen translate-x-1/4 translate-y-1/4" />
+          <div className="absolute w-[600px] h-[600px] bg-[#F59E0B]/5 rounded-full blur-3xl opacity-30 mix-blend-screen" />
         </div>
 
         <AuthCard
@@ -460,7 +459,7 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
 
   // Authenticated Central Hub View
   return (
-    <div className={`min-h-screen bg-canvas-base text-text-primary flex flex-col antialiased selection:bg-accent-glow/30 selection:text-text-primary ${className}`}>
+    <div className={`min-h-screen bg-[#0F1012] text-[#F1F3F7] flex flex-col antialiased selection:bg-[#F59E0B]/30 selection:text-white ${className}`}>
       {/* Central Hub Top Navigation */}
       <CentralHubHeader healthStatus={healthStatus} />
 
