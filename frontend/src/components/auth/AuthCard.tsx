@@ -63,15 +63,18 @@ export const AuthCard: React.FC<AuthCardProps> = ({
   } = useAuthForm()
 
   return (
-    <div className={`w-full max-w-md mx-auto flex flex-col gap-8 font-sans relative z-10 ${className}`}>
+    <div className={`w-full max-w-[480px] mx-auto flex flex-col gap-6 font-sans relative z-10 ${className}`}>
       {/* Centered Masthead */}
       <AuthMasthead />
 
       {/* Auth Card Box */}
-      <div className="bg-surface-subpanel rounded-xl border border-border-subtle surface-level-2 overflow-hidden flex flex-col shadow-2xl shadow-black/50">
+      <div data-testid="auth-card" className="bg-[#16181C] rounded-lg border border-[#3B3F4D] relative overflow-hidden flex flex-col shadow-2xl p-6">
+        {/* Top keylight edge highlight */}
+        <div className="absolute inset-x-0 top-0 h-[1px] bg-white/10 pointer-events-none" />
+
         <AuthModeTabs activeTab={activeTab} onTabChange={onTabChange} />
 
-        <div className="p-6">
+        <div>
           {activeTab === 'login' ? (
             <AuthLoginForm
               email={loginEmail}

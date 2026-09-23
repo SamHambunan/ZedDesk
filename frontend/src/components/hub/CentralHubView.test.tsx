@@ -62,15 +62,107 @@ describe('CentralHubView (Seam 2)', () => {
     )
   }
 
-  it('renders unauthenticated state with Kinetic Operational Dark AuthCard by default', () => {
-    renderView()
+  it('renders unauthenticated state on Industrial Graphite canvas (#0F1012) with focused 480px AuthCard and segmented tabs', () => {
+    const { container } = renderView()
 
+    // Industrial Graphite canvas (#0F1012)
+    const canvas = container.firstChild as HTMLElement
+    expect(canvas.className).toContain('bg-[#0F1012]')
+
+    // 480px card
+    const cardBox = screen.getByTestId('auth-card')
+    expect(cardBox).toBeInTheDocument()
+    const cardWrapper = cardBox.parentElement as HTMLElement
+    expect(cardWrapper.className).toContain('max-w-[480px]')
+
+    // Heading and segmented tabs
     expect(screen.getByRole('heading', { name: /^zeddesk$/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /log in/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /register/i })).toBeInTheDocument()
+    const tablist = screen.getByRole('tablist')
+    expect(tablist.className).toContain('grid-cols-2')
+    expect(tablist.className).toContain('bg-[#121316]')
+    expect(tablist.className).toContain('border-[#282A33]')
+
+    expect(screen.getByRole('tab', { name: /log in/i })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /register/i })).toHaveAttribute('aria-selected', 'false')
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/^password/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /log in/i })).toBeInTheDocument()
+  })
+
+  it('renders recessed dark inputs (#121316) with luminous amber focus glow rings and displays crimson borders on validation error', async () => {
+    const user = userEvent.setup()
+    renderView()
+
+    const emailInput = screen.getByLabelText(/email/i)
+    const passwordInput = screen.getByLabelText(/^password/i)
+
+    // Recessed dark fills (#121316), 1px micro-borders, and luminous amber focus glow rings
+    expect(emailInput.className).toContain('bg-[#121316]')
+    expect(emailInput.className).toContain('border-[#282A33]')
+    expect(emailInput.className).toContain('focus:ring-[#F59E0B]')
+
+    // Submit empty Sign In form triggers validation
+    await user.click(screen.getByRole('button', { name: /log in/i }))
+
+    expect(emailInput.className).toContain('border-[#EF4444]')
+    expect(passwordInput.className).toContain('border-[#EF4444]')
+    expect(screen.getByText('Email is required.')).toBeInTheDocument()
+    expect(screen.getByText('Password is required.')).toBeInTheDocument()
+
+    // Test email format validation
+    await user.type(emailInput, 'invalid-email')
+    expect(screen.getByText('Please enter a valid email address.')).toBeInTheDocument()
+
+    // Switch to Register tab and verify registration validation errors
+    await user.click(screen.getByRole('tab', { name: /register/i }))
+    await user.click(screen.getByRole('button', { name: /^register$/i }))
+
+    expect(screen.getByText('Full name is required.')).toBeInTheDocument()
+    expect(screen.getByText('Email is required.')).toBeInTheDocument()
+    expect(screen.getByText('Password is required.')).toBeInTheDocument()
+    expect(screen.getByText('Please confirm your password.')).toBeInTheDocument()
+
+    // Password length validation
+    await user.type(screen.getByLabelText(/^password/i), 'short')
+    expect(screen.getByText('Password must be at least 8 characters.')).toBeInTheDocument()
+
+    // Password confirmation mismatch
+    await user.clear(screen.getByLabelText(/^password/i))
+    await user.type(screen.getByLabelText(/^password/i), 'ValidPass123!')
+    await user.type(screen.getByLabelText(/confirm password/i), 'DifferentPass123!')
+    expect(screen.getByText('Passwords do not match.')).toBeInTheDocument()
+  })
+
+  it('detects existing session from localStorage and directly renders authenticated workspace hub', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.endsWith('/api/health')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ status: 'ok', services: { database: 'connected', redis: 'connected' } }),
+        } as Response)
+      }
+      if (url.endsWith('/api/organizations')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { id: 101, name: 'Acme Support', slug: 'acme', role: 'admin', agents_count: 14 },
+          ],
+        } as Response)
+      }
+      return Promise.reject(new Error(`Unhandled URL: ${url}`))
+    })
+
+    // Pre-populate localStorage
+    renderView('persisted-token', { id: 99, name: 'Existing User', email: 'existing@example.com' })
+
+    // Skips login card
+    expect(screen.queryByTestId('auth-card')).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: /log in/i })).not.toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByText('Existing User')).toBeInTheDocument()
+      expect(screen.getByText('Acme Support')).toBeInTheDocument()
+    })
   })
 
   it('submits login credentials to POST /api/login, handles success, and transitions to authenticated hub', async () => {
