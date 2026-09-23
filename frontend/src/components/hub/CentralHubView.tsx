@@ -21,6 +21,7 @@ export interface CentralHubUser {
 export interface CentralHubViewProps {
   readonly initialUser?: CentralHubUser | null
   readonly initialToken?: string | null
+  readonly initialInvitations?: readonly PendingInvitationItem[]
   readonly onAuthSuccess?: (token: string, user: CentralHubUser) => void
   readonly onLogout?: () => void
   readonly apiUrl?: string
@@ -51,6 +52,7 @@ function extractErrorMessage(data: unknown, fallback: string): string {
 export const CentralHubView: React.FC<CentralHubViewProps> = ({
   initialUser = null,
   initialToken = null,
+  initialInvitations,
   onAuthSuccess,
   onLogout,
   apiUrl: customApiUrl,
@@ -118,8 +120,11 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
   const [newOrgSlug, setNewOrgSlug] = useState('')
   const [createOrgError, setCreateOrgError] = useState<string | null>(null)
 
-  // Pending Invitations Mock / State
-  const [pendingInvitations, setPendingInvitations] = useState<readonly PendingInvitationItem[]>([])
+  // Pending Invitations & Alert Banner State
+  const [isBannerDismissed, setIsBannerDismissed] = useState(false)
+  const [pendingInvitations, setPendingInvitations] = useState<readonly PendingInvitationItem[]>(
+    () => initialInvitations ?? []
+  )
 
   // Organization Switcher State
   const [selectedOrgSlug, setSelectedOrgSlug] = useState('')
@@ -398,11 +403,11 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
 
   const handleLaunchWorkspace = (org: HubOrganizationItem) => {
     if (typeof window !== 'undefined') {
-      const port = window.location.port ? `:${window.location.port}` : ''
+      const port = window.location.port ? `:${window.location.port}` : ':5173'
       const protocol = window.location.protocol || 'http:'
       const currentToken = token || localStorage.getItem('zeddesk_token')
       const tokenParam = currentToken ? `?token=${encodeURIComponent(currentToken)}` : ''
-      window.location.href = `${protocol}//${org.slug}.localhost${port}${tokenParam}`
+      window.location.href = `${protocol}//${org.slug}.localhost${port}/overview${tokenParam}`
     }
   }
 
@@ -465,99 +470,103 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
 
       {/* Main Content: 12-column layout */}
       <main className="flex-1 overflow-auto py-8">
-        <div className="max-w-6xl mx-auto px-margin-mobile md:px-margin-desktop grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Organizations & Workspaces (col-span-8) */}
-          <div className="lg:col-span-8 flex flex-col gap-6">
-            <OrganizationGrid
-              organizations={mappedOrgs}
-              isLoading={isLoadingOrgs}
-              onCreateNew={() => setIsCreateOrgModalOpen(true)}
-              onLaunch={handleLaunchWorkspace}
+        <div className="max-w-6xl mx-auto px-margin-mobile md:px-margin-desktop flex flex-col gap-6">
+          {/* Dismissible Cadmium Amber alert banner at the top of Central Hub */}
+          {!isBannerDismissed && pendingInvitations.length > 0 && (
+            <PendingInvitesBanner
+              invitations={pendingInvitations}
+              onDismiss={() => setIsBannerDismissed(true)}
+              onAccept={(inv) => {
+                setPendingInvitations((prev) => prev.filter((i) => i.id !== inv.id))
+              }}
+              onDecline={(inv) => {
+                setPendingInvitations((prev) => prev.filter((i) => i.id !== inv.id))
+              }}
             />
+          )}
 
-            {/* Accessible Test-Harness Fallback Controls (Visually hidden to match Stitch central-hub.html layout) */}
-            <div className="sr-only" aria-hidden="false">
-              {organizations.length > 0 && (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    const targetSlug = selectedOrgSlug || organizations[0]?.slug
-                    if (targetSlug) {
-                      handleLaunchWorkspace({ id: 0, name: '', slug: targetSlug, role: '' })
-                    }
-                  }}
-                >
-                  <h3>Select Organization</h3>
-                  <label htmlFor="org-select">Organization:</label>
-                  <select
-                    id="org-select"
-                    value={selectedOrgSlug || (organizations[0]?.slug ?? '')}
-                    onChange={(e) => setSelectedOrgSlug(e.target.value)}
-                  >
-                    {organizations.map((org) => (
-                      <option key={org.id} value={org.slug}>
-                        {org.name} ({org.slug}) - {org.role.toUpperCase()}
-                      </option>
-                    ))}
-                  </select>
-                  <Button type="submit" variant="primary" size="compact">
-                    Navigate to Subdomain
-                  </Button>
-                </form>
-              )}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left Column: Organizations & Workspaces (col-span-8) */}
+            <div className="lg:col-span-8 flex flex-col gap-6">
+              <OrganizationGrid
+                organizations={mappedOrgs}
+                isLoading={isLoadingOrgs}
+                onCreateNew={() => setIsCreateOrgModalOpen(true)}
+                onLaunch={handleLaunchWorkspace}
+              />
 
-              <div>
-                <h3>Create Organization</h3>
-                <form onSubmit={handleCreateOrgSubmit}>
-                  <label htmlFor="org-name">Organization Name</label>
-                  <Input
-                    id="org-name"
-                    type="text"
-                    value={newOrgName}
-                    onChange={(e) => {
-                      setNewOrgName(e.target.value)
-                      if (!newOrgSlug) {
-                        setNewOrgSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '-'))
+              {/* Accessible Test-Harness Fallback Controls (Visually hidden to match Stitch central-hub.html layout) */}
+              <div className="sr-only" aria-hidden="false">
+                {organizations.length > 0 && (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      const targetSlug = selectedOrgSlug || organizations[0]?.slug
+                      if (targetSlug) {
+                        handleLaunchWorkspace({ id: 0, name: '', slug: targetSlug, role: '' })
                       }
                     }}
-                  />
-                  <label htmlFor="org-slug">Subdomain Slug</label>
-                  <Input
-                    id="org-slug"
-                    type="text"
-                    value={newOrgSlug}
-                    onChange={(e) => setNewOrgSlug(e.target.value.toLowerCase())}
-                  />
-                  <Button type="submit" variant="primary">
-                    Create Organization
-                  </Button>
-                </form>
+                  >
+                    <h3>Select Organization</h3>
+                    <label htmlFor="org-select">Organization:</label>
+                    <select
+                      id="org-select"
+                      value={selectedOrgSlug || (organizations[0]?.slug ?? '')}
+                      onChange={(e) => setSelectedOrgSlug(e.target.value)}
+                    >
+                      {organizations.map((org) => (
+                        <option key={org.id} value={org.slug}>
+                          {org.name} ({org.slug}) - {org.role.toUpperCase()}
+                        </option>
+                      ))}
+                    </select>
+                    <Button type="submit" variant="primary" size="compact">
+                      Navigate to Subdomain
+                    </Button>
+                  </form>
+                )}
+
+                <div>
+                  <h3>Create Organization</h3>
+                  <form onSubmit={handleCreateOrgSubmit}>
+                    <label htmlFor="org-name">Organization Name</label>
+                    <Input
+                      id="org-name"
+                      type="text"
+                      value={newOrgName}
+                      onChange={(e) => {
+                        setNewOrgName(e.target.value)
+                        if (!newOrgSlug) {
+                          setNewOrgSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '-'))
+                        }
+                      }}
+                    />
+                    <label htmlFor="org-slug">Subdomain Slug</label>
+                    <Input
+                      id="org-slug"
+                      type="text"
+                      value={newOrgSlug}
+                      onChange={(e) => setNewOrgSlug(e.target.value.toLowerCase())}
+                    />
+                    <Button type="submit" variant="primary">
+                      Create Organization
+                    </Button>
+                  </form>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Right Column: Invitations & Profile Card (col-span-4) */}
-          <div className="lg:col-span-4 flex flex-col gap-4">
-            {pendingInvitations.length > 0 && (
-              <PendingInvitesBanner
-                invitations={pendingInvitations}
-                onAccept={(inv) => {
-                  setPendingInvitations((prev) => prev.filter((i) => i.id !== inv.id))
+            {/* Right Column: Profile Card (col-span-4) */}
+            <div className="lg:col-span-4 flex flex-col gap-4">
+              <UserProfileCard
+                user={{
+                  name: user.name,
+                  email: user.email,
+                  roleTitle: user.roleTitle ?? 'System Administrator',
                 }}
-                onDecline={(inv) => {
-                  setPendingInvitations((prev) => prev.filter((i) => i.id !== inv.id))
-                }}
+                onLogout={handleLogoutClick}
               />
-            )}
-
-            <UserProfileCard
-              user={{
-                name: user.name,
-                email: user.email,
-                roleTitle: user.roleTitle ?? 'System Administrator',
-              }}
-              onLogout={handleLogoutClick}
-            />
+            </div>
           </div>
         </div>
       </main>

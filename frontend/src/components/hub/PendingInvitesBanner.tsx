@@ -1,5 +1,5 @@
 import React from 'react'
-import { Mail } from 'lucide-react'
+import { Mail, X } from 'lucide-react'
 import { hubContentData } from '../../data/mockData'
 
 export interface PendingInvitationItem {
@@ -13,6 +13,7 @@ export interface PendingInvitesBannerProps {
   readonly invitations: readonly PendingInvitationItem[]
   readonly onAccept?: (invitation: PendingInvitationItem) => void
   readonly onDecline?: (invitation: PendingInvitationItem) => void
+  readonly onDismiss?: () => void
   readonly isAccepting?: boolean
   readonly className?: string
 }
@@ -21,6 +22,7 @@ export const PendingInvitesBanner: React.FC<PendingInvitesBannerProps> = ({
   invitations,
   onAccept,
   onDecline,
+  onDismiss,
   isAccepting = false,
   className = '',
 }) => {
@@ -35,39 +37,51 @@ export const PendingInvitesBanner: React.FC<PendingInvitesBannerProps> = ({
     <div
       role="region"
       aria-label="Pending Invitations"
-      className={`bg-sentiment-warning/10 border border-sentiment-warning/30 rounded-lg p-4 flex items-start gap-3 shadow-sm ${className}`}
+      className={`bg-[#F59E0B]/10 border border-[#F59E0B]/30 rounded-lg p-4 flex items-start justify-between gap-3 shadow-sm ${className}`}
     >
-      <Mail className="w-5 h-5 text-sentiment-warning mt-0.5 shrink-0" />
-      <div className="flex flex-col gap-2 w-full">
-        <span className="font-title-md text-title-md text-sentiment-warning drop-shadow-[0_0_8px_rgba(245,158,11,0.3)]">
-          {count} {hubContentData.invitations.title}
-        </span>
-        <span className="font-body-compact text-body-compact text-text-secondary">
-          You've been invited to join "{primaryInvite.organizationName}".
-        </span>
-        <div className="flex gap-2 mt-1">
-          {onAccept && (
-            <button
-              type="button"
-              disabled={isAccepting}
-              onClick={() => onAccept(primaryInvite)}
-              className="text-xs font-semibold text-text-primary bg-sentiment-warning/20 border border-sentiment-warning/50 rounded px-2.5 py-1 hover:bg-sentiment-warning/30 transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              {hubContentData.invitations.accept}
-            </button>
-          )}
-          {onDecline && (
-            <button
-              type="button"
-              disabled={isAccepting}
-              onClick={() => onDecline(primaryInvite)}
-              className="text-xs font-medium text-text-secondary hover:text-text-primary px-2 py-1 transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              {hubContentData.invitations.decline}
-            </button>
-          )}
+      <div className="flex items-start gap-3 w-full">
+        <Mail className="w-5 h-5 text-[#F59E0B] mt-0.5 shrink-0" />
+        <div className="flex flex-col gap-2 w-full">
+          <span className="font-title-md text-title-md text-[#F59E0B] drop-shadow-[0_0_8px_rgba(245,158,11,0.3)] font-semibold">
+            {count} {hubContentData.invitations.title}
+          </span>
+          <span className="font-body-compact text-body-compact text-text-secondary">
+            You've been invited to join "{primaryInvite.organizationName}".
+          </span>
+          <div className="flex items-center gap-2 mt-1">
+            {onAccept && (
+              <button
+                type="button"
+                disabled={isAccepting}
+                onClick={() => onAccept(primaryInvite)}
+                className="text-xs font-semibold text-text-primary bg-[#F59E0B]/20 border border-[#F59E0B]/50 rounded px-2.5 py-1 hover:bg-[#F59E0B]/30 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                {hubContentData.invitations.accept}
+              </button>
+            )}
+            {onDecline && (
+              <button
+                type="button"
+                disabled={isAccepting}
+                onClick={() => onDecline(primaryInvite)}
+                className="text-xs font-medium text-text-secondary hover:text-text-primary px-2 py-1 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                {hubContentData.invitations.decline}
+              </button>
+            )}
+          </div>
         </div>
       </div>
+      {onDismiss && (
+        <button
+          type="button"
+          aria-label="Dismiss banner"
+          onClick={onDismiss}
+          className="text-[#F59E0B]/70 hover:text-[#F59E0B] hover:bg-[#F59E0B]/10 p-1 rounded transition-colors shrink-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#F59E0B]"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      )}
     </div>
   )
 }

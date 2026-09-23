@@ -24,7 +24,7 @@ export const OrganizationGrid: React.FC<OrganizationGridProps> = ({
         {hubContentData.organizations.title}
       </h1>
 
-      <div className="flex flex-col gap-3">
+      <div data-testid="org-grid-list" className="grid grid-cols-1 gap-4">
         {isLoading ? (
           <div className="bg-surface-subpanel border border-border-subtle rounded-xl p-8 text-center text-text-secondary font-body-default">
             Loading workspaces...
