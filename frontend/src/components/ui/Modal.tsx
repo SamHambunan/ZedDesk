@@ -25,6 +25,10 @@ export const Modal: React.FC<ModalProps> = ({
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null)
   const previousActiveElement = useRef<HTMLElement | null>(null)
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  })
   const titleId = useId()
   const descId = useId()
 
@@ -48,7 +52,7 @@ export const Modal: React.FC<ModalProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && closeOnEscape) {
         e.preventDefault()
-        onClose()
+        onCloseRef.current()
         return
       }
 
@@ -93,7 +97,7 @@ export const Modal: React.FC<ModalProps> = ({
         previousActiveElement.current.focus()
       }
     }
-  }, [isOpen, closeOnEscape, onClose])
+  }, [isOpen, closeOnEscape])
 
   if (!isOpen) return null
 

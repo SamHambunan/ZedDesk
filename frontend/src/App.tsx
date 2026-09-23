@@ -809,7 +809,7 @@ function AppInner({
 
   // --- RENDER CUSTOMER PORTAL ---
   if (isPortalRoute) {
-    return <CustomerPortalView apiUrl={apiUrl} subdomain={subdomain} />
+    return <CustomerPortalView apiUrl={apiUrl} subdomain={subdomain} pathname={activePath} />
   }
 
   // --- RENDER PUBLIC INVITATION ACCEPTANCE SCREEN ---
