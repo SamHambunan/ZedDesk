@@ -9,6 +9,8 @@ export type BadgeVariant =
   | 'ai'
   | 'workflow'
   | 'primary'
+  | 'admin'
+  | 'agent'
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant
@@ -43,6 +45,14 @@ const variantStyles: Record<BadgeVariant, { container: string; dot: string }> = 
   primary: {
     container: 'text-[#C3C0FF] bg-primary-container/12 border-primary-container/25',
     dot: 'bg-[#C3C0FF]',
+  },
+  admin: {
+    container: 'bg-[#8B5CF6]/15 text-[#C4B5FD] border-[#8B5CF6]/30',
+    dot: 'bg-[#8B5CF6]',
+  },
+  agent: {
+    container: 'bg-surface-subpanel text-text-secondary border-border-subtle',
+    dot: 'bg-text-secondary',
   },
 }
 

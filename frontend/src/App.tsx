@@ -116,7 +116,14 @@ function AppInner({
   const [isAccepting, setIsAccepting] = useState(false)
 
   // Workspace Shell Invitations State
-  const [workspaceView, setWorkspaceView] = useState<'overview' | 'invitations' | 'members' | 'teams' | 'team-management' | 'tickets'>('overview')
+  const [workspaceView, setWorkspaceView] = useState<'overview' | 'invitations' | 'members' | 'teams' | 'team-management' | 'tickets'>(() => {
+    if (activePath === '/members') return 'members'
+    if (activePath === '/invitations') return 'invitations'
+    if (activePath === '/teams') return 'teams'
+    if (activePath === '/team-management') return 'team-management'
+    if (activePath === '/tickets') return 'tickets'
+    return 'overview'
+  })
   const [workspaceInvitations, setWorkspaceInvitations] = useState<InvitationItem[]>([])
   const [loadingWorkspaceInvitations, setLoadingWorkspaceInvitations] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)

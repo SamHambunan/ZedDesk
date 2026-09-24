@@ -1,7 +1,7 @@
 import React, { forwardRef } from 'react'
 import { cn } from '../../lib/utils'
 
-export const Table = forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
+export const TableRoot = forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
     <div className="relative w-full overflow-auto rounded-lg border border-border-subtle bg-surface-panel">
       <table
@@ -12,7 +12,7 @@ export const Table = forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTable
     </div>
   )
 )
-Table.displayName = 'Table'
+TableRoot.displayName = 'TableRoot'
 
 export const TableHeader = forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
   ({ className, ...props }, ref) => (
@@ -119,3 +119,29 @@ export const TableCaption = forwardRef<HTMLTableCaptionElement, React.HTMLAttrib
   )
 )
 TableCaption.displayName = 'TableCaption'
+
+export const TableEmpty = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        'h-40 flex items-center justify-center text-text-muted text-body-compact',
+        className
+      )}
+      {...props}
+    />
+  )
+)
+TableEmpty.displayName = 'TableEmpty'
+
+export const Table = Object.assign(TableRoot, {
+  Root: TableRoot,
+  Header: TableHeader,
+  Head: TableHead,
+  Body: TableBody,
+  Row: TableRow,
+  Cell: TableCell,
+  Footer: TableFooter,
+  Caption: TableCaption,
+  Empty: TableEmpty,
+})
