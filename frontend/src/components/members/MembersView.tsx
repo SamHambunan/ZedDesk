@@ -1,16 +1,17 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useContext } from 'react'
 import { Plus, Search, Filter } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { MemberRosterTable } from './MemberRosterTable'
 import { PendingInvitationsTable } from './PendingInvitationsTable'
 import { InviteMemberModal } from './InviteMemberModal'
 import { membersContentData } from '../../data/mockData'
+import { WorkspaceShellContext } from '../workspace/WorkspaceShellContext'
 import type { Member, PendingInvitation } from './types'
 
 export interface MembersViewProps {
   readonly members: readonly Member[]
   readonly pendingInvitations: readonly PendingInvitation[]
-  readonly isAdmin: boolean
+  readonly isAdmin?: boolean
   readonly isLoadingMembers?: boolean
   readonly isLoadingInvitations?: boolean
   readonly inviteError?: string | null
@@ -18,6 +19,7 @@ export interface MembersViewProps {
   readonly onInviteSubmit?: (email: string, role: 'agent' | 'admin') => Promise<void> | void
   readonly onRevokeInvite?: (id: number) => Promise<void> | void
   readonly onCopyInviteLink?: (invitation: PendingInvitation) => void
+  readonly onActionClick?: (member: Member) => void
   readonly revokingId?: number | null
   readonly copiedId?: number | null
   readonly className?: string
@@ -34,10 +36,17 @@ export const MembersView: React.FC<MembersViewProps> = ({
   onInviteSubmit,
   onRevokeInvite,
   onCopyInviteLink,
+  onActionClick,
   revokingId = null,
   copiedId = null,
   className = '',
 }) => {
+  const shellContext = useContext(WorkspaceShellContext)
+  const effectiveIsAdmin =
+    isAdmin !== undefined
+      ? isAdmin
+      : (shellContext?.role || '').toLowerCase() === 'admin'
+
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedRole, setSelectedRole] = useState<'all' | 'admin' | 'agent'>('all')
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
@@ -103,7 +112,7 @@ export const MembersView: React.FC<MembersViewProps> = ({
           </p>
         </div>
 
-        {isAdmin && (
+        {effectiveIsAdmin && (
           <Button
             type="button"
             variant="primary"
@@ -176,11 +185,13 @@ export const MembersView: React.FC<MembersViewProps> = ({
       {/* Member Roster Table */}
       <MemberRosterTable
         members={filteredMembers}
+        isAdmin={effectiveIsAdmin}
         isLoading={isLoadingMembers}
+        onActionClick={onActionClick}
       />
 
       {/* Pending Invitations Section (Admins only) */}
-      {isAdmin && (
+      {effectiveIsAdmin && (
         <PendingInvitationsTable
           invitations={pendingInvitations}
           isLoading={isLoadingInvitations}
@@ -192,7 +203,7 @@ export const MembersView: React.FC<MembersViewProps> = ({
       )}
 
       {/* Invite Member Modal */}
-      {isAdmin && (
+      {effectiveIsAdmin && (
         <InviteMemberModal
           isOpen={isInviteModalOpen}
           onClose={handleCloseInviteModal}

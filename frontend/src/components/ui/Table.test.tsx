@@ -48,4 +48,27 @@ describe('Table Primitive', () => {
     const numericCell = screen.getByText('1,248')
     expect(numericCell.className).toContain('tabular-nums')
   })
+
+  it('supports compound subcomponent syntax (<Table.Root>, <Table.Header>, <Table.Head>, etc.)', () => {
+    render(
+      <Table.Root data-testid="compound-table">
+        <Table.Header>
+          <Table.Row>
+            <Table.Head>Name</Table.Head>
+            <Table.Head>Role</Table.Head>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          <Table.Row data-testid="compound-row">
+            <Table.Cell>Bob Agent</Table.Cell>
+            <Table.Cell>Agent</Table.Cell>
+          </Table.Row>
+        </Table.Body>
+      </Table.Root>
+    )
+
+    expect(screen.getByTestId('compound-table')).toBeInTheDocument()
+    expect(screen.getByTestId('compound-row')).toHaveClass('h-10')
+    expect(screen.getByText('Bob Agent')).toBeInTheDocument()
+  })
 })

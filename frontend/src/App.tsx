@@ -70,6 +70,14 @@ interface TeamItem {
   members: OrganizationMemberItem[]
 }
 
+const ROUTE_VIEW_MAP: Record<string, 'overview' | 'invitations' | 'members' | 'teams' | 'team-management' | 'tickets'> = {
+  '/members': 'members',
+  '/invitations': 'invitations',
+  '/teams': 'teams',
+  '/team-management': 'team-management',
+  '/tickets': 'tickets',
+}
+
 function extractErrorMessage(data: unknown, fallback: string): string {
   if (data && typeof data === 'object') {
     const errorObj = data as { message?: string; errors?: Record<string, string[]> }
@@ -116,7 +124,9 @@ function AppInner({
   const [isAccepting, setIsAccepting] = useState(false)
 
   // Workspace Shell Invitations State
-  const [workspaceView, setWorkspaceView] = useState<'overview' | 'invitations' | 'members' | 'teams' | 'team-management' | 'tickets'>('overview')
+  const [workspaceView, setWorkspaceView] = useState<'overview' | 'invitations' | 'members' | 'teams' | 'team-management' | 'tickets'>(
+    () => ROUTE_VIEW_MAP[activePath] ?? 'overview'
+  )
   const [workspaceInvitations, setWorkspaceInvitations] = useState<InvitationItem[]>([])
   const [loadingWorkspaceInvitations, setLoadingWorkspaceInvitations] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)

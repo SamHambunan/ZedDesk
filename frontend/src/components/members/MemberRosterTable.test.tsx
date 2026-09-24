@@ -37,7 +37,7 @@ describe('MemberRosterTable Component', () => {
     },
   ]
 
-  it('renders high-density 40px table with tabular numbers', () => {
+  it('renders high-density 40px table with JetBrains Mono tabular join dates and vertical alignment', () => {
     render(<MemberRosterTable members={mockMembers} />)
 
     const table = screen.getByTestId('members-roster-table')
@@ -47,7 +47,10 @@ describe('MemberRosterTable Component', () => {
     expect(row1).toHaveClass('h-10')
 
     const joinedCell = screen.getByTestId('member-joined-1')
+    expect(joinedCell).toHaveClass('tabular-nums')
+    expect(joinedCell.closest('td')).toHaveClass('font-mono-data')
     expect(joinedCell.closest('td')).toHaveClass('tabular-nums')
+    expect(joinedCell.closest('td')).toHaveClass('align-middle')
   })
 
   it('renders member avatar, initials fallback, full name, and email', () => {
@@ -64,16 +67,18 @@ describe('MemberRosterTable Component', () => {
     expect(screen.getByTestId('member-name-2')).toHaveTextContent('John Doe')
   })
 
-  it('renders assigned Role pill with Admin in violet and Agent in indigo', () => {
+  it('renders distinct role badges with Amethyst Violet for admin and Tactical Graphite for agent', () => {
     render(<MemberRosterTable members={mockMembers} />)
 
-    const adminPill = screen.getByTestId('member-role-1')
-    expect(adminPill).toHaveTextContent('Admin')
-    expect(adminPill).toHaveClass('text-purple-300')
+    const adminBadge = screen.getByTestId('member-role-1')
+    expect(adminBadge).toHaveTextContent('Admin')
+    expect(adminBadge.className).toContain('bg-[#8B5CF6]/15')
+    expect(adminBadge.className).toContain('text-[#C4B5FD]')
 
-    const agentPill = screen.getByTestId('member-role-2')
-    expect(agentPill).toHaveTextContent('Agent')
-    expect(agentPill).toHaveClass('text-indigo-300')
+    const agentBadge = screen.getByTestId('member-role-2')
+    expect(agentBadge).toHaveTextContent('Agent')
+    expect(agentBadge.className).toContain('bg-surface-subpanel')
+    expect(agentBadge.className).toContain('text-text-secondary')
   })
 
   it('renders team tags and online/offline status dots', () => {
@@ -87,14 +92,25 @@ describe('MemberRosterTable Component', () => {
     expect(screen.getByTestId('member-status-2')).toHaveTextContent('Offline')
   })
 
-  it('triggers onActionClick when action button is clicked', () => {
+  it('triggers onActionClick when action button is clicked by admin', () => {
     const handleAction = vi.fn()
-    render(<MemberRosterTable members={mockMembers} onActionClick={handleAction} />)
+    render(<MemberRosterTable members={mockMembers} isAdmin={true} onActionClick={handleAction} />)
 
     const actionBtn = screen.getByTestId('member-actions-btn-1')
     fireEvent.click(actionBtn)
 
     expect(handleAction).toHaveBeenCalledWith(mockMembers[0])
+  })
+
+  it('enforces strict RBAC visual elision: completely omits administrative action triggers when isAdmin is false', () => {
+    render(<MemberRosterTable members={mockMembers} isAdmin={false} />)
+
+    // Administrative action button triggers are completely absent from the DOM
+    expect(screen.queryByTestId('member-actions-btn-1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('member-actions-btn-2')).not.toBeInTheDocument()
+
+    // Actions column header is completely absent from the DOM
+    expect(screen.queryByText(/actions/i)).not.toBeInTheDocument()
   })
 
   it('renders loading state and empty state correctly', () => {

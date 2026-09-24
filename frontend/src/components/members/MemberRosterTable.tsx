@@ -1,18 +1,13 @@
 import React from 'react'
 import { MoreVertical } from 'lucide-react'
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '../ui/Table'
+import { Table } from '../ui/Table'
+import { Badge } from '../ui/Badge'
 import { membersContentData } from '../../data/mockData'
 import type { Member } from './types'
 
 export interface MemberRosterTableProps {
   readonly members: readonly Member[]
+  readonly isAdmin?: boolean
   readonly isLoading?: boolean
   readonly emptyMessage?: string
   readonly onActionClick?: (member: Member) => void
@@ -28,6 +23,7 @@ function getInitials(name?: string): string {
 
 export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
   members,
+  isAdmin = true,
   isLoading = false,
   emptyMessage = membersContentData.emptyMembersMessage,
   onActionClick,
@@ -63,47 +59,49 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
       data-testid="members-roster-table"
       className={`bg-surface-subpanel rounded border border-border-subtle overflow-hidden shadow-keylight flex flex-col ${className}`}
     >
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-surface-panel h-10 border-b border-border-subtle">
-            <TableHead className="w-[30%] min-w-[200px] text-label-caps font-label-caps text-text-muted uppercase">
+      <Table.Root>
+        <Table.Header>
+          <Table.Row className="bg-surface-panel h-10 border-b border-border-subtle">
+            <Table.Head className="w-[30%] min-w-[200px] text-label-caps font-label-caps text-text-muted uppercase">
               {membersContentData.columns.member}
-            </TableHead>
-            <TableHead className="w-[15%] text-label-caps font-label-caps text-text-muted uppercase">
+            </Table.Head>
+            <Table.Head className="w-[15%] text-label-caps font-label-caps text-text-muted uppercase">
               {membersContentData.columns.role}
-            </TableHead>
-            <TableHead className="w-[25%] text-label-caps font-label-caps text-text-muted uppercase">
+            </Table.Head>
+            <Table.Head className="w-[25%] text-label-caps font-label-caps text-text-muted uppercase">
               {membersContentData.columns.teams}
-            </TableHead>
-            <TableHead className="w-[15%] text-label-caps font-label-caps text-text-muted uppercase">
+            </Table.Head>
+            <Table.Head className="w-[15%] text-label-caps font-label-caps text-text-muted uppercase">
               {membersContentData.columns.joinedDate}
-            </TableHead>
-            <TableHead className="w-[10%] text-label-caps font-label-caps text-text-muted uppercase">
+            </Table.Head>
+            <Table.Head className="w-[10%] text-label-caps font-label-caps text-text-muted uppercase">
               {membersContentData.columns.status}
-            </TableHead>
-            <TableHead align="center" className="w-[50px] text-label-caps font-label-caps text-text-muted uppercase">
-              {membersContentData.columns.actions}
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+            </Table.Head>
+            {isAdmin && (
+              <Table.Head align="center" className="w-[50px] text-label-caps font-label-caps text-text-muted uppercase">
+                {membersContentData.columns.actions}
+              </Table.Head>
+            )}
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
           {members.map((member) => {
             const userName = member.user?.name || 'Unnamed Member'
             const userEmail = member.user?.email || ''
             const roleLower = (member.role || 'agent').toLowerCase()
-            const isAdmin = roleLower === 'admin'
+            const isMemberAdmin = roleLower === 'admin'
             const isOnline = member.status === 'online'
             const initials = getInitials(userName)
-            const joined = member.joined_date || '2023-01-15'
+            const joined = member.joined_date || '—'
 
             return (
-              <TableRow
+              <Table.Row
                 key={member.id}
                 data-testid={`member-row-${member.id}`}
                 className="h-10 border-b border-border-subtle hover:bg-surface-container-high/60 transition-colors group cursor-default"
               >
                 {/* Member Info */}
-                <TableCell className="py-1">
+                <Table.Cell className="py-1">
                   <div className="flex items-center gap-3 overflow-hidden">
                     <div className="w-6 h-6 rounded-full bg-surface-container-highest border border-border-subtle flex-shrink-0 overflow-hidden flex items-center justify-center">
                       {member.user?.avatar_url ? (
@@ -128,36 +126,27 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
                       {userEmail && (
                         <span
                           data-testid={`member-email-${member.id}`}
-                          className="text-[10px] text-text-muted truncate hidden sm:inline"
+                          className="text-[10px] text-text-muted truncate block"
                         >
                           {userEmail}
                         </span>
                       )}
                     </div>
                   </div>
-                </TableCell>
+                </Table.Cell>
 
-                {/* Role Pill */}
-                <TableCell className="py-1">
-                  {isAdmin ? (
-                    <span
-                      data-testid={`member-role-${member.id}`}
-                      className="inline-flex items-center px-1.5 py-0.5 rounded text-label-caps font-label-caps bg-purple-900/30 text-purple-300 border border-purple-700/50 uppercase h-[20px] select-none"
-                    >
-                      Admin
-                    </span>
-                  ) : (
-                    <span
-                      data-testid={`member-role-${member.id}`}
-                      className="inline-flex items-center px-1.5 py-0.5 rounded text-label-caps font-label-caps bg-primary-container/20 text-indigo-300 border border-primary-container/40 uppercase h-[20px] select-none"
-                    >
-                      Agent
-                    </span>
-                  )}
-                </TableCell>
+                {/* Role Badge */}
+                <Table.Cell className="py-1">
+                  <Badge
+                    variant={isMemberAdmin ? 'admin' : 'agent'}
+                    data-testid={`member-role-${member.id}`}
+                  >
+                    {isMemberAdmin ? 'Admin' : 'Agent'}
+                  </Badge>
+                </Table.Cell>
 
                 {/* Team Tags */}
-                <TableCell className="py-1">
+                <Table.Cell className="py-1">
                   <div className="flex items-center gap-1 overflow-hidden flex-wrap max-h-[32px]">
                     {member.teams && member.teams.length > 0 ? (
                       member.teams.map((teamName) => (
@@ -174,15 +163,23 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
                       </span>
                     )}
                   </div>
-                </TableCell>
+                </Table.Cell>
 
                 {/* Joined Date */}
-                <TableCell numeric className="py-1 text-left font-mono-data text-mono-data text-text-muted tabular-nums">
-                  <span data-testid={`member-joined-${member.id}`}>{joined}</span>
-                </TableCell>
+                <Table.Cell
+                  align="left"
+                  className="py-1 font-mono-data text-mono-data text-text-muted tabular-nums align-middle"
+                >
+                  <span
+                    data-testid={`member-joined-${member.id}`}
+                    className="tabular-nums"
+                  >
+                    {joined}
+                  </span>
+                </Table.Cell>
 
                 {/* Status Indicator */}
-                <TableCell className="py-1">
+                <Table.Cell className="py-1">
                   <div className="flex items-center gap-1.5">
                     <div
                       className={`w-1.5 h-1.5 rounded-full ${
@@ -198,25 +195,27 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
                       {isOnline ? 'Online' : 'Offline'}
                     </span>
                   </div>
-                </TableCell>
+                </Table.Cell>
 
-                {/* Actions */}
-                <TableCell align="center" className="py-1">
-                  <button
-                    type="button"
-                    aria-label={`Actions for ${userName}`}
-                    data-testid={`member-actions-btn-${member.id}`}
-                    onClick={() => onActionClick?.(member)}
-                    className="text-text-muted hover:text-text-primary p-1 rounded hover:bg-surface-container-high transition-colors focus:outline-none"
-                  >
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
-                </TableCell>
-              </TableRow>
+                {/* Actions - completely omitted when viewed as agent */}
+                {isAdmin && (
+                  <Table.Cell align="center" className="py-1">
+                    <button
+                      type="button"
+                      aria-label={`Actions for ${userName}`}
+                      data-testid={`member-actions-btn-${member.id}`}
+                      onClick={() => onActionClick?.(member)}
+                      className="text-text-muted hover:text-text-primary p-1 rounded hover:bg-surface-container-high transition-colors focus:outline-none"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                  </Table.Cell>
+                )}
+              </Table.Row>
             )
           })}
-        </TableBody>
-      </Table>
+        </Table.Body>
+      </Table.Root>
     </div>
   )
 }

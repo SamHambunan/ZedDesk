@@ -55,4 +55,16 @@ describe('Badge Primitive', () => {
     expect(dot?.className).toContain('rounded-full')
     expect(dot?.className).toContain('bg-sentiment-positive')
   })
+
+  it('renders admin and agent role badge variants with Amethyst Violet and Tactical Graphite styling', () => {
+    const { rerender } = render(<Badge variant="admin">Admin</Badge>)
+    let badge = screen.getByText('Admin')
+    expect(badge.className).toContain('bg-[#8B5CF6]/15')
+    expect(badge.className).toContain('text-[#C4B5FD]')
+
+    rerender(<Badge variant="agent">Agent</Badge>)
+    badge = screen.getByText('Agent')
+    expect(badge.className).toContain('bg-surface-subpanel')
+    expect(badge.className).toContain('text-text-secondary')
+  })
 })
