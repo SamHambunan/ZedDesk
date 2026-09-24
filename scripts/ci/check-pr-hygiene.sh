@@ -6,10 +6,23 @@ set -eu
 # and internal context from being committed to feature branches and pull requests.
 # Explicitly permits architectural decision records under 'docs/adr/**'.
 
-BASE_REF="${1:-origin/master}"
+BASE_REF="origin/master"
+USE_STDIN=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --stdin)
+      USE_STDIN=true
+      ;;
+    *)
+      BASE_REF="$arg"
+      ;;
+  esac
+done
+
 CHANGED_FILES=""
 
-if [ "${1:-}" = "--stdin" ]; then
+if [ "$USE_STDIN" = true ]; then
   # Read changed files from standard input
   CHANGED_FILES=$(cat)
 else

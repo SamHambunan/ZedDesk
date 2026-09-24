@@ -35,6 +35,21 @@ assert_contains() {
   fi
 }
 
+run_hygiene_test() {
+  local input="$1"
+  local expected_code="$2"
+  local test_name="$3"
+  local needle="${4:-}"
+
+  local output=""
+  local exit_code=0
+  output=$(echo "$input" | bash "$HYGIENE_SCRIPT" --stdin 2>&1) || exit_code=$?
+  assert_eq "$expected_code" "$exit_code" "$test_name"
+  if [ -n "$needle" ]; then
+    assert_contains "$needle" "$output" "$test_name [output check]"
+  fi
+}
+
 echo "=== Running PR Hygiene Gate Unit Tests ==="
 
 if [ ! -f "$HYGIENE_SCRIPT" ]; then
@@ -50,11 +65,7 @@ docker-compose.yml
 .github/workflows/ci.yml
 EOF
 )
-OUTPUT=$(echo "$TEST_INPUT" | bash "$HYGIENE_SCRIPT" --stdin 2>&1) || EXIT_CODE=$?
-EXIT_CODE=${EXIT_CODE:-0}
-assert_eq "0" "$EXIT_CODE" "Clean application files pass with exit 0"
-assert_contains "PR hygiene check passed" "$OUTPUT" "Clean output message"
-unset EXIT_CODE
+run_hygiene_test "$TEST_INPUT" "0" "Clean application files pass" "PR hygiene check passed"
 
 # Test 2: Architectural Decision Records under docs/adr/ are permitted
 TEST_INPUT=$(cat << 'EOF'
@@ -62,11 +73,7 @@ docs/adr/0009-native-ci-runners-with-service-containers.md
 docs/adr/0001-shared-database-row-level-tenancy.md
 EOF
 )
-OUTPUT=$(echo "$TEST_INPUT" | bash "$HYGIENE_SCRIPT" --stdin 2>&1) || EXIT_CODE=$?
-EXIT_CODE=${EXIT_CODE:-0}
-assert_eq "0" "$EXIT_CODE" "Architectural decision records under docs/adr/ pass"
-assert_contains "PR hygiene check passed" "$OUTPUT" "ADR clean output message"
-unset EXIT_CODE
+run_hygiene_test "$TEST_INPUT" "0" "Architectural decision records under docs/adr/ pass" "PR hygiene check passed"
 
 # Test 3: Prohibited .agents/** fails
 TEST_INPUT=$(cat << 'EOF'
@@ -74,62 +81,26 @@ TEST_INPUT=$(cat << 'EOF'
 backend/app/Models/Ticket.php
 EOF
 )
-OUTPUT=$(echo "$TEST_INPUT" | bash "$HYGIENE_SCRIPT" --stdin 2>&1) || EXIT_CODE=$?
-EXIT_CODE=${EXIT_CODE:-0}
-assert_eq "1" "$EXIT_CODE" "Prohibited .agents/** file fails with exit 1"
-assert_contains ".agents/skills/tdd/SKILL.md" "$OUTPUT" "Violating file identified"
-assert_contains "PR hygiene gate failed" "$OUTPUT" "Error message includes PR hygiene gate failed"
-unset EXIT_CODE
+run_hygiene_test "$TEST_INPUT" "1" "Prohibited .agents/** file fails" ".agents/skills/tdd/SKILL.md"
 
 # Test 4: Prohibited AGENTS.md fails
-TEST_INPUT=$(cat << 'EOF'
-AGENTS.md
-EOF
-)
-OUTPUT=$(echo "$TEST_INPUT" | bash "$HYGIENE_SCRIPT" --stdin 2>&1) || EXIT_CODE=$?
-EXIT_CODE=${EXIT_CODE:-0}
-assert_eq "1" "$EXIT_CODE" "Prohibited AGENTS.md fails with exit 1"
-assert_contains "AGENTS.md" "$OUTPUT" "Violating AGENTS.md identified"
-unset EXIT_CODE
+TEST_INPUT="AGENTS.md"
+run_hygiene_test "$TEST_INPUT" "1" "Prohibited AGENTS.md fails" "AGENTS.md"
 
 # Test 5: Prohibited CONTEXT.md fails
-TEST_INPUT=$(cat << 'EOF'
-CONTEXT.md
-EOF
-)
-OUTPUT=$(echo "$TEST_INPUT" | bash "$HYGIENE_SCRIPT" --stdin 2>&1) || EXIT_CODE=$?
-EXIT_CODE=${EXIT_CODE:-0}
-assert_eq "1" "$EXIT_CODE" "Prohibited CONTEXT.md fails with exit 1"
-assert_contains "CONTEXT.md" "$OUTPUT" "Violating CONTEXT.md identified"
-unset EXIT_CODE
+TEST_INPUT="CONTEXT.md"
+run_hygiene_test "$TEST_INPUT" "1" "Prohibited CONTEXT.md fails" "CONTEXT.md"
 
 # Test 6: Prohibited .scratch/** fails
-TEST_INPUT=$(cat << 'EOF'
-.scratch/test-plan.md
-EOF
-)
-OUTPUT=$(echo "$TEST_INPUT" | bash "$HYGIENE_SCRIPT" --stdin 2>&1) || EXIT_CODE=$?
-EXIT_CODE=${EXIT_CODE:-0}
-assert_eq "1" "$EXIT_CODE" "Prohibited .scratch/** fails with exit 1"
-assert_contains ".scratch/test-plan.md" "$OUTPUT" "Violating .scratch file identified"
-unset EXIT_CODE
+TEST_INPUT=".scratch/test-plan.md"
+run_hygiene_test "$TEST_INPUT" "1" "Prohibited .scratch/** fails" ".scratch/test-plan.md"
 
 # Test 7: Prohibited docs outside docs/adr/ fails
-TEST_INPUT=$(cat << 'EOF'
-docs/agents/domain.md
-EOF
-)
-OUTPUT=$(echo "$TEST_INPUT" | bash "$HYGIENE_SCRIPT" --stdin 2>&1) || EXIT_CODE=$?
-EXIT_CODE=${EXIT_CODE:-0}
-assert_eq "1" "$EXIT_CODE" "Prohibited documentation outside docs/adr/ fails with exit 1"
-assert_contains "docs/agents/domain.md" "$OUTPUT" "Violating non-ADR docs file identified"
-unset EXIT_CODE
+TEST_INPUT="docs/agents/domain.md"
+run_hygiene_test "$TEST_INPUT" "1" "Prohibited documentation outside docs/adr/ fails" "docs/agents/domain.md"
 
 # Test 8: Empty input passes
-OUTPUT=$(echo "" | bash "$HYGIENE_SCRIPT" --stdin 2>&1) || EXIT_CODE=$?
-EXIT_CODE=${EXIT_CODE:-0}
-assert_eq "0" "$EXIT_CODE" "Empty changed files list passes with exit 0"
-unset EXIT_CODE
+run_hygiene_test "" "0" "Empty changed files list passes" "PR hygiene check passed"
 
 echo ""
 echo "=== Test Results: ${PASSED_COUNT} passed, ${FAILED_COUNT} failed ==="
