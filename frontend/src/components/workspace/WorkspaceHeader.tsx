@@ -11,39 +11,32 @@ import {
   Plus,
   Layers,
 } from 'lucide-react'
-import { QueryClientContext, QueryClientProvider, useQuery } from '@tanstack/react-query'
-import { queryClient as defaultQueryClient } from '../../lib/query-client'
+import { useQuery } from '@tanstack/react-query'
 import { getCentralHubUrl, getOrganizationUrl, getApiBaseUrl } from '../../utils/url'
+import { clearAuthToken } from '../../lib/api-client'
 import { workspaceContentData } from '../../data/mockData'
-import { WorkspaceShellContext } from './WorkspaceShell'
+import { Badge } from '../ui/Badge'
+import {
+  WorkspaceShellContext,
+  SafeQueryProvider,
+  type WorkspaceShellUser,
+  type RoleType,
+} from './WorkspaceShellContext'
 
-function SafeQueryProvider({ children }: { children: React.ReactNode }) {
-  const client = useContext(QueryClientContext)
-  if (client) {
-    return <>{children}</>
-  }
-  return <QueryClientProvider client={defaultQueryClient}>{children}</QueryClientProvider>
-}
-
-export interface WorkspaceHeaderUser {
-  readonly id?: number
-  readonly name: string
-  readonly email: string
-  readonly avatarUrl?: string
-}
+export type WorkspaceHeaderUser = WorkspaceShellUser
 
 export interface WorkspaceOrganization {
   readonly id?: number | string
   readonly name: string
   readonly slug: string
-  readonly role?: string
+  readonly role?: RoleType
 }
 
 export interface WorkspaceHeaderProps {
   readonly organizationName?: string
   readonly organizationSlug?: string
   readonly user?: WorkspaceHeaderUser | null
-  readonly role?: string | null
+  readonly role?: RoleType | null
   readonly token?: string | null
   readonly apiUrl?: string
   readonly organizations?: readonly WorkspaceOrganization[]
@@ -87,8 +80,21 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
 
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const switcherRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
+
+  // Global ⌘K / Ctrl+K keyboard shortcut listener to focus search input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Close menus on outside click
   useEffect(() => {
@@ -104,8 +110,8 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleOutsideClick)
   }, [])
 
-  // TanStack Query to load organizations if not supplied via props or context
-  const { data: fetchedOrganizations = [] } = useQuery<WorkspaceOrganization[]>({
+  // TanStack Query to load organizations on-demand when switcher is open
+  const { data: fetchedOrganizations = [], isLoading: isLoadingOrgs } = useQuery<WorkspaceOrganization[]>({
     queryKey: ['organizations', token, resolvedApiUrl],
     queryFn: async () => {
       if (!token) return []
@@ -142,6 +148,10 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
 
   const handleSelectOrg = (targetOrg: WorkspaceOrganization) => {
     setIsSwitcherOpen(false)
+    // Guard against self-tenant redundant redirect
+    if (targetOrg.slug === organizationSlug) {
+      return
+    }
     onSelectOrganization?.(targetOrg)
     const targetUrl = getOrganizationUrl(targetOrg.slug, token, '/overview')
     if (typeof window !== 'undefined') {
@@ -164,11 +174,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
       }
     }
 
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('zeddesk_token')
-      localStorage.removeItem('zeddesk_user')
-    }
-
+    clearAuthToken()
     setShowProfileMenu(false)
 
     if (onLogout) {
@@ -202,6 +208,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
         <div className="hidden md:flex relative items-center">
           <Search className="w-4 h-4 text-text-muted absolute left-3 pointer-events-none" />
           <input
+            ref={searchInputRef}
             type="text"
             value={searchQuery}
             onChange={handleSearchChange}
@@ -220,7 +227,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
         <button
           type="button"
           onClick={onCopilotClick}
-          className="h-[32px] px-3 bg-gradient-to-r from-accent-indigo-glow to-primary-container rounded border border-[#571bc1] text-label-regular font-label-regular text-white flex items-center gap-1.5 hover:opacity-90 transition-opacity shadow-keylight cursor-pointer"
+          className="h-[32px] px-3 bg-gradient-to-r from-accent-indigo-glow to-primary-container rounded border border-primary-dark text-label-regular font-label-regular text-white flex items-center gap-1.5 hover:opacity-90 transition-opacity shadow-keylight cursor-pointer"
         >
           <Sparkles className="w-3.5 h-3.5 animate-pulse" />
           <span>{workspaceContentData.brand.copilotLabel}</span>
@@ -262,54 +269,58 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
                 Organizations
               </div>
 
-              <div className="max-h-60 overflow-y-auto flex flex-col gap-1 py-1">
-                {availableOrgs.map((org) => {
-                  const isActive = org.slug === organizationSlug
-                  const orgRole = (org.role || 'agent').toLowerCase()
-                  const isOrgAdmin = orgRole === 'admin'
+              {isLoadingOrgs ? (
+                <div className="flex items-center justify-center py-4 text-text-muted text-body-compact gap-2">
+                  <div className="w-3.5 h-3.5 border-2 border-accent-glow border-t-transparent rounded-full animate-spin" />
+                  <span>Loading organizations...</span>
+                </div>
+              ) : (
+                <div className="max-h-60 overflow-y-auto flex flex-col gap-1 py-1">
+                  {availableOrgs.map((org) => {
+                    const isActive = org.slug === organizationSlug
+                    const orgRole = (org.role || 'agent').toLowerCase()
+                    const isOrgAdmin = orgRole === 'admin'
 
-                  return (
-                    <button
-                      key={org.slug}
-                      type="button"
-                      data-testid={`tenant-option-${org.slug}`}
-                      onClick={() => handleSelectOrg(org)}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded text-left text-body-compact transition-colors cursor-pointer ${
-                        isActive
-                          ? 'bg-surface-subpanel text-text-primary font-medium'
-                          : 'text-text-secondary hover:text-text-primary hover:bg-surface-container-high'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <Building2 className="w-4 h-4 text-text-muted shrink-0" />
-                        <div className="flex flex-col min-w-0">
-                          <span className="truncate font-medium text-text-primary">{org.name}</span>
-                          <span className="text-[10px] text-text-muted font-mono-data truncate">
-                            {org.slug}
-                          </span>
+                    return (
+                      <button
+                        key={org.slug}
+                        type="button"
+                        data-testid={`tenant-option-${org.slug}`}
+                        onClick={() => handleSelectOrg(org)}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded text-left text-body-compact transition-colors cursor-pointer ${
+                          isActive
+                            ? 'bg-surface-subpanel text-text-primary font-medium'
+                            : 'text-text-secondary hover:text-text-primary hover:bg-surface-container-high'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Building2 className="w-4 h-4 text-text-muted shrink-0" />
+                          <div className="flex flex-col min-w-0">
+                            <span className="truncate font-medium text-text-primary">{org.name}</span>
+                            <span className="text-[10px] text-text-muted font-mono-data truncate">
+                              {org.slug}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold ${
-                            isOrgAdmin
-                              ? 'bg-[#8B5CF6]/15 text-[#C4B5FD] border border-[#8B5CF6]/30'
-                              : 'bg-[#282A33] text-[#94A3B8] border border-[#3B3F4D]'
-                          }`}
-                        >
-                          {orgRole}
-                        </span>
-                        {isActive && (
-                          <Check
-                            data-testid={`active-org-check-${org.slug}`}
-                            className="w-4 h-4 text-sentiment-warning shrink-0"
-                          />
-                        )}
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Badge
+                            variant={isOrgAdmin ? 'ai' : 'neutral'}
+                            className="font-mono uppercase text-[10px] px-1.5 py-0.5 tracking-wider"
+                          >
+                            {orgRole}
+                          </Badge>
+                          {isActive && (
+                            <Check
+                              data-testid={`active-org-check-${org.slug}`}
+                              className="w-4 h-4 text-sentiment-warning shrink-0"
+                            />
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
 
               {/* Divider */}
               <div className="my-1.5 border-t border-border-subtle" />

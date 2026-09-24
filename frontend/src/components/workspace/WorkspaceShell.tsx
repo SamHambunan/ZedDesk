@@ -1,7 +1,6 @@
-import React, { useState, useContext, createContext, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Plus, Users, Network, Inbox, Gauge } from 'lucide-react'
-import { QueryClientContext, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
-import { queryClient as defaultQueryClient } from '../../lib/query-client'
+import { useQueryClient } from '@tanstack/react-query'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import { WorkspaceHeader, type WorkspaceOrganization } from './WorkspaceHeader'
 import { WorkspaceSidebar } from './WorkspaceSidebar'
@@ -12,14 +11,17 @@ import { PerimeterErrorCard } from './PerimeterErrorCard'
 import { CreateOrganizationModal } from '../hub/CreateOrganizationModal'
 import { workspaceContentData } from '../../data/mockData'
 import { getApiBaseUrl, getOrganizationUrl } from '../../utils/url'
+import {
+  WorkspaceShellContext,
+  useWorkspaceShell,
+  SafeQueryProvider,
+  type WorkspaceShellUser,
+  type WorkspaceShellContextValue,
+  type RoleType,
+} from './WorkspaceShellContext'
 
-function SafeQueryProvider({ children }: { children: React.ReactNode }) {
-  const client = useContext(QueryClientContext)
-  if (client) {
-    return <>{children}</>
-  }
-  return <QueryClientProvider client={defaultQueryClient}>{children}</QueryClientProvider>
-}
+export { WorkspaceShellContext, useWorkspaceShell, SafeQueryProvider }
+export type { WorkspaceShellUser, WorkspaceShellContextValue, RoleType }
 
 function extractErrorMessage(data: unknown, fallback: string): string {
   if (data && typeof data === 'object') {
@@ -32,61 +34,19 @@ function extractErrorMessage(data: unknown, fallback: string): string {
   return fallback
 }
 
-export interface WorkspaceShellContextValue {
-  readonly organization: {
-    readonly id?: number
-    readonly name: string
-    readonly slug: string
-  }
-  readonly user: {
-    readonly id?: number
-    readonly name: string
-    readonly email: string
-    readonly avatarUrl?: string
-  } | null
-  readonly role: string | null
-  readonly subdomain: string
-  readonly token: string | null
-  readonly isSidebarCollapsed: boolean
-  readonly toggleSidebar: () => void
-  readonly setSidebarCollapsed: (collapsed: boolean) => void
-  readonly activeRoute: string
-  readonly onNavigate?: (route: string) => void
-  readonly onLogout?: () => void
-  readonly onCopilotClick?: () => void
-  readonly onSearch?: (query: string) => void
-  readonly onInviteMemberClick?: () => void
-  readonly onAuthSuccess?: (token: string, user: any) => void
-  readonly isCreateOrgModalOpen: boolean
-  readonly openCreateOrgModal: () => void
-  readonly closeCreateOrgModal: () => void
-  readonly apiUrl?: string
-  readonly organizations?: readonly WorkspaceOrganization[]
-}
-
-export const WorkspaceShellContext = createContext<WorkspaceShellContextValue | null>(null)
-
-export function useWorkspaceShell(): WorkspaceShellContextValue {
-  const ctx = useContext(WorkspaceShellContext)
-  if (!ctx) {
-    throw new Error('useWorkspaceShell must be used within a WorkspaceShell.Provider')
-  }
-  return ctx
-}
-
 export interface WorkspaceShellProviderProps {
   readonly subdomain?: string
   readonly token?: string | null
   readonly organization?: { readonly id?: number; readonly name: string; readonly slug: string }
-  readonly user?: { readonly id?: number; readonly name: string; readonly email: string; readonly avatarUrl?: string } | null
-  readonly role?: string | null
+  readonly user?: WorkspaceShellUser | null
+  readonly role?: RoleType | null
   readonly activeView?: string
   readonly onNavigate?: (view: string) => void
   readonly onLogout?: () => void
   readonly onCopilotClick?: () => void
   readonly onSearch?: (query: string) => void
   readonly onInviteMemberClick?: () => void
-  readonly onAuthSuccess?: (token: string, user: any) => void
+  readonly onAuthSuccess?: (token: string, user: WorkspaceShellUser) => void
   readonly apiUrl?: string
   readonly organizations?: readonly WorkspaceOrganization[]
   readonly children?: React.ReactNode
@@ -135,7 +95,6 @@ export const WorkspaceShellProvider: React.FC<WorkspaceShellProviderProps> = ({
 
   // Subdomain Perimeter Access Guards
   const isUnauthenticated = shouldQueryWorkspace && (!token || queryError?.status === 401)
-
   const returnUrl = typeof window !== 'undefined' ? window.location.href : undefined
 
   const effectiveOrganization = useMemo(() => {
@@ -144,13 +103,13 @@ export const WorkspaceShellProvider: React.FC<WorkspaceShellProviderProps> = ({
     return { id: 1, name: subdomain || 'Organization', slug: subdomain || 'org' }
   }, [propOrg, workspaceData, subdomain])
 
-  const effectiveUser = useMemo(() => {
+  const effectiveUser: WorkspaceShellUser | null = useMemo(() => {
     if (propUser !== undefined) return propUser
     if (workspaceData?.user) return workspaceData.user
     return null
   }, [propUser, workspaceData])
 
-  const effectiveRole = useMemo(() => {
+  const effectiveRole: RoleType | null = useMemo(() => {
     if (propRole !== undefined) return propRole
     if (workspaceData?.role) return workspaceData.role
     return null

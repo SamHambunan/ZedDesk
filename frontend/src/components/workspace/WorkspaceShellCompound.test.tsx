@@ -378,3 +378,55 @@ describe('User Profile Popover and Sanctum Logout', () => {
     })
   })
 })
+
+describe('Review Fixes & Ergonomics', () => {
+  it('focuses search input when global ⌘K or Ctrl+K is pressed', () => {
+    render(
+      <WorkspaceHeader
+        organizationName="Acme Corp"
+        organizationSlug="acme"
+      />
+    )
+
+    const searchInput = screen.getByPlaceholderText(/search\.\.\./i)
+    expect(document.activeElement).not.toBe(searchInput)
+
+    fireEvent.keyDown(window, { key: 'k', metaKey: true })
+    expect(document.activeElement).toBe(searchInput)
+  })
+
+  it('closes switcher without triggering redirect when active tenant is clicked', () => {
+    delete (window as any).location
+    ;(window as any).location = {
+      href: 'http://acme.localhost:5173/overview',
+      hostname: 'acme.localhost',
+      port: '5173',
+      protocol: 'http:',
+      search: '',
+    }
+
+    const mockOrgs = [
+      { id: 1, name: 'Acme Corp', slug: 'acme', role: 'admin' },
+      { id: 2, name: 'Other Corp', slug: 'other', role: 'agent' },
+    ]
+
+    render(
+      <WorkspaceHeader
+        organizationName="Acme Corp"
+        organizationSlug="acme"
+        organizations={mockOrgs}
+      />
+    )
+
+    fireEvent.click(screen.getByTestId('tenant-switcher-trigger'))
+    expect(screen.getByTestId('tenant-switcher-dropdown')).toBeInTheDocument()
+
+    // Click active org (acme)
+    fireEvent.click(screen.getByTestId('tenant-option-acme'))
+
+    // Dropdown closes, href did not change
+    expect(screen.queryByTestId('tenant-switcher-dropdown')).not.toBeInTheDocument()
+    expect(window.location.href).toBe('http://acme.localhost:5173/overview')
+  })
+})
+
