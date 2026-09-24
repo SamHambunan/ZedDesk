@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useContext } from 'react'
 import {
   LayoutDashboard,
   Ticket,
@@ -13,10 +13,11 @@ import {
   PanelLeftOpen,
 } from 'lucide-react'
 import { workspaceContentData } from '../../data/mockData'
+import { WorkspaceShellContext } from './WorkspaceShell'
 
 export interface WorkspaceSidebarProps {
-  readonly organizationName: string
-  readonly organizationSlug: string
+  readonly organizationName?: string
+  readonly organizationSlug?: string
   readonly activeRoute?: string
   readonly role?: string | null
   readonly isCollapsed?: boolean
@@ -26,22 +27,32 @@ export interface WorkspaceSidebarProps {
 }
 
 export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
-  organizationName,
-  organizationSlug,
-  activeRoute = 'overview',
-  role,
-  isCollapsed = false,
-  onToggleCollapse,
-  onNavigate,
+  organizationName: propOrgName,
+  organizationSlug: propOrgSlug,
+  activeRoute: propActiveRoute,
+  role: propRole,
+  isCollapsed: propIsCollapsed,
+  onToggleCollapse: propOnToggleCollapse,
+  onNavigate: propOnNavigate,
   className = '',
 }) => {
+  const shellContext = useContext(WorkspaceShellContext)
+
+  const organizationName = propOrgName ?? shellContext?.organization?.name ?? ''
+  const organizationSlug = propOrgSlug ?? shellContext?.organization?.slug ?? ''
+  const activeRoute = propActiveRoute ?? shellContext?.activeRoute ?? 'overview'
+  const role = propRole !== undefined ? propRole : shellContext?.role
+  const isCollapsed = propIsCollapsed !== undefined ? propIsCollapsed : (shellContext?.isSidebarCollapsed ?? false)
+  const onToggleCollapse = propOnToggleCollapse ?? shellContext?.toggleSidebar
+  const onNavigate = propOnNavigate ?? shellContext?.onNavigate
+
   const isAdmin = (role || '').toLowerCase() === 'admin'
 
   const navItemClass = (isActive: boolean) =>
     `flex items-center gap-3 px-3 py-2 rounded-r transition-colors text-body-default font-body-default w-full text-left cursor-pointer border-l-2 ${
       isActive
-        ? 'bg-surface-container-high text-text-primary border-[#6366F1] font-medium'
-        : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-subpanel'
+        ? 'bg-surface-subpanel text-text-primary border-[#F59E0B] font-medium'
+        : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-subpanel/50'
     }`
 
   const handleNav = (route: string) => {
@@ -53,7 +64,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
       aria-label="Workspace Navigation"
       data-testid="workspace-nav"
       className={`bg-surface-panel border-r border-border-subtle fixed left-0 top-[64px] h-[calc(100vh-64px)] ${
-        isCollapsed ? 'w-16' : 'w-[240px]'
+        isCollapsed ? 'w-[60px]' : 'w-[240px]'
       } flex flex-col py-4 z-40 transition-all duration-200 ease-in-out select-none ${className}`}
     >
       {/* Organization Header Badge in Sidebar */}

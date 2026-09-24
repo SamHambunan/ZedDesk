@@ -1,7 +1,29 @@
-import React, { useState } from 'react'
-import { Sparkles, Search, ChevronsUpDown, Bell, LogOut, ExternalLink } from 'lucide-react'
-import { getCentralHubUrl } from '../../utils/url'
+import React, { useState, useContext, useRef, useEffect } from 'react'
+import {
+  Sparkles,
+  Search,
+  ChevronsUpDown,
+  Bell,
+  LogOut,
+  ExternalLink,
+  Check,
+  Building2,
+  Plus,
+  Layers,
+} from 'lucide-react'
+import { QueryClientContext, QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { queryClient as defaultQueryClient } from '../../lib/query-client'
+import { getCentralHubUrl, getOrganizationUrl, getApiBaseUrl } from '../../utils/url'
 import { workspaceContentData } from '../../data/mockData'
+import { WorkspaceShellContext } from './WorkspaceShell'
+
+function SafeQueryProvider({ children }: { children: React.ReactNode }) {
+  const client = useContext(QueryClientContext)
+  if (client) {
+    return <>{children}</>
+  }
+  return <QueryClientProvider client={defaultQueryClient}>{children}</QueryClientProvider>
+}
 
 export interface WorkspaceHeaderUser {
   readonly id?: number
@@ -10,33 +32,150 @@ export interface WorkspaceHeaderUser {
   readonly avatarUrl?: string
 }
 
+export interface WorkspaceOrganization {
+  readonly id?: number | string
+  readonly name: string
+  readonly slug: string
+  readonly role?: string
+}
+
 export interface WorkspaceHeaderProps {
-  readonly organizationName: string
-  readonly organizationSlug: string
+  readonly organizationName?: string
+  readonly organizationSlug?: string
   readonly user?: WorkspaceHeaderUser | null
   readonly role?: string | null
+  readonly token?: string | null
+  readonly apiUrl?: string
+  readonly organizations?: readonly WorkspaceOrganization[]
   readonly onCopilotClick?: () => void
   readonly onSearch?: (query: string) => void
   readonly onLogout?: () => void
+  readonly onSelectOrganization?: (org: WorkspaceOrganization) => void
+  readonly onNewOrganizationClick?: () => void
   readonly className?: string
 }
 
-export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
-  organizationName,
-  organizationSlug,
-  user,
-  role,
-  onCopilotClick,
-  onSearch,
-  onLogout,
+const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
+  organizationName: propOrgName,
+  organizationSlug: propOrgSlug,
+  user: propUser,
+  role: propRole,
+  token: propToken,
+  apiUrl: propApiUrl,
+  organizations: propOrganizations,
+  onCopilotClick: propOnCopilotClick,
+  onSearch: propOnSearch,
+  onLogout: propOnLogout,
+  onSelectOrganization,
+  onNewOrganizationClick: propOnNewOrgClick,
   className = '',
 }) => {
+  const shellContext = useContext(WorkspaceShellContext)
+
+  const organizationName = propOrgName ?? shellContext?.organization?.name ?? ''
+  const organizationSlug = propOrgSlug ?? shellContext?.organization?.slug ?? ''
+  const user = propUser !== undefined ? propUser : shellContext?.user
+  const role = propRole !== undefined ? propRole : shellContext?.role
+  const token = propToken ?? shellContext?.token ?? (typeof window !== 'undefined' ? localStorage.getItem('zeddesk_token') : null)
+  const resolvedApiUrl = propApiUrl ?? shellContext?.apiUrl ?? getApiBaseUrl(null)
+  const onCopilotClick = propOnCopilotClick ?? shellContext?.onCopilotClick
+  const onSearch = propOnSearch ?? shellContext?.onSearch
+  const onLogout = propOnLogout ?? shellContext?.onLogout
+  const onNewOrganizationClick = propOnNewOrgClick ?? shellContext?.openCreateOrgModal
+
   const [searchQuery, setSearchQuery] = useState('')
+  const [isSwitcherOpen, setIsSwitcherOpen] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
+
+  const switcherRef = useRef<HTMLDivElement>(null)
+  const profileRef = useRef<HTMLDivElement>(null)
+
+  // Close menus on outside click
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) {
+        setIsSwitcherOpen(false)
+      }
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setShowProfileMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
+
+  // TanStack Query to load organizations if not supplied via props or context
+  const { data: fetchedOrganizations = [] } = useQuery<WorkspaceOrganization[]>({
+    queryKey: ['organizations', token, resolvedApiUrl],
+    queryFn: async () => {
+      if (!token) return []
+      try {
+        const res = await fetch(`${resolvedApiUrl}/api/organizations`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        })
+        if (!res.ok) return []
+        return res.json()
+      } catch {
+        return []
+      }
+    },
+    enabled: Boolean(isSwitcherOpen && token && !propOrganizations && !shellContext?.organizations),
+  })
+
+  const availableOrgs: readonly WorkspaceOrganization[] =
+    propOrganizations ?? shellContext?.organizations ?? (fetchedOrganizations.length > 0 ? fetchedOrganizations : [
+      {
+        id: 1,
+        name: organizationName || 'Organization',
+        slug: organizationSlug || 'org',
+        role: role || 'admin',
+      },
+    ])
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value)
     onSearch?.(e.target.value)
+  }
+
+  const handleSelectOrg = (targetOrg: WorkspaceOrganization) => {
+    setIsSwitcherOpen(false)
+    onSelectOrganization?.(targetOrg)
+    const targetUrl = getOrganizationUrl(targetOrg.slug, token, '/overview')
+    if (typeof window !== 'undefined') {
+      window.location.href = targetUrl
+    }
+  }
+
+  const handleSignOut = async () => {
+    if (token) {
+      try {
+        await fetch(`${resolvedApiUrl}/api/logout`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        })
+      } catch {
+        // Fallback gracefully
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('zeddesk_token')
+      localStorage.removeItem('zeddesk_user')
+    }
+
+    setShowProfileMenu(false)
+
+    if (onLogout) {
+      onLogout()
+    } else if (typeof window !== 'undefined') {
+      window.location.href = getCentralHubUrl()
+    }
   }
 
   const roleLabel = role ? role.toLowerCase() : ''
@@ -44,6 +183,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
 
   return (
     <header
+      role="banner"
       className={`bg-surface-panel/90 backdrop-blur-xl border-b border-border-subtle h-[64px] flex items-center justify-between px-4 md:px-6 fixed top-0 left-0 right-0 z-50 transition-all duration-200 ${className}`}
     >
       {/* Left: ZedDesk Branding & Global Command Search */}
@@ -74,7 +214,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
         </div>
       </div>
 
-      {/* Right: Copilot Trigger, Tenant Badge, User Avatar */}
+      {/* Right: Copilot Trigger, In-Header Tenant Switcher, User Avatar */}
       <div className="flex items-center gap-3 md:gap-4">
         {/* Luminous AI Copilot Button */}
         <button
@@ -86,19 +226,124 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
           <span>{workspaceContentData.brand.copilotLabel}</span>
         </button>
 
-        {/* Tenant Switcher / Central Hub Badge */}
-        <a
-          href={getCentralHubUrl()}
-          data-testid="central-hub-link"
-          title={`Switch tenant or return to Central Hub (${organizationSlug})`}
-          className="h-[32px] px-3 bg-surface-container-low hover:bg-surface-subpanel rounded border border-border-subtle text-label-regular font-label-regular text-text-secondary flex items-center gap-1.5 transition-colors cursor-pointer"
-        >
-          <span data-testid="workspace-org-name" className="text-text-primary font-medium truncate max-w-[140px] sm:max-w-[200px]">
-            {organizationName}
-          </span>
-          <span className="text-[10px] text-text-muted hidden sm:inline">• Production</span>
-          <ChevronsUpDown className="w-3.5 h-3.5 text-text-muted shrink-0" />
-        </a>
+        {/* Interactive In-Header Tenant Switcher */}
+        <div className="relative" ref={switcherRef}>
+          <button
+            type="button"
+            data-testid="tenant-switcher-trigger"
+            aria-haspopup="listbox"
+            aria-expanded={isSwitcherOpen}
+            onClick={() => {
+              setIsSwitcherOpen((prev) => !prev)
+              setShowProfileMenu(false)
+            }}
+            title={`Switch tenant (${organizationSlug})`}
+            className="h-[32px] px-3 bg-surface-container-low hover:bg-surface-subpanel rounded border border-border-subtle text-label-regular font-label-regular text-text-secondary flex items-center gap-1.5 transition-colors cursor-pointer select-none"
+          >
+            <span
+              data-testid="workspace-org-name"
+              className="text-text-primary font-medium truncate max-w-[140px] sm:max-w-[200px]"
+            >
+              {organizationName}
+            </span>
+            <span className="text-[10px] text-text-muted hidden sm:inline">• Production</span>
+            <ChevronsUpDown className="w-3.5 h-3.5 text-text-muted shrink-0" />
+          </button>
+
+          {/* Tenant Switcher Dropdown */}
+          {isSwitcherOpen && (
+            <div
+              data-testid="tenant-switcher-dropdown"
+              role="listbox"
+              aria-label="Organizations"
+              className="absolute right-0 mt-2 w-72 bg-surface-panel border border-border-prominent rounded-lg shadow-modal p-2 z-50 animate-in fade-in duration-100"
+            >
+              <div className="px-2 py-1.5 text-label-caps text-text-muted text-[11px] font-semibold tracking-wider uppercase border-b border-border-subtle mb-1">
+                Organizations
+              </div>
+
+              <div className="max-h-60 overflow-y-auto flex flex-col gap-1 py-1">
+                {availableOrgs.map((org) => {
+                  const isActive = org.slug === organizationSlug
+                  const orgRole = (org.role || 'agent').toLowerCase()
+                  const isOrgAdmin = orgRole === 'admin'
+
+                  return (
+                    <button
+                      key={org.slug}
+                      type="button"
+                      data-testid={`tenant-option-${org.slug}`}
+                      onClick={() => handleSelectOrg(org)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded text-left text-body-compact transition-colors cursor-pointer ${
+                        isActive
+                          ? 'bg-surface-subpanel text-text-primary font-medium'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-surface-container-high'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Building2 className="w-4 h-4 text-text-muted shrink-0" />
+                        <div className="flex flex-col min-w-0">
+                          <span className="truncate font-medium text-text-primary">{org.name}</span>
+                          <span className="text-[10px] text-text-muted font-mono-data truncate">
+                            {org.slug}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold ${
+                            isOrgAdmin
+                              ? 'bg-[#8B5CF6]/15 text-[#C4B5FD] border border-[#8B5CF6]/30'
+                              : 'bg-[#282A33] text-[#94A3B8] border border-[#3B3F4D]'
+                          }`}
+                        >
+                          {orgRole}
+                        </span>
+                        {isActive && (
+                          <Check
+                            data-testid={`active-org-check-${org.slug}`}
+                            className="w-4 h-4 text-sentiment-warning shrink-0"
+                          />
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Divider */}
+              <div className="my-1.5 border-t border-border-subtle" />
+
+              {/* Action triggers */}
+              <div className="flex flex-col gap-0.5">
+                <button
+                  type="button"
+                  data-testid="new-org-trigger"
+                  onClick={() => {
+                    setIsSwitcherOpen(false)
+                    onNewOrganizationClick?.()
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded text-left text-body-compact text-accent-glow hover:bg-surface-container-high transition-colors cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 text-accent-glow" />
+                  <span className="font-medium">+ New Organization</span>
+                </button>
+
+                <a
+                  href={getCentralHubUrl()}
+                  data-testid="central-hub-link"
+                  className="w-full flex items-center justify-between px-3 py-2 rounded text-left text-body-compact text-text-secondary hover:text-text-primary hover:bg-surface-container-high transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-text-muted" />
+                    <span>Central Hub</span>
+                  </div>
+                  <ExternalLink className="w-3.5 h-3.5 text-text-muted" />
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Divider */}
         <div className="h-5 w-px bg-border-subtle hidden sm:block mx-0.5" />
@@ -113,13 +358,19 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
         </button>
 
         {/* User Info & Avatar with Online Status Dot */}
-        <div className="relative flex items-center gap-2">
+        <div className="relative flex items-center gap-2" ref={profileRef}>
           {user && (
             <div className="flex flex-col text-right pr-1">
-              <span data-testid="workspace-user-name" className="text-body-compact font-medium text-text-primary leading-tight">
+              <span
+                data-testid="workspace-user-name"
+                className="text-body-compact font-medium text-text-primary leading-tight"
+              >
                 {user.name}
               </span>
-              <span data-testid="workspace-user-email" className="text-[11px] text-text-muted leading-tight">
+              <span
+                data-testid="workspace-user-email"
+                className="text-[11px] text-text-muted leading-tight"
+              >
                 {user.email}
               </span>
             </div>
@@ -140,7 +391,11 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
 
           <button
             type="button"
-            onClick={() => setShowProfileMenu((prev) => !prev)}
+            data-testid="user-profile-trigger"
+            onClick={() => {
+              setShowProfileMenu((prev) => !prev)
+              setIsSwitcherOpen(false)
+            }}
             aria-label="User profile menu"
             className="relative w-8 h-8 rounded-full overflow-visible border border-border-subtle hover:border-accent-glow transition-colors focus:outline-none cursor-pointer"
           >
@@ -156,18 +411,21 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
             />
           </button>
 
-          {/* Profile Menu Dropdown */}
+          {/* Profile Menu Popover */}
           {showProfileMenu && (
             <div
+              data-testid="user-profile-menu"
               role="menu"
               className="absolute right-0 top-11 w-56 bg-surface-subpanel border border-border-prominent rounded-lg shadow-elevation-3 py-1.5 z-50 animate-in fade-in duration-100"
             >
               {user && (
-                <div className="px-3 py-2 border-b border-border-subtle lg:hidden">
+                <div className="px-3 py-2 border-b border-border-subtle">
                   <p className="text-body-compact font-medium text-text-primary">{user.name}</p>
                   <p className="text-[11px] text-text-muted truncate">{user.email}</p>
                   {roleLabel && (
-                    <p className="text-[10px] text-accent-glow uppercase font-mono mt-1 font-semibold">{roleLabel}</p>
+                    <p className="text-[10px] text-accent-glow uppercase font-mono mt-1 font-semibold">
+                      {roleLabel}
+                    </p>
                   )}
                 </div>
               )}
@@ -180,29 +438,24 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
                 <ExternalLink className="w-3.5 h-3.5 text-text-muted" />
               </a>
 
-              {onLogout && (
-                <button
-                  type="button"
-                  data-testid="workspace-logout-btn"
-                  onClick={() => {
-                    setShowProfileMenu(false)
-                    onLogout()
-                  }}
-                  className="w-full text-left flex items-center gap-2 px-3 py-2 text-body-compact text-sentiment-critical hover:bg-surface-container-high transition-colors cursor-pointer"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Log Out</span>
-                </button>
-              )}
+              <button
+                type="button"
+                data-testid="workspace-logout-btn"
+                onClick={handleSignOut}
+                className="w-full text-left flex items-center gap-2 px-3 py-2 text-body-compact text-sentiment-critical hover:bg-surface-container-high transition-colors cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out</span>
+              </button>
             </div>
           )}
 
-          {/* Always provide workspace-logout-btn for test harness accessibility if profile menu is closed */}
-          {onLogout && !showProfileMenu && (
+          {/* Always provide accessible logout button for test harness accessibility if profile menu is closed */}
+          {!showProfileMenu && onLogout && (
             <button
               type="button"
               data-testid="workspace-logout-btn"
-              onClick={onLogout}
+              onClick={handleSignOut}
               className="sr-only"
             >
               Log Out
@@ -211,6 +464,14 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
         </div>
       </div>
     </header>
+  )
+}
+
+export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = (props) => {
+  return (
+    <SafeQueryProvider>
+      <WorkspaceHeaderContent {...props} />
+    </SafeQueryProvider>
   )
 }
 

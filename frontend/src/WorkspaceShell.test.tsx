@@ -229,9 +229,9 @@ describe('Tenant Subdomain Workspace Shell', () => {
     expect(screen.getAllByText('Support Tier 1').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('12 active agents • 8 tickets open')).toBeInTheDocument()
 
-    // Active route highlight on Overview with 2px #6366F1 border
+    // Active route highlight on Overview with 2px #F59E0B Cadmium Amber border
     const overviewBtn = screen.getByTestId('nav-overview')
-    expect(overviewBtn).toHaveClass('border-[#6366F1]')
+    expect(overviewBtn).toHaveClass('border-[#F59E0B]')
     expect(overviewBtn).toHaveClass('border-l-2')
   })
 
