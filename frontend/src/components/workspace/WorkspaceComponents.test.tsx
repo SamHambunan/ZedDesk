@@ -52,10 +52,13 @@ describe('WorkspaceHeader Component', () => {
     fireEvent.click(copilotBtn)
     expect(handleCopilot).toHaveBeenCalledTimes(1)
 
-    // Tenant switcher link to Central Hub
-    const tenantLink = screen.getByTestId('central-hub-link')
-    expect(tenantLink).toBeInTheDocument()
+    // Tenant switcher trigger and Central Hub link
+    const tenantTrigger = screen.getByTestId('tenant-switcher-trigger')
+    expect(tenantTrigger).toBeInTheDocument()
     expect(screen.getByTestId('workspace-org-name')).toHaveTextContent('Acme Corp Support')
+
+    fireEvent.click(tenantTrigger)
+    expect(screen.getByTestId('central-hub-link')).toBeInTheDocument()
 
     // User avatar with online status indicator dot
     const onlineDot = screen.getByLabelText(/online status/i)
@@ -69,7 +72,7 @@ describe('WorkspaceHeader Component', () => {
 })
 
 describe('WorkspaceSidebar Component', () => {
-  it('renders navigation links with active 2px left indicator bar in #6366F1', () => {
+  it('renders navigation links with active 2px left indicator bar in #F59E0B', () => {
     const handleNavigate = vi.fn()
     const handleToggle = vi.fn()
 
@@ -106,8 +109,8 @@ describe('WorkspaceSidebar Component', () => {
     expect(kbNav).toBeInTheDocument()
     expect(settingsNav).toBeInTheDocument()
 
-    // Active route has 2px left indicator bar in #6366F1
-    expect(overviewNav).toHaveClass('border-[#6366F1]')
+    // Active route has 2px left indicator bar in #F59E0B
+    expect(overviewNav).toHaveClass('border-[#F59E0B]')
     expect(overviewNav).toHaveClass('border-l-2')
     expect(ticketsNav).toHaveClass('border-transparent')
 
@@ -126,7 +129,7 @@ describe('WorkspaceSidebar Component', () => {
         onToggleCollapse={handleToggle}
       />
     )
-    expect(ticketsNav).toHaveClass('border-[#6366F1]')
+    expect(ticketsNav).toHaveClass('border-[#F59E0B]')
     expect(overviewNav).toHaveClass('border-transparent')
 
     // Collapse toggle button
