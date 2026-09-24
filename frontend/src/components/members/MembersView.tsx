@@ -19,6 +19,7 @@ export interface MembersViewProps {
   readonly onInviteSubmit?: (email: string, role: 'agent' | 'admin') => Promise<void> | void
   readonly onRevokeInvite?: (id: number) => Promise<void> | void
   readonly onCopyInviteLink?: (invitation: PendingInvitation) => void
+  readonly onActionClick?: (member: Member) => void
   readonly revokingId?: number | null
   readonly copiedId?: number | null
   readonly className?: string
@@ -35,6 +36,7 @@ export const MembersView: React.FC<MembersViewProps> = ({
   onInviteSubmit,
   onRevokeInvite,
   onCopyInviteLink,
+  onActionClick,
   revokingId = null,
   copiedId = null,
   className = '',
@@ -185,6 +187,7 @@ export const MembersView: React.FC<MembersViewProps> = ({
         members={filteredMembers}
         isAdmin={effectiveIsAdmin}
         isLoading={isLoadingMembers}
+        onActionClick={onActionClick}
       />
 
       {/* Pending Invitations Section (Admins only) */}

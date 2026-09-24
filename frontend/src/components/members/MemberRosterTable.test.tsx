@@ -48,7 +48,8 @@ describe('MemberRosterTable Component', () => {
 
     const joinedCell = screen.getByTestId('member-joined-1')
     expect(joinedCell).toHaveClass('tabular-nums')
-    expect(joinedCell.className).toMatch(/font-\['JetBrains_Mono'|font-mono/)
+    expect(joinedCell.closest('td')).toHaveClass('font-mono-data')
+    expect(joinedCell.closest('td')).toHaveClass('tabular-nums')
     expect(joinedCell.closest('td')).toHaveClass('align-middle')
   })
 

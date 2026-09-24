@@ -175,7 +175,8 @@ describe('Organization Member Roster & RBAC Inspection Flow', () => {
     // JetBrains Mono tabular figures formatting for join dates with vertical alignment
     const joinDate1 = screen.getByTestId('member-joined-1')
     expect(joinDate1).toHaveClass('tabular-nums')
-    expect(joinDate1.className).toMatch(/font-\['JetBrains_Mono'|font-mono/)
+    expect(joinDate1.closest('td')).toHaveClass('font-mono-data')
+    expect(joinDate1.closest('td')).toHaveClass('tabular-nums')
     expect(joinDate1.closest('td')).toHaveClass('align-middle')
 
     // Role Badges: Admin in Amethyst Violet (#8B5CF6/15 text-[#C4B5FD])

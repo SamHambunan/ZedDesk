@@ -120,20 +120,6 @@ export const TableCaption = forwardRef<HTMLTableCaptionElement, React.HTMLAttrib
 )
 TableCaption.displayName = 'TableCaption'
 
-export const TableEmpty = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(
-        'h-40 flex items-center justify-center text-text-muted text-body-compact',
-        className
-      )}
-      {...props}
-    />
-  )
-)
-TableEmpty.displayName = 'TableEmpty'
-
 export const Table = Object.assign(TableRoot, {
   Root: TableRoot,
   Header: TableHeader,
@@ -143,5 +129,4 @@ export const Table = Object.assign(TableRoot, {
   Cell: TableCell,
   Footer: TableFooter,
   Caption: TableCaption,
-  Empty: TableEmpty,
 })

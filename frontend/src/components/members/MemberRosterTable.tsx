@@ -92,7 +92,7 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
             const isMemberAdmin = roleLower === 'admin'
             const isOnline = member.status === 'online'
             const initials = getInitials(userName)
-            const joined = member.joined_date || '2023-01-15'
+            const joined = member.joined_date || '—'
 
             return (
               <Table.Row
@@ -126,7 +126,7 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
                       {userEmail && (
                         <span
                           data-testid={`member-email-${member.id}`}
-                          className="text-[10px] text-text-muted truncate hidden sm:inline"
+                          className="text-[10px] text-text-muted truncate block"
                         >
                           {userEmail}
                         </span>
@@ -140,7 +140,6 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
                   <Badge
                     variant={isMemberAdmin ? 'admin' : 'agent'}
                     data-testid={`member-role-${member.id}`}
-                    className="h-5 px-2 font-semibold uppercase tracking-wider text-[11px]"
                   >
                     {isMemberAdmin ? 'Admin' : 'Agent'}
                   </Badge>
@@ -168,12 +167,12 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
 
                 {/* Joined Date */}
                 <Table.Cell
-                  numeric
-                  className="py-1 text-left font-mono font-['JetBrains_Mono',monospace] text-mono-data text-text-muted tabular-nums align-middle"
+                  align="left"
+                  className="py-1 font-mono-data text-mono-data text-text-muted tabular-nums align-middle"
                 >
                   <span
                     data-testid={`member-joined-${member.id}`}
-                    className="font-mono font-['JetBrains_Mono',monospace] tabular-nums"
+                    className="tabular-nums"
                   >
                     {joined}
                   </span>
