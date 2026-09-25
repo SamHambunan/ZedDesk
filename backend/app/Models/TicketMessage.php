@@ -33,6 +33,7 @@ class TicketMessage extends Model
         'body',
         'status',
         'target_status',
+        'created_at',
     ];
 
     /**

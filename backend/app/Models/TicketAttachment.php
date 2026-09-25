@@ -25,6 +25,7 @@ class TicketAttachment extends Model
         'file_path',
         'mime_type',
         'file_size',
+        'created_at',
     ];
 
     /**

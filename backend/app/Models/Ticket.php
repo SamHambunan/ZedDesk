@@ -39,6 +39,7 @@ class Ticket extends Model
         'first_replied_at',
         'resolved_at',
         'closed_at',
+        'created_at',
     ];
 
     /**
