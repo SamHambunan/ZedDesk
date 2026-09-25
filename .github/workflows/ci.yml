@@ -247,18 +247,7 @@ jobs:
           HYGIENE_STATUS="${{ needs.hygiene.result }}"
           BACKEND_STATUS="${{ needs.backend.result }}"
           FRONTEND_STATUS="${{ needs.frontend.result }}"
-          STATUS="${ROLLUP_STATUS:-}"
-          if [ -z "$STATUS" ]; then
-            if [ "$HYGIENE_STATUS" != "success" ] && [ "$HYGIENE_STATUS" != "skipped" ]; then
-              STATUS="FAILED"
-            elif [ "$BACKEND_STATUS" != "success" ] && [ "$BACKEND_STATUS" != "skipped" ]; then
-              STATUS="FAILED"
-            elif [ "$FRONTEND_STATUS" != "success" ] && [ "$FRONTEND_STATUS" != "skipped" ]; then
-              STATUS="FAILED"
-            else
-              STATUS="PASSED"
-            fi
-          fi
+          STATUS="${ROLLUP_STATUS:-FAILED}"
 
           format_icon() {
             case "$1" in

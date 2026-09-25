@@ -140,18 +140,7 @@ simulate_rollup_execution() {
 
     # Read exported ROLLUP_STATUS if available, with resilient fallback
     ROLLUP_STATUS=$(grep '^ROLLUP_STATUS=' "$GITHUB_ENV" 2>/dev/null | cut -d'=' -f2- || true)
-    STATUS="${ROLLUP_STATUS:-}"
-    if [ -z "$STATUS" ]; then
-      if [ "$HYGIENE_STATUS" != "success" ] && [ "$HYGIENE_STATUS" != "skipped" ]; then
-        STATUS="FAILED"
-      elif [ "$BACKEND_STATUS" != "success" ] && [ "$BACKEND_STATUS" != "skipped" ]; then
-        STATUS="FAILED"
-      elif [ "$FRONTEND_STATUS" != "success" ] && [ "$FRONTEND_STATUS" != "skipped" ]; then
-        STATUS="FAILED"
-      else
-        STATUS="PASSED"
-      fi
-    fi
+    STATUS="${ROLLUP_STATUS:-FAILED}"
 
     format_icon() {
       case "$1" in
