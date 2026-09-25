@@ -194,9 +194,11 @@ jobs:
           fi
 
           if [ "$FAILED" -ne 0 ]; then
+            echo "ROLLUP_STATUS=FAILED" >> "$GITHUB_ENV"
             exit 1
           fi
 
+          echo "ROLLUP_STATUS=PASSED" >> "$GITHUB_ENV"
           echo "All upstream checks completed successfully."
 
       - name: Render CI Step Summary Table
@@ -204,14 +206,7 @@ jobs:
         run: |
           HYGIENE_STATUS="${{ needs.hygiene.result }}"
           BACKEND_STATUS="${{ needs.backend.result }}"
-
-          ROLLUP_STATUS="PASSED"
-          if [ "$HYGIENE_STATUS" != "success" ] && [ "$HYGIENE_STATUS" != "skipped" ]; then
-            ROLLUP_STATUS="FAILED"
-          fi
-          if [ "$BACKEND_STATUS" != "success" ] && [ "$BACKEND_STATUS" != "skipped" ]; then
-            ROLLUP_STATUS="FAILED"
-          fi
+          STATUS="${ROLLUP_STATUS:-FAILED}"
 
           {
             echo "## CI Pipeline Status: Ready to Merge"
@@ -220,5 +215,5 @@ jobs:
             echo "| :--- | :---: | :--- |"
             echo "| PR Hygiene & Path Filtering | \`$HYGIENE_STATUS\` | Repository governance and monorepo path evaluation |"
             echo "| Backend CI (PHP 8.4 / PG / Redis) | \`$BACKEND_STATUS\` | Static quality, security audit, and test suite |"
-            echo "| **Rollup Status** | **$ROLLUP_STATUS** | Status check rollup outcome |"
+            echo "| **Rollup Status** | **$STATUS** | Status check rollup outcome |"
           } >> "$GITHUB_STEP_SUMMARY"
