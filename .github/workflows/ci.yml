@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  hygiene:
+    name: hygiene
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ github.ref == 'refs/heads/master' || steps.filter.outputs.backend == 'true' }}
+      frontend: ${{ github.ref == 'refs/heads/master' || steps.filter.outputs.frontend == 'true' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure base ref is available
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin master:refs/remotes/origin/master --depth=500 || true
+
+      - name: PR Hygiene Gate
+        if: github.event_name == 'pull_request'
+        run: |
+          bash scripts/ci/check-pr-hygiene.sh origin/master
+
+      - name: Path Filtering
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'infrastructure/**'
+              - 'docker-compose.yml'
+              - '.github/workflows/**'
+            frontend:
+              - 'frontend/**'
+              - 'infrastructure/**'
+              - 'docker-compose.yml'
+              - '.github/workflows/**'
+
+  ci-gate:
+    name: ci / ready-to-merge
+    if: always()
+    needs: [hygiene]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Upstream Pipeline Outcomes
+        run: |
+          echo "Evaluating CI rollup status..."
+          HYGIENE_STATUS="${{ needs.hygiene.result }}"
+          echo "Hygiene job status: $HYGIENE_STATUS"
+
+          if [ "$HYGIENE_STATUS" != "success" ] && [ "$HYGIENE_STATUS" != "skipped" ]; then
+            echo "::error::Hygiene gate failed with status: $HYGIENE_STATUS"
+            exit 1
+          fi
+
+          echo "All upstream checks completed successfully."
+
+      - name: Render CI Step Summary Table
+        run: |
+          {
+            echo "## CI Pipeline Status: Ready to Merge"
+            echo ""
+            echo "| Job / Phase | Status | Details |"
+            echo "| :--- | :---: | :--- |"
+            echo "| PR Hygiene & Path Filtering | \`${{ needs.hygiene.result }}\` | Repository governance and monorepo path evaluation |"
+            echo "| **Rollup Status** | **PASSED** | Clean pull request verified |"
+          } >> "$GITHUB_STEP_SUMMARY"
