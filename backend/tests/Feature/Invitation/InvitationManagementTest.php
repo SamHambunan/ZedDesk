@@ -1,11 +1,14 @@
 <?php
 
 use App\Enums\Role;
+use App\Models\Invitation;
 use App\Models\Organization;
 use App\Models\OrganizationMember;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -62,7 +65,7 @@ beforeEach(function () {
 });
 
 test('admin can create an invitation with email and role', function () {
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->postJson('http://acme.localhost/api/invitations', [
             'email' => 'newcolleague@acme.test',
             'role' => 'agent',
@@ -93,7 +96,7 @@ test('admin can create an invitation with email and role', function () {
 });
 
 test('admin can create an invitation with admin role', function () {
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->postJson('http://acme.localhost/api/invitations', [
             'email' => 'coadmin@acme.test',
             'role' => 'admin',
@@ -110,7 +113,7 @@ test('admin can create an invitation with admin role', function () {
 });
 
 test('non-admin agent cannot create an invitation and receives 403 forbidden', function () {
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->agentToken)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->agentToken)
         ->postJson('http://acme.localhost/api/invitations', [
             'email' => 'another@acme.test',
             'role' => 'agent',
@@ -120,7 +123,7 @@ test('non-admin agent cannot create an invitation and receives 403 forbidden', f
 });
 
 test('invitation creation fails when email is already an active organization member', function () {
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->postJson('http://acme.localhost/api/invitations', [
             'email' => 'agent@acme.test',
             'role' => 'agent',
@@ -131,14 +134,14 @@ test('invitation creation fails when email is already an active organization mem
 });
 
 test('invitation creation fails when a pending invitation already exists for the email', function () {
-    $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
+    $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->postJson('http://acme.localhost/api/invitations', [
             'email' => 'invitee@acme.test',
             'role' => 'agent',
         ])
         ->assertStatus(201);
 
-    $duplicateResponse = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
+    $duplicateResponse = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->postJson('http://acme.localhost/api/invitations', [
             'email' => 'invitee@acme.test',
             'role' => 'admin',
@@ -149,7 +152,7 @@ test('invitation creation fails when a pending invitation already exists for the
 });
 
 test('invitation creation validates required fields and role enum', function () {
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->postJson('http://acme.localhost/api/invitations', [
             'email' => 'not-an-email',
             'role' => 'superadmin',
@@ -160,19 +163,19 @@ test('invitation creation validates required fields and role enum', function () 
 });
 
 test('admin can list pending invitations for the organization', function () {
-    $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
+    $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->postJson('http://acme.localhost/api/invitations', [
             'email' => 'pending1@acme.test',
             'role' => 'agent',
         ]);
 
-    $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
+    $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->postJson('http://acme.localhost/api/invitations', [
             'email' => 'pending2@acme.test',
             'role' => 'admin',
         ]);
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->getJson('http://acme.localhost/api/invitations');
 
     $response->assertStatus(200)
@@ -184,14 +187,14 @@ test('admin can list pending invitations for the organization', function () {
 });
 
 test('agent cannot list invitations and receives 403 forbidden', function () {
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->agentToken)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->agentToken)
         ->getJson('http://acme.localhost/api/invitations');
 
     $response->assertStatus(403);
 });
 
 test('admin can revoke an active invitation', function () {
-    $createResponse = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
+    $createResponse = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->postJson('http://acme.localhost/api/invitations', [
             'email' => 'torevoke@acme.test',
             'role' => 'agent',
@@ -199,7 +202,7 @@ test('admin can revoke an active invitation', function () {
 
     $invitationId = $createResponse->json('invitation.id');
 
-    $revokeResponse = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
+    $revokeResponse = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->deleteJson("http://acme.localhost/api/invitations/{$invitationId}");
 
     $revokeResponse->assertStatus(200);
@@ -208,10 +211,10 @@ test('admin can revoke an active invitation', function () {
         'id' => $invitationId,
     ]);
 
-    $this->assertNotNull(\Illuminate\Support\Facades\DB::table('organization_invitations')->where('id', $invitationId)->value('revoked_at'));
+    $this->assertNotNull(DB::table('organization_invitations')->where('id', $invitationId)->value('revoked_at'));
 
     // Listing pending invitations should no longer include the revoked invitation
-    $listResponse = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
+    $listResponse = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->getJson('http://acme.localhost/api/invitations');
 
     $listResponse->assertStatus(200)
@@ -219,49 +222,49 @@ test('admin can revoke an active invitation', function () {
 });
 
 test('agent cannot revoke an invitation and receives 403 forbidden', function () {
-    $invitation = \App\Models\Invitation::create([
+    $invitation = Invitation::create([
         'organization_id' => $this->acmeOrg->id,
         'email' => 'agentrevoke@acme.test',
         'role' => Role::AGENT,
-        'token' => \Illuminate\Support\Str::random(64),
+        'token' => Str::random(64),
         'expires_at' => now()->addDays(7),
         'invited_by_user_id' => $this->adminUser->id,
     ]);
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->agentToken)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->agentToken)
         ->deleteJson("http://acme.localhost/api/invitations/{$invitation->id}");
 
     $response->assertStatus(403);
 });
 
 test('admin cannot revoke an invitation from another organization', function () {
-    $invitation = \App\Models\Invitation::create([
+    $invitation = Invitation::create([
         'organization_id' => $this->betaOrg->id,
         'email' => 'beta@invitee.test',
         'role' => Role::AGENT,
-        'token' => \Illuminate\Support\Str::random(64),
+        'token' => Str::random(64),
         'expires_at' => now()->addDays(7),
         'invited_by_user_id' => $this->otherOrgUser->id,
     ]);
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->deleteJson("http://acme.localhost/api/invitations/{$invitation->id}");
 
     $response->assertStatus(404);
 });
 
 test('admin cannot revoke an already revoked invitation', function () {
-    $invitation = \App\Models\Invitation::create([
+    $invitation = Invitation::create([
         'organization_id' => $this->acmeOrg->id,
         'email' => 'alreadyrevoked@acme.test',
         'role' => Role::AGENT,
-        'token' => \Illuminate\Support\Str::random(64),
+        'token' => Str::random(64),
         'expires_at' => now()->addDays(7),
         'invited_by_user_id' => $this->adminUser->id,
         'revoked_at' => now()->subHour(),
     ]);
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->deleteJson("http://acme.localhost/api/invitations/{$invitation->id}");
 
     $response->assertStatus(422)
@@ -271,16 +274,16 @@ test('admin cannot revoke an already revoked invitation', function () {
 });
 
 test('admin cannot revoke an expired invitation', function () {
-    $invitation = \App\Models\Invitation::create([
+    $invitation = Invitation::create([
         'organization_id' => $this->acmeOrg->id,
         'email' => 'alreadyexpired@acme.test',
         'role' => Role::AGENT,
-        'token' => \Illuminate\Support\Str::random(64),
+        'token' => Str::random(64),
         'expires_at' => now()->subDay(),
         'invited_by_user_id' => $this->adminUser->id,
     ]);
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->deleteJson("http://acme.localhost/api/invitations/{$invitation->id}");
 
     $response->assertStatus(422)
@@ -290,17 +293,17 @@ test('admin cannot revoke an expired invitation', function () {
 });
 
 test('admin cannot revoke an accepted invitation', function () {
-    $invitation = \App\Models\Invitation::create([
+    $invitation = Invitation::create([
         'organization_id' => $this->acmeOrg->id,
         'email' => 'alreadyaccepted@acme.test',
         'role' => Role::AGENT,
-        'token' => \Illuminate\Support\Str::random(64),
+        'token' => Str::random(64),
         'expires_at' => now()->addDays(7),
         'invited_by_user_id' => $this->adminUser->id,
         'accepted_at' => now()->subHour(),
     ]);
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->adminToken)
         ->deleteJson("http://acme.localhost/api/invitations/{$invitation->id}");
 
     $response->assertStatus(422)

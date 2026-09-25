@@ -54,6 +54,7 @@ class ResolveOrganization
         if (str_ends_with($host, '.localhost')) {
             $subdomain = substr($host, 0, -strlen('.localhost'));
             $parts = explode('.', $subdomain);
+
             return $parts[0] ?: null;
         }
 

@@ -1,9 +1,10 @@
 <?php
 
+use App\Models\Invitation;
 use App\Models\Organization;
-use App\Models\OrganizationMember;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -160,11 +161,11 @@ test('user invitations endpoint returns pending invitations for authenticated us
         'slug' => 'target-org',
     ]);
 
-    \App\Models\Invitation::create([
+    Invitation::create([
         'organization_id' => $org->id,
         'email' => 'member@example.com',
         'role' => 'agent',
-        'token' => \Illuminate\Support\Str::random(64),
+        'token' => Str::random(64),
         'expires_at' => now()->addDays(7),
         'invited_by_user_id' => $user->id,
     ]);
@@ -176,4 +177,3 @@ test('user invitations endpoint returns pending invitations for authenticated us
         ->assertJsonStructure(['invitations' => [['id', 'organizationName', 'role', 'token']]]);
     expect($res->json('invitations.0.organizationName'))->toBe('Target Org');
 });
-

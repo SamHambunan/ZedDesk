@@ -63,7 +63,7 @@ test('unauthenticated request to organization subdomain returns 401 unauthorized
 test('authenticated user who is not an organization member receives 403 forbidden', function () {
     $token = $this->otherUser->createToken('test-token')->plainTextToken;
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$token)
         ->getJson('http://acme.localhost/api/workspace');
 
     $response->assertStatus(403)
@@ -75,7 +75,7 @@ test('authenticated user who is not an organization member receives 403 forbidde
 test('authenticated organization member receives 200 with organization and user details and admin role', function () {
     $token = $this->acmeUser->createToken('test-token')->plainTextToken;
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$token)
         ->getJson('http://acme.localhost/api/workspace');
 
     $response->assertStatus(200)
@@ -109,7 +109,7 @@ test('authenticated organization member with agent role receives agent role in w
 
     $token = $agentUser->createToken('test-token')->plainTextToken;
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$token)
         ->getJson('http://acme.localhost/api/workspace');
 
     $response->assertStatus(200)

@@ -13,7 +13,9 @@ use App\Models\Ticket;
 use App\Models\User;
 use App\Policies\TicketPolicy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -600,7 +602,7 @@ test('compound index queries utilize indexes and perform efficiently', function 
     $records = [];
     for ($i = 0; $i < 20; $i++) {
         $records[] = [
-            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'id' => (string) Str::uuid(),
             'organization_id' => $this->acmeOrg->id,
             'customer_id' => $this->acmeCustomer->id,
             'ticket_number' => 1000 + $i,
@@ -612,7 +614,7 @@ test('compound index queries utilize indexes and perform efficiently', function 
             'updated_at' => now(),
         ];
     }
-    \Illuminate\Support\Facades\DB::table('tickets')->insert($records);
+    DB::table('tickets')->insert($records);
 
     Sanctum::actingAs($this->acmeAgentUser);
 
@@ -625,10 +627,10 @@ test('compound index queries utilize indexes and perform efficiently', function 
         ->and($elapsedMs)->toBeLessThan(2000); // Sub-2-second execution over HTTP
 
     // Verify PostgreSQL execution plan strictly utilizes the compound index
-    $explainOutput = \Illuminate\Support\Facades\DB::transaction(function () {
-        \Illuminate\Support\Facades\DB::statement('SET LOCAL enable_seqscan = off');
+    $explainOutput = DB::transaction(function () {
+        DB::statement('SET LOCAL enable_seqscan = off');
 
-        return \Illuminate\Support\Facades\DB::select(
+        return DB::select(
             'EXPLAIN SELECT * FROM tickets WHERE organization_id = ? AND status = ?',
             [$this->acmeOrg->id, 'open']
         );
