@@ -2,7 +2,7 @@ import { useEffect, useState, useContext, useMemo } from 'react'
 import { QueryClientContext, QueryClientProvider } from '@tanstack/react-query'
 import { queryClient as defaultQueryClient } from './lib/query-client'
 import { CentralHubView } from './components/hub'
-import { WorkspaceShell } from './components/workspace'
+import { WorkspaceShell, type WorkspaceShellUser } from './components/workspace'
 import { TeamsView, TeamManagementView } from './components/teams'
 import { MembersView } from './components/members'
 import { PublicInvitationView } from './components/invitations'
@@ -19,11 +19,7 @@ function SafeQueryProvider({ children }: { children: React.ReactNode }) {
   return <QueryClientProvider client={defaultQueryClient}>{children}</QueryClientProvider>
 }
 
-interface User {
-  id?: number
-  name: string
-  email: string
-}
+type User = WorkspaceShellUser
 
 interface InvitationItem {
   id: number
