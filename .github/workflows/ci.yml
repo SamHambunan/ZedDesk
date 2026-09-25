@@ -249,13 +249,69 @@ jobs:
           FRONTEND_STATUS="${{ needs.frontend.result }}"
           STATUS="${ROLLUP_STATUS:-FAILED}"
 
+          format_icon() {
+            case "$1" in
+              success) echo ":white_check_mark:" ;;
+              skipped) echo ":fast_forward:" ;;
+              failure) echo ":x:" ;;
+              cancelled) echo ":stop_sign:" ;;
+              *) echo ":question:" ;;
+            esac
+          }
+
+          HYGIENE_ICON=$(format_icon "$HYGIENE_STATUS")
+          BACKEND_ICON=$(format_icon "$BACKEND_STATUS")
+          FRONTEND_ICON=$(format_icon "$FRONTEND_STATUS")
+
+          get_details() {
+            job="$1"
+            status="$2"
+            case "$job" in
+              hygiene)
+                case "$status" in
+                  success) echo "Repository governance and monorepo path evaluation passed" ;;
+                  skipped) echo "Governance check bypassed" ;;
+                  *) echo "Governance violations or prohibited files detected" ;;
+                esac
+                ;;
+              backend)
+                case "$status" in
+                  success) echo "Static quality, security audit, and test suite passed" ;;
+                  skipped) echo "Path-filtered (no backend changes detected)" ;;
+                  *) echo "Backend quality check, linting, or test suite failed" ;;
+                esac
+                ;;
+              frontend)
+                case "$status" in
+                  success) echo "TypeScript compilation, production build, and Vitest suite passed" ;;
+                  skipped) echo "Path-filtered (no frontend changes detected)" ;;
+                  *) echo "Frontend linting, build, or test suite failed" ;;
+                esac
+                ;;
+            esac
+          }
+
+          HYGIENE_DETAILS=$(get_details "hygiene" "$HYGIENE_STATUS")
+          BACKEND_DETAILS=$(get_details "backend" "$BACKEND_STATUS")
+          FRONTEND_DETAILS=$(get_details "frontend" "$FRONTEND_STATUS")
+
+          if [ "$STATUS" = "PASSED" ]; then
+            SUMMARY_HEADER="## CI Pipeline Status: Ready to Merge :white_check_mark:"
+            ROLLUP_DETAILS="All upstream checks completed successfully or were legitimately skipped."
+            ROLLUP_BADGE=":white_check_mark: **PASSED**"
+          else
+            SUMMARY_HEADER="## CI Pipeline Status: Checks Failed :x:"
+            ROLLUP_DETAILS="One or more upstream checks failed. Resolve failures before merging."
+            ROLLUP_BADGE=":x: **FAILED**"
+          fi
+
           {
-            echo "## CI Pipeline Status: Ready to Merge"
+            echo "$SUMMARY_HEADER"
             echo ""
             echo "| Job / Phase | Status | Details |"
             echo "| :--- | :---: | :--- |"
-            echo "| PR Hygiene & Path Filtering | \`$HYGIENE_STATUS\` | Repository governance and monorepo path evaluation |"
-            echo "| Backend CI (PHP 8.4 / PG / Redis) | \`$BACKEND_STATUS\` | Static quality, security audit, and test suite |"
-            echo "| Frontend CI (Node 22 / Oxlint / Vitest) | \`$FRONTEND_STATUS\` | TypeScript compilation, production build, and test suite |"
-            echo "| **Rollup Status** | **$STATUS** | Status check rollup outcome |"
+            echo "| PR Hygiene & Path Filtering | $HYGIENE_ICON \`$HYGIENE_STATUS\` | $HYGIENE_DETAILS |"
+            echo "| Backend CI (PHP 8.4 / PG / Redis) | $BACKEND_ICON \`$BACKEND_STATUS\` | $BACKEND_DETAILS |"
+            echo "| Frontend CI (Node 22 / Oxlint / Vitest) | $FRONTEND_ICON \`$FRONTEND_STATUS\` | $FRONTEND_DETAILS |"
+            echo "| **Rollup Status** | $ROLLUP_BADGE | $ROLLUP_DETAILS |"
           } >> "$GITHUB_STEP_SUMMARY"
