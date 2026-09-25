@@ -11,8 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Invitation extends Model
 {
-    use HasFactory;
     use BelongsToOrganization;
+    use HasFactory;
 
     protected $table = 'organization_invitations';
 

@@ -17,8 +17,6 @@ class CustomerRepository
      * Handles concurrency and prevents duplicate key race conditions.
      *
      * @param  array{email: string, name: string, phone?: ?string, metadata?: ?array}  $data
-     * @param  Organization|int|null  $organization
-     * @return Customer
      *
      * @throws InvalidArgumentException|QueryException
      */

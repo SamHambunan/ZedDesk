@@ -9,15 +9,13 @@ use App\Repositories\CustomerRepository;
 class FindOrCreateCustomer
 {
     public function __construct(
-        protected CustomerRepository $customerRepository = new CustomerRepository()
+        protected CustomerRepository $customerRepository = new CustomerRepository
     ) {}
 
     /**
      * Execute the atomic find-or-create customer intake action.
      *
      * @param  array{email: string, name: string, phone?: ?string, metadata?: ?array}  $data
-     * @param  Organization|int|null  $organization
-     * @return Customer
      */
     public function execute(array $data, Organization|int|null $organization = null): Customer
     {

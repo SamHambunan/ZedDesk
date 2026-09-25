@@ -45,38 +45,175 @@ jobs:
               - 'infrastructure/**'
               - 'docker-compose.yml'
               - '.github/workflows/**'
+              - 'scripts/**'
             frontend:
               - 'frontend/**'
               - 'infrastructure/**'
               - 'docker-compose.yml'
               - '.github/workflows/**'
+              - 'scripts/**'
+
+  backend:
+    name: backend
+    needs: [hygiene]
+    if: needs.hygiene.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: zeddesk
+          POSTGRES_USER: zeddesk
+          POSTGRES_PASSWORD: zeddesk_secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U zeddesk -d zeddesk"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      APP_NAME: ZedDesk
+      APP_ENV: testing
+      APP_KEY: base64:49Dxr4bsMuVoxE7lt/tD/xsd3iCz1DhiZSsBHkZXjiM=
+      APP_DEBUG: true
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: zeddesk
+      DB_USERNAME: zeddesk
+      DB_PASSWORD: zeddesk_secret
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_pgsql, redis
+          coverage: none
+          tools: composer:v2
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        working-directory: backend
+        run: |
+          echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Prepare Environment File
+        working-directory: backend
+        run: |
+          cp .env.example .env
+          sed -i 's/DB_HOST=postgres/DB_HOST=127.0.0.1/' .env
+          sed -i 's/REDIS_HOST=redis/REDIS_HOST=127.0.0.1/' .env
+
+      - name: Install Composer Dependencies
+        working-directory: backend
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Validate Composer Manifest
+        working-directory: backend
+        run: composer validate --strict
+
+      - name: Audit Composer Dependencies
+        working-directory: backend
+        run: composer audit
+
+      - name: Verify Code Style (Laravel Pint)
+        working-directory: backend
+        run: vendor/bin/pint --test
+
+      - name: Verify Service Health
+        working-directory: backend
+        run: |
+          php -r "new PDO('pgsql:host=127.0.0.1;port=5432;dbname=zeddesk', 'zeddesk', 'zeddesk_secret');"
+          php -r "(new Redis())->connect('127.0.0.1', 6379);"
+
+      - name: Execute Backend Test Suite
+        working-directory: backend
+        run: php artisan test --bail
+
+      - name: Upload Backend Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-laravel-log
+          path: backend/storage/logs/laravel.log
+          retention-days: 7
+          if-no-files-found: ignore
 
   ci-gate:
     name: ci / ready-to-merge
     if: always()
-    needs: [hygiene]
+    needs: [hygiene, backend]
     runs-on: ubuntu-latest
     steps:
       - name: Verify Upstream Pipeline Outcomes
         run: |
           echo "Evaluating CI rollup status..."
           HYGIENE_STATUS="${{ needs.hygiene.result }}"
+          BACKEND_STATUS="${{ needs.backend.result }}"
           echo "Hygiene job status: $HYGIENE_STATUS"
+          echo "Backend job status: $BACKEND_STATUS"
 
+          FAILED=0
           if [ "$HYGIENE_STATUS" != "success" ] && [ "$HYGIENE_STATUS" != "skipped" ]; then
             echo "::error::Hygiene gate failed with status: $HYGIENE_STATUS"
+            FAILED=1
+          fi
+
+          if [ "$BACKEND_STATUS" != "success" ] && [ "$BACKEND_STATUS" != "skipped" ]; then
+            echo "::error::Backend job failed with status: $BACKEND_STATUS"
+            FAILED=1
+          fi
+
+          if [ "$FAILED" -ne 0 ]; then
+            echo "ROLLUP_STATUS=FAILED" >> "$GITHUB_ENV"
             exit 1
           fi
 
+          echo "ROLLUP_STATUS=PASSED" >> "$GITHUB_ENV"
           echo "All upstream checks completed successfully."
 
       - name: Render CI Step Summary Table
+        if: always()
         run: |
+          HYGIENE_STATUS="${{ needs.hygiene.result }}"
+          BACKEND_STATUS="${{ needs.backend.result }}"
+          STATUS="${ROLLUP_STATUS:-FAILED}"
+
           {
             echo "## CI Pipeline Status: Ready to Merge"
             echo ""
             echo "| Job / Phase | Status | Details |"
             echo "| :--- | :---: | :--- |"
-            echo "| PR Hygiene & Path Filtering | \`${{ needs.hygiene.result }}\` | Repository governance and monorepo path evaluation |"
-            echo "| **Rollup Status** | **PASSED** | Clean pull request verified |"
+            echo "| PR Hygiene & Path Filtering | \`$HYGIENE_STATUS\` | Repository governance and monorepo path evaluation |"
+            echo "| Backend CI (PHP 8.4 / PG / Redis) | \`$BACKEND_STATUS\` | Static quality, security audit, and test suite |"
+            echo "| **Rollup Status** | **$STATUS** | Status check rollup outcome |"
           } >> "$GITHUB_STEP_SUMMARY"

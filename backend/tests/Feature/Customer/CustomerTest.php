@@ -181,7 +181,7 @@ test('customer model relationships to organization and future tickets', function
 });
 
 test('repository findOrCreate creates a new customer when non-existent', function () {
-    $repo = new CustomerRepository();
+    $repo = new CustomerRepository;
 
     $customer = $repo->findOrCreate([
         'email' => 'newcustomer@example.com',
@@ -213,7 +213,7 @@ test('repository findOrCreate returns existing customer without duplication', fu
         'phone' => '111-222',
     ]);
 
-    $repo = new CustomerRepository();
+    $repo = new CustomerRepository;
 
     $found = $repo->findOrCreate([
         'email' => 'existing@example.com',
@@ -228,7 +228,7 @@ test('repository findOrCreate returns existing customer without duplication', fu
 });
 
 test('repository findOrCreate isolates customers across organizations', function () {
-    $repo = new CustomerRepository();
+    $repo = new CustomerRepository;
 
     $acmeCustomer = $repo->findOrCreate([
         'email' => 'shared_lookup@example.com',
@@ -249,7 +249,7 @@ test('repository findOrCreate isolates customers across organizations', function
 test('repository findOrCreate uses active organization context if organization not explicitly passed', function () {
     OrganizationContext::setCurrent($this->acmeOrg);
 
-    $repo = new CustomerRepository();
+    $repo = new CustomerRepository;
 
     $customer = $repo->findOrCreate([
         'email' => 'context_customer@example.com',
@@ -260,7 +260,7 @@ test('repository findOrCreate uses active organization context if organization n
 });
 
 test('action FindOrCreateCustomer executes lookup and creation atomically', function () {
-    $action = new FindOrCreateCustomer(new CustomerRepository());
+    $action = new FindOrCreateCustomer(new CustomerRepository);
 
     $customer = $action->execute([
         'email' => 'action_customer@example.com',
@@ -295,14 +295,14 @@ test('repository findByEmail retrieves customer within organization', function (
         'name' => 'Find Me',
     ]);
 
-    $repo = new CustomerRepository();
+    $repo = new CustomerRepository;
 
     expect($repo->findByEmail('find_me@example.com', $this->acmeOrg)->id)->toBe($customer->id)
         ->and($repo->findByEmail('find_me@example.com', $this->betaOrg))->toBeNull();
 });
 
 test('repository findOrCreate throws InvalidArgumentException when no organization provided or set', function () {
-    $repo = new CustomerRepository();
+    $repo = new CustomerRepository;
 
     expect(function () use ($repo) {
         $repo->findOrCreate([
@@ -313,7 +313,7 @@ test('repository findOrCreate throws InvalidArgumentException when no organizati
 });
 
 test('repository findOrCreate throws InvalidArgumentException when email is empty', function () {
-    $repo = new CustomerRepository();
+    $repo = new CustomerRepository;
 
     expect(function () use ($repo) {
         $repo->findOrCreate([
@@ -324,7 +324,7 @@ test('repository findOrCreate throws InvalidArgumentException when email is empt
 });
 
 test('repository findOrCreate throws InvalidArgumentException when name is empty', function () {
-    $repo = new CustomerRepository();
+    $repo = new CustomerRepository;
 
     expect(function () use ($repo) {
         $repo->findOrCreate([
@@ -355,13 +355,15 @@ test('action FindOrCreateCustomer recovers from unique constraint collision duri
 
     // Subclass CustomerRepository to simulate the initial findByEmail lookup returning null
     // while executing the real production findOrCreate logic (DB::transaction, create, catch, recovery)
-    $repo = new class extends CustomerRepository {
+    $repo = new class extends CustomerRepository
+    {
         public bool $simulatedRace = false;
 
         public function findByEmail(string $email, Organization|int|null $organization = null): ?Customer
         {
             if (! $this->simulatedRace) {
                 $this->simulatedRace = true;
+
                 // Return null on initial lookup to simulate two requests running findByEmail at the same millisecond
                 return null;
             }

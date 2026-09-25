@@ -7,7 +7,6 @@ use App\Models\OrganizationMember;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -233,7 +232,7 @@ test('existing user can accept invitation after authenticating, linking user to 
 
     $token = $existingUser->createToken('bob-token')->plainTextToken;
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$token)
         ->postJson('/api/invitations/bob-invite-token/accept');
 
     $response->assertStatus(200)
@@ -280,7 +279,7 @@ test('existing user acceptance fails if authenticated user email does not match 
 
     $token = $wrongUser->createToken('wrong-token')->plainTextToken;
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$token)
         ->postJson('/api/invitations/mismatch-token/accept');
 
     $response->assertStatus(403)
@@ -313,7 +312,7 @@ test('existing user acceptance fails if user is already a member of the organiza
 
     $token = $existingMember->createToken('member-token')->plainTextToken;
 
-    $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+    $response = $this->withHeader('Authorization', 'Bearer '.$token)
         ->postJson('/api/invitations/already-member-token/accept');
 
     $response->assertStatus(422)

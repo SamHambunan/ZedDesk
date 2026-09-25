@@ -4,6 +4,8 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -46,12 +48,12 @@ class User extends Authenticatable
         ];
     }
 
-    public function organizationMembers(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function organizationMembers(): HasMany
     {
         return $this->hasMany(OrganizationMember::class);
     }
 
-    public function organizations(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function organizations(): BelongsToMany
     {
         return $this->belongsToMany(Organization::class, 'organization_members')
             ->withPivot('role')
