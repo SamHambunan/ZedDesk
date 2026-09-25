@@ -168,10 +168,43 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  frontend:
+    name: frontend
+    needs: [hygiene]
+    if: needs.hygiene.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Static Code Analysis (Oxlint)
+        working-directory: frontend
+        run: npm run lint
+
+      - name: TypeScript Check & Production Build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Execute Vitest Test Suite
+        working-directory: frontend
+        run: npm run test
+
   ci-gate:
     name: ci / ready-to-merge
     if: always()
-    needs: [hygiene, backend]
+    needs: [hygiene, backend, frontend]
     runs-on: ubuntu-latest
     steps:
       - name: Verify Upstream Pipeline Outcomes
@@ -179,8 +212,10 @@ jobs:
           echo "Evaluating CI rollup status..."
           HYGIENE_STATUS="${{ needs.hygiene.result }}"
           BACKEND_STATUS="${{ needs.backend.result }}"
+          FRONTEND_STATUS="${{ needs.frontend.result }}"
           echo "Hygiene job status: $HYGIENE_STATUS"
           echo "Backend job status: $BACKEND_STATUS"
+          echo "Frontend job status: $FRONTEND_STATUS"
 
           FAILED=0
           if [ "$HYGIENE_STATUS" != "success" ] && [ "$HYGIENE_STATUS" != "skipped" ]; then
@@ -190,6 +225,11 @@ jobs:
 
           if [ "$BACKEND_STATUS" != "success" ] && [ "$BACKEND_STATUS" != "skipped" ]; then
             echo "::error::Backend job failed with status: $BACKEND_STATUS"
+            FAILED=1
+          fi
+
+          if [ "$FRONTEND_STATUS" != "success" ] && [ "$FRONTEND_STATUS" != "skipped" ]; then
+            echo "::error::Frontend job failed with status: $FRONTEND_STATUS"
             FAILED=1
           fi
 
@@ -206,6 +246,7 @@ jobs:
         run: |
           HYGIENE_STATUS="${{ needs.hygiene.result }}"
           BACKEND_STATUS="${{ needs.backend.result }}"
+          FRONTEND_STATUS="${{ needs.frontend.result }}"
           STATUS="${ROLLUP_STATUS:-FAILED}"
 
           {
@@ -215,5 +256,6 @@ jobs:
             echo "| :--- | :---: | :--- |"
             echo "| PR Hygiene & Path Filtering | \`$HYGIENE_STATUS\` | Repository governance and monorepo path evaluation |"
             echo "| Backend CI (PHP 8.4 / PG / Redis) | \`$BACKEND_STATUS\` | Static quality, security audit, and test suite |"
+            echo "| Frontend CI (Node 22 / Oxlint / Vitest) | \`$FRONTEND_STATUS\` | TypeScript compilation, production build, and test suite |"
             echo "| **Rollup Status** | **$STATUS** | Status check rollup outcome |"
           } >> "$GITHUB_STEP_SUMMARY"

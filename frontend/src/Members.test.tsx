@@ -107,7 +107,7 @@ describe('Organization Member Roster & RBAC Inspection Flow', () => {
   })
 
   function setupFetchMock(workspacePayload: typeof mockAdminWorkspace) {
-    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+    global.fetch = vi.fn().mockImplementation((url: string, _init?: RequestInit) => {
       const urlStr = String(url)
 
       if (urlStr.includes('/api/workspace')) {

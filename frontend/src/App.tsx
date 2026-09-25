@@ -20,7 +20,7 @@ function SafeQueryProvider({ children }: { children: React.ReactNode }) {
 }
 
 interface User {
-  id: number
+  id?: number
   name: string
   email: string
 }
