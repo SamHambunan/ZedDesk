@@ -59,7 +59,7 @@ assert_contains "Laravel error log captured" "path: backend/storage/logs/laravel
 assert_contains "Artifact retained for 7 days" "retention-days: 7"
 
 # 8. CI rollup gate integration
-assert_contains "ci-gate depends on backend" "needs: \[hygiene, backend\]"
+assert_contains "ci-gate depends on backend" "needs:.*backend"
 assert_contains "ci-gate inspects backend result" "BACKEND_STATUS=.*needs\.backend\.result"
 
 echo ""

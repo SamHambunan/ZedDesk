@@ -11,7 +11,7 @@ export interface PublicInvitationData {
 }
 
 export interface AuthenticatedUser {
-  readonly id: number
+  readonly id?: number
   readonly name: string
   readonly email: string
 }
