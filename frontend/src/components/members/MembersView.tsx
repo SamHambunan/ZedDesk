@@ -58,12 +58,6 @@ export const MembersView: React.FC<MembersViewProps> = ({
 
   const effectiveCopiedId = copiedId ?? internalCopiedId
 
-  useEffect(() => {
-    setOptimisticRemovedIds((prev) =>
-      prev.filter((id) => pendingInvitations.some((inv) => inv.id === id))
-    )
-  }, [pendingInvitations])
-
   const displayedInvitations = useMemo(() => {
     return pendingInvitations.filter((inv) => !optimisticRemovedIds.includes(inv.id))
   }, [pendingInvitations, optimisticRemovedIds])

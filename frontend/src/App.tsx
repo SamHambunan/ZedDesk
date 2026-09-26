@@ -880,8 +880,6 @@ function AppInner({
             onInviteSubmit={(email, role) => handleSendInvite(email, role)}
             onRevokeInvite={handleRevokeInvite}
             onCopyInviteLink={(inv) => {
-              const link = `${getCentralHubUrl()}/invitations/${inv.token}`
-              navigator.clipboard?.writeText?.(link)
               setCopiedId(inv.id)
               setTimeout(() => setCopiedId(null), 2000)
             }}

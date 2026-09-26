@@ -169,20 +169,11 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
             variant="amber"
             size="compact"
             data-testid="invite-submit-btn"
-            disabled={isSubmitting}
-            className="gap-1.5"
+            isLoading={isSubmitting}
+            leftIcon={!isSubmitting ? <UserPlus className="w-3.5 h-3.5" /> : undefined}
+            className="gap-1.5 font-semibold"
           >
-            {isSubmitting ? (
-              <>
-                <div className="w-3.5 h-3.5 rounded-full border-2 border-[#0F1012] border-t-transparent animate-spin" />
-                <span>Sending...</span>
-              </>
-            ) : (
-              <>
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>Send Invitation</span>
-              </>
-            )}
+            {isSubmitting ? 'Sending...' : 'Send Invitation'}
           </Button>
         </Modal.Footer>
       </form>
