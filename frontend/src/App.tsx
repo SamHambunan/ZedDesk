@@ -253,7 +253,7 @@ function AppInner({
       .then(async (res) => {
         if (!cancelled && res.ok) {
           const data = await res.json()
-          setWorkspaceInvitations(data.invitations || [])
+          setWorkspaceInvitations([...(data.invitations || [])])
         }
       })
       .catch(() => {
@@ -306,12 +306,10 @@ function AppInner({
 
       setInviteSuccess('Invitation created successfully.')
       if (data.invitation) {
-        setWorkspaceInvitations((prev) => {
-          if (prev.some((item) => item.id === data.invitation.id)) {
-            return prev
-          }
-          return [data.invitation, ...prev]
-        })
+        setWorkspaceInvitations((prev) => [
+          data.invitation,
+          ...prev.filter((item) => item.id !== data.invitation.id),
+        ])
       }
     } catch {
       setInviteError('Network error creating invitation.')
@@ -320,6 +318,9 @@ function AppInner({
 
   const handleRevokeInvite = async (id: number) => {
     setRevokingId(id)
+    const previous = workspaceInvitations
+    // Optimistic cache update
+    setWorkspaceInvitations((prev) => prev.filter((inv) => inv.id !== id))
     try {
       const res = await fetch(`${apiUrl}/api/invitations/${id}`, {
         method: 'DELETE',
@@ -329,11 +330,13 @@ function AppInner({
         },
       })
 
-      if (res.ok) {
-        setWorkspaceInvitations((prev) => prev.filter((inv) => inv.id !== id))
+      if (!res.ok) {
+        setWorkspaceInvitations(previous)
+      } else {
+        defaultQueryClient.invalidateQueries({ queryKey: ['invitations'] })
       }
     } catch {
-      // Ignored
+      setWorkspaceInvitations(previous)
     } finally {
       setRevokingId(null)
     }

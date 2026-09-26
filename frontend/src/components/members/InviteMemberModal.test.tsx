@@ -25,9 +25,19 @@ describe('InviteMemberModal Component', () => {
 
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByText('Invite Organization Member')).toBeInTheDocument()
+    expect(screen.getByText('Send an onboarding invitation link with role-based permissions.')).toBeInTheDocument()
     expect(screen.getByTestId('invite-email-input')).toBeInTheDocument()
-    expect(screen.getByTestId('invite-role-select')).toHaveValue('agent')
-    expect(screen.getByTestId('invite-submit-btn')).toHaveTextContent(/send invitation/i)
+    const roleSelect = screen.getByTestId('invite-role-select')
+    expect(roleSelect).toHaveValue('agent')
+    expect(roleSelect.querySelectorAll('option')).toHaveLength(2)
+    expect(screen.getByRole('option', { name: /agent/i })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /admin/i })).toBeInTheDocument()
+
+    const submitBtn = screen.getByTestId('invite-submit-btn')
+    expect(submitBtn).toHaveTextContent(/send invitation/i)
+    // Cadmium Amber button styling
+    expect(submitBtn.className).toContain('bg-[#F59E0B]')
+    expect(submitBtn.className).toContain('text-[#0F1012]')
   })
 
   it('prevents submission and displays error for empty or invalid email', async () => {
