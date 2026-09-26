@@ -23,6 +23,11 @@ describe('Button Primitive', () => {
     button = screen.getByRole('button', { name: 'Ghost Option' })
     expect(button.className).toContain('bg-transparent')
     expect(button.className).toContain('text-on-surface-variant')
+
+    rerender(<Button variant="amber">Cadmium Amber</Button>)
+    button = screen.getByRole('button', { name: 'Cadmium Amber' })
+    expect(button.className).toContain('bg-[#F59E0B]')
+    expect(button.className).toContain('text-[#0F1012]')
   })
 
   it('renders AI action variant with sparkle icon prefix', () => {

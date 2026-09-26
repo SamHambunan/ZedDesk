@@ -1,11 +1,13 @@
-import React, { useState, useMemo, useContext } from 'react'
+import React, { useState, useMemo, useContext, useEffect } from 'react'
 import { Plus, Search, Filter } from 'lucide-react'
 import { Button } from '../ui/Button'
+import { Toast } from '../ui/Toast'
 import { MemberRosterTable } from './MemberRosterTable'
 import { PendingInvitationsTable } from './PendingInvitationsTable'
 import { InviteMemberModal } from './InviteMemberModal'
 import { membersContentData } from '../../data/mockData'
 import { WorkspaceShellContext } from '../workspace/WorkspaceShellContext'
+import { getCentralHubUrl } from '../../utils/url'
 import type { Member, PendingInvitation } from './types'
 
 export interface MembersViewProps {
@@ -50,6 +52,15 @@ export const MembersView: React.FC<MembersViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedRole, setSelectedRole] = useState<'all' | 'admin' | 'agent'>('all')
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
+  const [internalCopiedId, setInternalCopiedId] = useState<number | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [optimisticRemovedIds, setOptimisticRemovedIds] = useState<number[]>([])
+
+  const effectiveCopiedId = copiedId ?? internalCopiedId
+
+  const displayedInvitations = useMemo(() => {
+    return pendingInvitations.filter((inv) => !optimisticRemovedIds.includes(inv.id))
+  }, [pendingInvitations, optimisticRemovedIds])
 
   // Filtered members based on search query and role filter
   const filteredMembers = useMemo(() => {
@@ -75,9 +86,9 @@ export const MembersView: React.FC<MembersViewProps> = ({
     const memberEmails = members
       .map((m) => m.user?.email)
       .filter((e): e is string => Boolean(e))
-    const inviteEmails = pendingInvitations.map((i) => i.email)
+    const inviteEmails = displayedInvitations.map((i) => i.email)
     return [...memberEmails, ...inviteEmails]
-  }, [members, pendingInvitations])
+  }, [members, displayedInvitations])
 
   const handleOpenInviteModal = () => {
     setIsInviteModalOpen(true)
@@ -90,6 +101,31 @@ export const MembersView: React.FC<MembersViewProps> = ({
   const handleInviteSubmit = async (email: string, role: 'agent' | 'admin') => {
     if (onInviteSubmit) {
       await onInviteSubmit(email, role)
+    }
+  }
+
+  const handleCopyLink = (invitation: PendingInvitation) => {
+    const fullUrl = `${getCentralHubUrl()}/invitations/${invitation.token}`
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(fullUrl).catch(() => {})
+    }
+    setInternalCopiedId(invitation.id)
+    setTimeout(() => {
+      setInternalCopiedId((curr) => (curr === invitation.id ? null : curr))
+    }, 2000)
+
+    setToastMessage(`Invitation link copied for ${invitation.email}`)
+    onCopyInviteLink?.(invitation)
+  }
+
+  const handleRevoke = async (id: number) => {
+    setOptimisticRemovedIds((prev) => [...prev, id])
+    try {
+      if (onRevokeInvite) {
+        await onRevokeInvite(id)
+      }
+    } catch {
+      setOptimisticRemovedIds((prev) => prev.filter((item) => item !== id))
     }
   }
 
@@ -115,13 +151,13 @@ export const MembersView: React.FC<MembersViewProps> = ({
         {effectiveIsAdmin && (
           <Button
             type="button"
-            variant="primary"
+            variant="amber"
             size="compact"
             data-testid="invite-member-btn"
             onClick={handleOpenInviteModal}
             className="self-start gap-2 shadow-keylight-primary"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 text-[#0F1012]" />
             <span>{membersContentData.inviteMemberBtn}</span>
           </Button>
         )}
@@ -176,7 +212,7 @@ export const MembersView: React.FC<MembersViewProps> = ({
           <span>{membersContentData.activeMembersLabel}</span>
           <span className="mx-1">•</span>
           <span className="text-sentiment-warning font-semibold">
-            {pendingInvitations.length}
+            {displayedInvitations.length}
           </span>{' '}
           <span>{membersContentData.pendingInvitesLabel}</span>
         </div>
@@ -193,12 +229,13 @@ export const MembersView: React.FC<MembersViewProps> = ({
       {/* Pending Invitations Section (Admins only) */}
       {effectiveIsAdmin && (
         <PendingInvitationsTable
-          invitations={pendingInvitations}
+          invitations={displayedInvitations}
+          isAdmin={effectiveIsAdmin}
           isLoading={isLoadingInvitations}
           revokingId={revokingId}
-          copiedId={copiedId}
-          onCopyLink={onCopyInviteLink}
-          onRevoke={onRevokeInvite}
+          copiedId={effectiveCopiedId}
+          onCopyLink={handleCopyLink}
+          onRevoke={handleRevoke}
         />
       )}
 
@@ -213,6 +250,13 @@ export const MembersView: React.FC<MembersViewProps> = ({
           success={inviteSuccess}
         />
       )}
+
+      {/* Tactical Toast Notification */}
+      <Toast
+        open={Boolean(toastMessage)}
+        onClose={() => setToastMessage(null)}
+        message={toastMessage || ''}
+      />
     </div>
   )
 }
