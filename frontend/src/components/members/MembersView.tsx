@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useContext, useEffect } from 'react'
+import React, { useState, useMemo, useContext } from 'react'
 import { Plus, Search, Filter } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Toast } from '../ui/Toast'
