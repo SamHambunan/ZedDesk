@@ -2,7 +2,7 @@ import React, { forwardRef } from 'react'
 import { Sparkles, Loader2 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'ai' | 'danger'
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'ai' | 'danger' | 'amber'
 export type ButtonSize = 'compact' | 'standard' | 'lg' | 'icon'
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -44,6 +44,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         'bg-gradient-to-b from-accent-indigo-glow to-primary-container hover:brightness-110 text-white border border-secondary/40 shadow-keylight-primary',
       danger:
         'bg-sentiment-negative hover:bg-rose-600 text-white shadow-keylight-primary border border-transparent',
+      amber:
+        'bg-[#F59E0B] hover:bg-[#D97706] active:bg-[#B45309] text-[#0F1012] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] border border-transparent',
     }
 
     const sizeStyles: Record<ButtonSize, string> = {

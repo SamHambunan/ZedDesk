@@ -14,6 +14,7 @@ import type { PendingInvitation } from './types'
 
 export interface PendingInvitationsTableProps {
   readonly invitations: readonly PendingInvitation[]
+  readonly isAdmin?: boolean
   readonly isLoading?: boolean
   readonly revokingId?: number | null
   readonly copiedId?: number | null
@@ -51,6 +52,7 @@ function formatExpiresIn(expiresAtIso: string): string {
 
 export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = ({
   invitations,
+  isAdmin = true,
   isLoading = false,
   revokingId = null,
   copiedId = null,
@@ -117,17 +119,17 @@ export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = (
                 <TableHead className="w-[12%] text-label-caps font-label-caps text-text-muted uppercase">
                   {membersContentData.pendingSection.columns.invitationLink}
                 </TableHead>
-                <TableHead align="center" className="w-[8%] text-label-caps font-label-caps text-text-muted uppercase">
-                  {membersContentData.pendingSection.columns.action}
-                </TableHead>
+                {isAdmin && (
+                  <TableHead align="center" className="w-[8%] text-label-caps font-label-caps text-text-muted uppercase">
+                    {membersContentData.pendingSection.columns.action}
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {invitations.map((inv) => {
                 const isRevoking = revokingId === inv.id
                 const isCopied = copiedId === inv.id
-                const roleCapitalized =
-                  (inv.role || 'agent').charAt(0).toUpperCase() + (inv.role || 'agent').slice(1).toLowerCase()
                 const inviterName = inv.invited_by?.name || 'System'
                 const expiresFormatted = formatExpiresIn(inv.expires_at)
                 const createdFormatted = inv.created_at ? inv.created_at.slice(0, 10) : 'Recent'
@@ -154,11 +156,15 @@ export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = (
                       </div>
                     </TableCell>
 
-                    {/* Assigned Role */}
+                    {/* Assigned Role Badge */}
                     <TableCell className="py-1">
-                      <span className="font-label-regular text-label-regular text-text-primary capitalize">
-                        {roleCapitalized}
-                      </span>
+                      <Badge
+                        variant={inv.role === 'admin' ? 'admin' : 'agent'}
+                        data-testid={`invitation-role-${inv.id}`}
+                        className="capitalize"
+                      >
+                        {inv.role || 'agent'}
+                      </Badge>
                     </TableCell>
 
                     {/* Invited By */}
@@ -182,7 +188,7 @@ export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = (
                     <TableCell numeric className="py-1 text-left">
                       <div className="font-mono-data text-mono-data text-text-muted tabular-nums flex items-center gap-1.5">
                         <div className="w-1.5 h-1.5 rounded-full bg-sentiment-warning shadow-[0_0_4px_rgba(245,158,11,0.5)]" />
-                        <span>{expiresFormatted}</span>
+                        <span data-testid={`invitation-expires-${inv.id}`}>{expiresFormatted}</span>
                       </div>
                     </TableCell>
 
@@ -213,22 +219,24 @@ export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = (
                     </TableCell>
 
                     {/* Revoke Action */}
-                    <TableCell align="center" className="py-1">
-                      <button
-                        type="button"
-                        data-testid={`revoke-invitation-btn-${inv.id}`}
-                        disabled={isRevoking}
-                        onClick={() => onRevoke?.(inv.id)}
-                        className="inline-flex items-center gap-1 text-sentiment-critical hover:text-red-400 font-label-caps text-[11px] uppercase tracking-wider transition-colors p-1 disabled:opacity-50 cursor-pointer"
-                      >
-                        <Trash2 className="w-3 h-3 sm:hidden" />
-                        <span className="hidden sm:inline">
-                          {isRevoking
-                            ? membersContentData.pendingSection.revoking
-                            : membersContentData.pendingSection.revoke}
-                        </span>
-                      </button>
-                    </TableCell>
+                    {isAdmin && (
+                      <TableCell align="center" className="py-1">
+                        <button
+                          type="button"
+                          data-testid={`revoke-invitation-btn-${inv.id}`}
+                          disabled={isRevoking}
+                          onClick={() => onRevoke?.(inv.id)}
+                          className="inline-flex items-center gap-1 text-sentiment-critical hover:text-red-400 font-label-caps text-[11px] uppercase tracking-wider transition-colors p-1 disabled:opacity-50 cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3 sm:hidden" />
+                          <span className="hidden sm:inline">
+                            {isRevoking
+                              ? membersContentData.pendingSection.revoking
+                              : membersContentData.pendingSection.revoke}
+                          </span>
+                        </button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 )
               })}

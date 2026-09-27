@@ -212,4 +212,84 @@ describe('MembersView Component', () => {
     expect(screen.getByTestId('pending-invitations-section')).toBeInTheDocument()
     expect(screen.getByTestId('member-actions-btn-1')).toBeInTheDocument()
   })
+
+  it('renders "+ Invite Member" action button in Cadmium Amber styling', () => {
+    render(
+      <MembersView
+        members={mockMembers}
+        pendingInvitations={mockInvitations}
+        isAdmin={true}
+      />
+    )
+
+    const inviteBtn = screen.getByTestId('invite-member-btn')
+    expect(inviteBtn).toBeInTheDocument()
+    expect(inviteBtn.className).toContain('bg-[#F59E0B]')
+    expect(inviteBtn.className).toContain('text-[#0F1012]')
+  })
+
+  it('copies full invitation link to clipboard and triggers a bottom-right tactical toast', async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    })
+
+    const onCopyMock = vi.fn()
+    render(
+      <MembersView
+        members={mockMembers}
+        pendingInvitations={mockInvitations}
+        isAdmin={true}
+        onCopyInviteLink={onCopyMock}
+      />
+    )
+
+    const copyBtn = screen.getByTestId('copy-invitation-link-101')
+    fireEvent.click(copyBtn)
+
+    expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining('/invitations/tok-101'))
+    expect(onCopyMock).toHaveBeenCalledWith(mockInvitations[0])
+
+    // Tactical toast confirmation
+    const toast = screen.getByTestId('tactical-toast')
+    expect(toast).toBeInTheDocument()
+    expect(toast).toHaveTextContent(/invitation link copied for pending@acme.corp/i)
+    expect(toast.className).toContain('fixed')
+    expect(toast.className).toContain('bottom-5')
+    expect(toast.className).toContain('right-5')
+  })
+
+  it('optimistically removes invitation record upon revocation', async () => {
+    let resolveRevoke: () => void = () => {}
+    const onRevokePromise = new Promise<void>((resolve) => {
+      resolveRevoke = resolve
+    })
+    const onRevokeMock = vi.fn().mockReturnValue(onRevokePromise)
+
+    render(
+      <MembersView
+        members={mockMembers}
+        pendingInvitations={mockInvitations}
+        isAdmin={true}
+        onRevokeInvite={onRevokeMock}
+      />
+    )
+
+    expect(screen.getByTestId('invitation-row-101')).toBeInTheDocument()
+
+    // Trigger revocation
+    const revokeBtn = screen.getByTestId('revoke-invitation-btn-101')
+    fireEvent.click(revokeBtn)
+
+    expect(onRevokeMock).toHaveBeenCalledWith(101)
+
+    // Optimistically removed immediately from DOM before async resolution
+    expect(screen.queryByTestId('invitation-row-101')).not.toBeInTheDocument()
+    expect(screen.getByTestId('pending-invitations-empty')).toBeInTheDocument()
+
+    // Resolve revocation
+    resolveRevoke()
+  })
 })

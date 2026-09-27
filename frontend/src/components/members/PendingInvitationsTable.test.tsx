@@ -110,4 +110,11 @@ describe('PendingInvitationsTable Component', () => {
     expect(screen.getByTestId('pending-invitations-empty')).toBeInTheDocument()
     expect(screen.getByText(/no pending invitations/i)).toBeInTheDocument()
   })
+
+  it('omits revocation action button and header when isAdmin is false', () => {
+    render(<PendingInvitationsTable invitations={mockInvitations} isAdmin={false} />)
+    expect(screen.queryByTestId('revoke-invitation-btn-11')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('revoke-invitation-btn-12')).not.toBeInTheDocument()
+    expect(screen.queryByText(/revoke/i)).not.toBeInTheDocument()
+  })
 })
