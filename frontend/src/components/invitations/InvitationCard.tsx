@@ -28,6 +28,7 @@ export function getInviterDisplayName(invitation?: PublicInvitationData | null):
 export interface InvitationCardRootProps extends React.HTMLAttributes<HTMLDivElement> {
   readonly children: React.ReactNode
   readonly className?: string
+  readonly 'data-testid'?: string
 }
 
 export const InvitationCardRoot: React.FC<InvitationCardRootProps> = ({
@@ -423,6 +424,7 @@ export interface InvitationCardProps {
   readonly onLogout?: () => Promise<void> | void
   readonly onGoToWorkspace?: (slug: string) => void
   readonly className?: string
+  readonly 'data-testid'?: string
 }
 
 export const InvitationCardComponent: React.FC<InvitationCardProps> = ({
