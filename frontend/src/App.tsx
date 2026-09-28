@@ -571,19 +571,28 @@ function AppInner({
 
       if (res.ok) {
         setTeams((prev) => prev.filter((t) => t.id !== teamId))
+        defaultQueryClient.invalidateQueries({ queryKey: ['teams'] })
+        defaultQueryClient.invalidateQueries({ queryKey: ['workspace'] })
       } else {
         const data = await res.json()
-        setTeamActionError((prev) => ({ ...prev, [teamId]: extractErrorMessage(data, 'Failed to delete team.') }))
+        const errMsg = extractErrorMessage(data, 'Failed to delete team.')
+        setTeamActionError((prev) => ({ ...prev, [teamId]: errMsg }))
+        throw new Error(errMsg)
       }
-    } catch {
-      setTeamActionError((prev) => ({ ...prev, [teamId]: 'Network error deleting team.' }))
+    } catch (err) {
+      if (err instanceof Error && err.message) {
+        setTeamActionError((prev) => ({ ...prev, [teamId]: err.message }))
+      } else {
+        setTeamActionError((prev) => ({ ...prev, [teamId]: 'Network error deleting team.' }))
+      }
+      throw err
     } finally {
       setDeletingTeamId(null)
     }
   }
 
-  const handleAddMemberToTeam = async (teamId: number) => {
-    const selectedOrgMemberId = selectedMemberToAdd[teamId]
+  const handleAddMemberToTeam = async (teamId: number, memberId?: number) => {
+    const selectedOrgMemberId = memberId !== undefined ? String(memberId) : selectedMemberToAdd[teamId]
     if (!selectedOrgMemberId) return
 
     setAddingMemberTeamId(teamId)
@@ -604,18 +613,26 @@ function AppInner({
 
       const data = await res.json()
       if (!res.ok) {
-        setTeamActionError((prev) => ({ ...prev, [teamId]: extractErrorMessage(data, 'Failed to add member.') }))
-        return
+        const errMsg = extractErrorMessage(data, 'Failed to add member.')
+        setTeamActionError((prev) => ({ ...prev, [teamId]: errMsg }))
+        throw new Error(errMsg)
       }
 
       setSelectedMemberToAdd((prev) => ({ ...prev, [teamId]: '' }))
+      defaultQueryClient.invalidateQueries({ queryKey: ['teams'] })
+      defaultQueryClient.invalidateQueries({ queryKey: ['workspace'] })
       if (data.team) {
         setTeams((prev) => prev.map((t) => (t.id === teamId ? data.team : t)))
       } else {
         loadTeams()
       }
-    } catch {
-      setTeamActionError((prev) => ({ ...prev, [teamId]: 'Network error adding member.' }))
+    } catch (err) {
+      if (err instanceof Error && err.message) {
+        setTeamActionError((prev) => ({ ...prev, [teamId]: err.message }))
+      } else {
+        setTeamActionError((prev) => ({ ...prev, [teamId]: 'Network error adding member.' }))
+      }
+      throw err
     } finally {
       setAddingMemberTeamId(null)
     }
@@ -625,6 +642,16 @@ function AppInner({
     const key = `${teamId}-${memberId}`
     setRemovingMemberKey(key)
     setTeamActionError((prev) => ({ ...prev, [teamId]: null }))
+
+    const previousTeams = teams
+    // Optimistic detachment
+    setTeams((prev) =>
+      prev.map((t) =>
+        t.id === teamId
+          ? { ...t, members: (t.members || []).filter((m) => m.id !== memberId) }
+          : t
+      )
+    )
 
     try {
       const res = await fetch(`${apiUrl}/api/teams/${teamId}/members/${memberId}`, {
@@ -637,17 +664,25 @@ function AppInner({
 
       const data = await res.json()
       if (!res.ok) {
-        setTeamActionError((prev) => ({ ...prev, [teamId]: extractErrorMessage(data, 'Failed to remove member.') }))
-        return
+        setTeams(previousTeams)
+        const errMsg = extractErrorMessage(data, 'Failed to remove member.')
+        setTeamActionError((prev) => ({ ...prev, [teamId]: errMsg }))
+        throw new Error(errMsg)
       }
 
+      defaultQueryClient.invalidateQueries({ queryKey: ['teams'] })
+      defaultQueryClient.invalidateQueries({ queryKey: ['workspace'] })
       if (data.team) {
         setTeams((prev) => prev.map((t) => (t.id === teamId ? data.team : t)))
-      } else {
-        loadTeams()
       }
-    } catch {
-      setTeamActionError((prev) => ({ ...prev, [teamId]: 'Network error removing member.' }))
+    } catch (err) {
+      setTeams(previousTeams)
+      if (err instanceof Error && err.message) {
+        setTeamActionError((prev) => ({ ...prev, [teamId]: err.message }))
+      } else {
+        setTeamActionError((prev) => ({ ...prev, [teamId]: 'Network error removing member.' }))
+      }
+      throw err
     } finally {
       setRemovingMemberKey(null)
     }
@@ -930,6 +965,7 @@ function AppInner({
                   setSelectedMemberToAdd((prev) => ({ ...prev, [teamId]: value }))
                 }
                 onAddMember={handleAddMemberToTeam}
+                onAssignMember={(teamId, memberId) => handleAddMemberToTeam(teamId, memberId)}
                 onRemoveMember={handleRemoveMemberFromTeam}
               />
             )}

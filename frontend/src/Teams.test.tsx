@@ -429,4 +429,220 @@ describe('Workspace Teams and Member Assignment', () => {
       expect(screen.getByTestId('team-description-2')).toHaveTextContent('Enterprise client onboarding')
     })
   }, 15000)
+
+  it('allows admin on /teams view to manage member assignments via compound modal, remove members optimistically, and delete teams with member validation', async () => {
+    const user = userEvent.setup()
+    window.location.hostname = 'acme.localhost'
+    localStorage.setItem('zeddesk_token', 'mock-admin-token')
+
+    let mockTeams = [
+      {
+        id: 1,
+        organization_id: 1,
+        name: 'General Support',
+        description: 'Default customer support team',
+        created_at: '2026-09-05T12:00:00.000000Z',
+        members: [
+          {
+            id: 10,
+            organization_id: 1,
+            user_id: 1,
+            role: 'admin',
+            user: { id: 1, name: 'Alice Admin', email: 'alice@acme.test' },
+          },
+        ],
+      },
+      {
+        id: 2,
+        organization_id: 1,
+        name: 'Empty Team',
+        description: 'No active members',
+        created_at: '2026-09-05T12:30:00.000000Z',
+        members: [],
+      },
+    ]
+
+    const mockOrgMembers = [
+      {
+        id: 10,
+        organization_id: 1,
+        user_id: 1,
+        role: 'admin',
+        user: { id: 1, name: 'Alice Admin', email: 'alice@acme.test' },
+      },
+      {
+        id: 20,
+        organization_id: 1,
+        user_id: 2,
+        role: 'agent',
+        user: { id: 2, name: 'Bob Agent', email: 'bob@acme.test' },
+      },
+      {
+        id: 30,
+        organization_id: 1,
+        user_id: 3,
+        role: 'agent',
+        user: { id: 3, name: 'Charlie Rep', email: 'charlie@acme.test' },
+      },
+    ]
+
+    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes('/api/workspace')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            organization: { id: 1, name: 'Acme Corporation', slug: 'acme' },
+            user: { id: 1, name: 'Alice Admin', email: 'alice@acme.test' },
+            role: 'admin',
+          }),
+        } as Response)
+      }
+
+      if (url.includes('/api/members')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ members: mockOrgMembers }),
+        } as Response)
+      }
+
+      // GET /api/teams
+      if (url.endsWith('/api/teams') && (!init || init.method === 'GET')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ teams: mockTeams }),
+        } as Response)
+      }
+
+      // POST /api/teams/1/members (assign member)
+      if (url.includes('/api/teams/1/members') && init?.method === 'POST') {
+        const body = JSON.parse(init.body as string)
+        const memberToAdd = mockOrgMembers.find((m) => m.id === body.organization_member_id)
+        const targetTeam = mockTeams.find((t) => t.id === 1)
+        if (targetTeam && memberToAdd) {
+          targetTeam.members.push(memberToAdd)
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => ({ message: 'Member added to team successfully.', team: targetTeam }),
+        } as Response)
+      }
+
+      // DELETE /api/teams/1/members/20 (remove member)
+      if (url.includes('/api/teams/1/members/20') && init?.method === 'DELETE') {
+        const targetTeam = mockTeams.find((t) => t.id === 1)
+        if (targetTeam) {
+          targetTeam.members = targetTeam.members.filter((m) => m.id !== 20)
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ message: 'Member removed from team successfully.', team: targetTeam }),
+        } as Response)
+      }
+
+      // DELETE /api/teams/2 (delete team)
+      if (url.includes('/api/teams/2') && init?.method === 'DELETE') {
+        mockTeams = mockTeams.filter((t) => t.id !== 2)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ message: 'Team deleted successfully.' }),
+        } as Response)
+      }
+
+      return Promise.reject(new Error(`Unhandled URL: ${url}`))
+    })
+
+    render(<App hostname="acme.localhost" />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('workspace-org-name')).toHaveTextContent('Acme Corporation')
+    })
+
+    // Navigate to /teams
+    const teamsNav = screen.getByTestId('nav-teams')
+    await user.click(teamsNav)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('teams-view')).toBeInTheDocument()
+      expect(screen.getByTestId('team-name-1')).toHaveTextContent('General Support')
+      expect(screen.getByTestId('team-name-2')).toHaveTextContent('Empty Team')
+      expect(screen.getByTestId('team-agent-count-1')).toHaveTextContent('1')
+      expect(screen.getByTestId('team-agent-count-2')).toHaveTextContent('0')
+    })
+
+    // 1. Assign Member via Compound Modal
+    const assignBtn = screen.getByTestId('add-member-btn-1')
+    expect(assignBtn).toHaveTextContent(/assign member/i)
+    await user.click(assignBtn)
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      expect(screen.getByTestId('assign-member-title')).toHaveTextContent(/general support/i)
+    })
+
+    // Verify Alice Admin (already assigned) is excluded, Bob Agent is available
+    const memberSelect = screen.getByTestId('assign-member-select')
+    const options = Array.from(memberSelect.querySelectorAll('option')).map((o) => o.textContent)
+    expect(options.some((t) => t?.includes('Alice Admin'))).toBe(false)
+    expect(options.some((t) => t?.includes('Bob Agent'))).toBe(true)
+
+    // Select Bob Agent and submit
+    await user.selectOptions(memberSelect, '20')
+    await user.click(screen.getByTestId('assign-member-submit'))
+
+    // Modal closes and roster updates
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByTestId('team-member-1-20')).toHaveTextContent('Bob Agent')
+      expect(screen.getByTestId('team-agent-count-1')).toHaveTextContent('2')
+    })
+
+    // 2. Remove Member with Optimistic UI Update
+    const removeBtn = screen.getByTestId('remove-member-btn-1-20')
+    await user.click(removeBtn)
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('team-member-1-20')).not.toBeInTheDocument()
+      expect(screen.getByTestId('team-agent-count-1')).toHaveTextContent('1')
+    })
+
+    // 3. Delete Team with Active Members (Validation prevents deletion)
+    await user.click(screen.getByTestId('delete-team-btn-1'))
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      expect(screen.getByTestId('delete-team-members-warning')).toBeInTheDocument()
+      expect(screen.getByTestId('delete-team-members-warning')).toHaveTextContent(/1 active member/i)
+      expect(screen.getByTestId('confirm-delete-team-btn')).toBeDisabled()
+    })
+
+    // Close modal
+    await user.click(screen.getByTestId('cancel-delete-team-btn'))
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    // 4. Delete Empty Team (Team 2)
+    await user.click(screen.getByTestId('delete-team-btn-2'))
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      expect(screen.getByTestId('delete-team-confirmation-text')).toHaveTextContent(/empty team/i)
+      expect(screen.getByTestId('confirm-delete-team-btn')).not.toBeDisabled()
+    })
+
+    await user.click(screen.getByTestId('confirm-delete-team-btn'))
+
+    // Team 2 is deleted and removed from the grid
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('team-name-2')).not.toBeInTheDocument()
+      expect(screen.getByTestId('team-name-1')).toBeInTheDocument()
+    })
+  }, 15000)
 })

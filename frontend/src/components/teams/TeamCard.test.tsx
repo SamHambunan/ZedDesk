@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react'
-import { describe, it, expect } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
 import { TeamCard } from './TeamCard'
 import type { Team } from './types'
 
@@ -21,7 +21,7 @@ describe('TeamCard Component', () => {
         id: 21,
         organization_id: 1,
         user_id: 102,
-        role: 'agent',
+        role: 'admin',
         user: { id: 102, name: 'Alice Walker', email: 'alice@acme.test' },
       },
     ],
@@ -39,12 +39,15 @@ describe('TeamCard Component', () => {
     expect(countChip.className).toMatch(/font-mono|JetBrains/)
   })
 
-  it('displays preview list of assigned Organization Members', () => {
+  it('displays preview list of assigned Organization Members with role badges', () => {
     render(<TeamCard team={mockTeam} isAdmin={false} />)
 
     expect(screen.getByTestId('team-member-1-20')).toHaveTextContent('Bob Agent')
     expect(screen.getByTestId('team-member-1-20')).toHaveTextContent('bob@acme.test')
+    expect(screen.getByTestId('team-member-1-20')).toHaveTextContent(/agent/i)
+
     expect(screen.getByTestId('team-member-1-21')).toHaveTextContent('Alice Walker')
+    expect(screen.getByTestId('team-member-1-21')).toHaveTextContent(/admin/i)
   })
 
   it('enforces RBAC: omits mutation actions when isAdmin is false', () => {
@@ -69,5 +72,36 @@ describe('TeamCard Component', () => {
     expect(screen.getByTestId('delete-team-btn-1')).toBeInTheDocument()
     expect(screen.getByTestId('add-member-btn-1')).toBeInTheDocument()
     expect(screen.getByTestId('remove-member-btn-1-20')).toBeInTheDocument()
+  })
+
+  it('renders "+ Assign Member" action and triggers onOpenAssignModal for admin', () => {
+    const handleOpenAssignModal = vi.fn()
+    render(
+      <TeamCard
+        team={mockTeam}
+        isAdmin={true}
+        onOpenAssignModal={handleOpenAssignModal}
+      />
+    )
+
+    const assignBtn = screen.getByTestId('add-member-btn-1')
+    expect(assignBtn).toHaveTextContent(/assign member/i)
+
+    fireEvent.click(assignBtn)
+    expect(handleOpenAssignModal).toHaveBeenCalledWith(mockTeam)
+  })
+
+  it('triggers onOpenDeleteModal when delete button is clicked and callback is provided', () => {
+    const handleOpenDeleteModal = vi.fn()
+    render(
+      <TeamCard
+        team={mockTeam}
+        isAdmin={true}
+        onOpenDeleteModal={handleOpenDeleteModal}
+      />
+    )
+
+    fireEvent.click(screen.getByTestId('delete-team-btn-1'))
+    expect(handleOpenDeleteModal).toHaveBeenCalledWith(mockTeam)
   })
 })
