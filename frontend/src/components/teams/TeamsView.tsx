@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react'
+import React, { useState, useContext, useMemo } from 'react'
 import { Plus, Users2 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import apiClient from '../../lib/api-client'
@@ -84,10 +84,18 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
       ? isAdmin
       : (shellContext?.role || '').toLowerCase() === 'admin'
 
-  const [displayTeams, setDisplayTeams] = useState<Team[]>(teams)
-  useEffect(() => {
-    setDisplayTeams(teams)
-  }, [teams])
+  // Optimistic tracking without props-to-state useEffect synchronization
+  const [removedMemberKeys, setRemovedMemberKeys] = useState<Set<string>>(new Set())
+  const [deletedTeamIds, setDeletedTeamIds] = useState<Set<number>>(new Set())
+
+  const displayTeams = useMemo(() => {
+    return teams
+      .filter((t) => !deletedTeamIds.has(t.id))
+      .map((t) => ({
+        ...t,
+        members: (t.members || []).filter((m) => !removedMemberKeys.has(`${t.id}-${m.id}`)),
+      }))
+  }, [teams, deletedTeamIds, removedMemberKeys])
 
   // Create Team Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -131,7 +139,6 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
   }
 
   const handleOpenAssignModal = (team: Team) => {
-    // Keep active team up-to-date from displayTeams
     const current = displayTeams.find((t) => t.id === team.id) || team
     setAssigningTeam(current)
     setAssignError(null)
@@ -150,7 +157,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
       if (onAssignMember) {
         await onAssignMember(teamId, memberId)
       } else if (onAddMember) {
-        await onAddMember(teamId)
+        await (onAddMember as (tId: number, mId?: number) => Promise<void> | void)(teamId, memberId)
       } else {
         await apiClient.post(`/api/teams/${teamId}/members`, {
           organization_member_id: memberId,
@@ -187,39 +194,40 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
     setIsDeletingTeam(true)
     setDeleteError(null)
 
+    // Optimistically mark deleted in local derived view
+    setDeletedTeamIds((prev) => new Set(prev).add(teamId))
+
     try {
       if (onDelete) {
         await onDelete(teamId)
       } else {
         await apiClient.delete(`/api/teams/${teamId}`)
       }
-      setDisplayTeams((prev) => prev.filter((t) => t.id !== teamId))
       queryClient.invalidateQueries({ queryKey: ['teams'] })
       queryClient.invalidateQueries({ queryKey: ['workspace'] })
       setDeletingTeam(null)
     } catch (err: unknown) {
+      // Rollback optimistic delete
+      setDeletedTeamIds((prev) => {
+        const next = new Set(prev)
+        next.delete(teamId)
+        return next
+      })
       const axiosError = err as { response?: { data?: { message?: string } }; message?: string }
       const msg =
         axiosError?.response?.data?.message ||
         axiosError?.message ||
         'Failed to delete team.'
       setDeleteError(msg)
-      throw err
     } finally {
       setIsDeletingTeam(false)
     }
   }
 
   const handleRemoveMember = async (teamId: number, memberId: number) => {
-    const previous = displayTeams
-    // Optimistic detachment
-    setDisplayTeams((prev) =>
-      prev.map((t) =>
-        t.id === teamId
-          ? { ...t, members: (t.members || []).filter((m) => m.id !== memberId) }
-          : t
-      )
-    )
+    const key = `${teamId}-${memberId}`
+    // Optimistic detachment in local derived view
+    setRemovedMemberKeys((prev) => new Set(prev).add(key))
 
     try {
       if (onRemoveMember) {
@@ -230,7 +238,12 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
       queryClient.invalidateQueries({ queryKey: ['teams'] })
       queryClient.invalidateQueries({ queryKey: ['workspace'] })
     } catch (err) {
-      setDisplayTeams(previous) // Rollback optimistic update
+      // Rollback optimistic removal
+      setRemovedMemberKeys((prev) => {
+        const next = new Set(prev)
+        next.delete(key)
+        return next
+      })
       throw err
     }
   }

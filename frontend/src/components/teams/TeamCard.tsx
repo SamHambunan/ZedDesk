@@ -151,25 +151,30 @@ export const TeamCard: React.FC<TeamCardProps> = ({
             </div>
             {isAdmin && (
               <div className="flex gap-2 shrink-0">
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="compact"
                   data-testid={`edit-team-btn-${team.id}`}
                   onClick={() => onStartEdit?.(team)}
-                  className="h-8 px-3 text-label-regular font-label-regular bg-surface-panel border border-border-prominent text-text-secondary hover:text-text-primary rounded transition-colors flex items-center gap-1.5"
+                  leftIcon={<Pencil className="w-3 h-3" />}
+                  className="h-8 px-3 text-label-regular font-label-regular gap-1.5"
                 >
-                  <Pencil className="w-3 h-3" />
                   Edit
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="danger"
+                  size="compact"
                   data-testid={`delete-team-btn-${team.id}`}
                   onClick={() => (onOpenDeleteModal ? onOpenDeleteModal(team) : onDelete?.(team.id))}
                   disabled={isDeleting}
-                  className="h-8 px-3 text-label-regular font-label-regular bg-sentiment-negative/10 border border-sentiment-negative/30 text-sentiment-negative hover:bg-sentiment-negative/20 rounded transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  isLoading={isDeleting}
+                  leftIcon={!isDeleting ? <Trash2 className="w-3 h-3" /> : undefined}
+                  className="h-8 px-3 text-label-regular font-label-regular gap-1.5"
                 >
-                  <Trash2 className="w-3 h-3" />
                   {isDeleting ? 'Deleting...' : 'Delete'}
-                </button>
+                </Button>
               </div>
             )}
           </>
@@ -211,7 +216,7 @@ export const TeamCard: React.FC<TeamCardProps> = ({
                 leftIcon={<Plus className="w-3.5 h-3.5" />}
                 className="w-full justify-center gap-1.5 text-xs text-accent-glow hover:text-accent-glow/80 font-medium"
               >
-                + Assign Member
+                Assign Member
               </Button>
             ) : (
               <AssignMemberModal

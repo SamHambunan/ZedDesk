@@ -1,5 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useContext } from 'react'
 import { UserPlus, AlertCircle, Users } from 'lucide-react'
+import { QueryClientContext, QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { queryClient as defaultQueryClient } from '../../lib/query-client'
+import apiClient from '../../lib/api-client'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import type { Team, TeamMember, OrganizationMember } from './types'
@@ -9,7 +12,7 @@ export interface AssignMemberModalProps {
   readonly onClose?: () => void
   readonly team?: Team | null
   readonly teamId?: number
-  readonly orgMembers: OrganizationMember[]
+  readonly orgMembers?: OrganizationMember[]
   readonly currentMembers?: TeamMember[]
   readonly selectedMemberId?: string
   readonly onSelectMember?: (value: string) => void
@@ -22,12 +25,12 @@ export interface AssignMemberModalProps {
   readonly className?: string
 }
 
-export const AssignMemberModal: React.FC<AssignMemberModalProps> = ({
+const AssignMemberModalInner: React.FC<AssignMemberModalProps> = ({
   isOpen,
   onClose,
   team,
   teamId: propTeamId,
-  orgMembers = [],
+  orgMembers,
   currentMembers: propCurrentMembers,
   selectedMemberId: propSelectedMemberId = '',
   onSelectMember,
@@ -43,7 +46,20 @@ export const AssignMemberModal: React.FC<AssignMemberModalProps> = ({
   const effectiveTeamId = team?.id ?? propTeamId ?? 0
   const activeMembers = team?.members ?? propCurrentMembers ?? []
 
-  const eligibleMembers = orgMembers.filter(
+  // Query eligible organization members if not passed from parent
+  const { data: fetchedMembers, isLoading: isQueryLoading } = useQuery({
+    queryKey: ['members'],
+    queryFn: async () => {
+      const res = await apiClient.get('/api/members')
+      return (res.data?.members || []) as OrganizationMember[]
+    },
+    enabled: Boolean(isCompoundModal && isOpen && (!orgMembers || orgMembers.length === 0)),
+  })
+
+  const effectiveOrgMembers = orgMembers && orgMembers.length > 0 ? orgMembers : (fetchedMembers || [])
+  const effectiveLoadingMembers = isLoadingMembers || isQueryLoading
+
+  const eligibleMembers = effectiveOrgMembers.filter(
     (m) => !activeMembers.some((cm) => cm.id === m.id || cm.user_id === m.user_id)
   )
 
@@ -90,7 +106,7 @@ export const AssignMemberModal: React.FC<AssignMemberModalProps> = ({
       if (onAssignMember) {
         await onAssignMember(effectiveTeamId, memberIdNum)
       } else if (onAddMember) {
-        await onAddMember(effectiveTeamId)
+        await (onAddMember as (tId: number, mId?: number) => Promise<void> | void)(effectiveTeamId, memberIdNum)
       }
       setInternalSelectedId('')
       onClose?.()
@@ -137,7 +153,7 @@ export const AssignMemberModal: React.FC<AssignMemberModalProps> = ({
               </div>
             )}
 
-            {isLoadingMembers ? (
+            {effectiveLoadingMembers ? (
               <div className="flex items-center justify-center py-6 text-text-secondary text-xs">
                 Loading eligible organization members...
               </div>
@@ -214,7 +230,7 @@ export const AssignMemberModal: React.FC<AssignMemberModalProps> = ({
         className="flex-1 min-w-[14rem] h-9 px-3 text-body-compact font-body-compact bg-surface-subpanel border border-border-prominent rounded text-text-primary focus:border-accent-glow/60 focus:outline-none transition-colors"
       >
         <option value="">
-          {isLoadingMembers ? 'Loading members...' : 'Select Organization Member to add...'}
+          {effectiveLoadingMembers ? 'Loading members...' : 'Select Organization Member to add...'}
         </option>
         {eligibleMembers.map((m) => (
           <option key={m.id} value={m.id}>
@@ -233,6 +249,18 @@ export const AssignMemberModal: React.FC<AssignMemberModalProps> = ({
       </button>
     </div>
   )
+}
+
+export const AssignMemberModal: React.FC<AssignMemberModalProps> = (props) => {
+  const existingClient = useContext(QueryClientContext)
+  if (!existingClient) {
+    return (
+      <QueryClientProvider client={defaultQueryClient}>
+        <AssignMemberModalInner {...props} />
+      </QueryClientProvider>
+    )
+  }
+  return <AssignMemberModalInner {...props} />
 }
 
 AssignMemberModal.displayName = 'AssignMemberModal'
