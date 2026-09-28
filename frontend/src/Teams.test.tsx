@@ -81,10 +81,16 @@ describe('Workspace Teams and Member Assignment', () => {
       expect(screen.getByTestId('team-description-1')).toHaveTextContent('First line incident response')
       expect(screen.getByTestId('team-member-1-20')).toHaveTextContent('Bob Agent')
       expect(screen.getByTestId('team-member-1-20')).toHaveTextContent('bob@acme.test')
+      expect(screen.getByTestId('teams-grid')).toBeInTheDocument()
+      const countChip = screen.getByTestId('team-agent-count-1')
+      expect(countChip).toHaveTextContent('1')
+      expect(countChip).toHaveClass('tabular-nums')
     })
 
-    // Agent must NOT see team creation form or mutation buttons
+    // Agent must NOT see team creation button, form, or mutation buttons
+    expect(screen.queryByTestId('create-team-btn')).not.toBeInTheDocument()
     expect(screen.queryByTestId('create-team-form')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByTestId('delete-team-btn-1')).not.toBeInTheDocument()
     expect(screen.queryByTestId('edit-team-btn-1')).not.toBeInTheDocument()
     expect(screen.queryByTestId('add-member-btn-1')).not.toBeInTheDocument()
@@ -295,6 +301,132 @@ describe('Workspace Teams and Member Assignment', () => {
 
     await waitFor(() => {
       expect(screen.queryByTestId('team-name-2')).not.toBeInTheDocument()
+    })
+  }, 15000)
+
+  it('allows admin to view teams grid, open compound modal, validate inputs, and create a team via POST /api/teams', async () => {
+    const user = userEvent.setup()
+    window.location.hostname = 'acme.localhost'
+    localStorage.setItem('zeddesk_token', 'mock-admin-token')
+
+    let mockTeams = [
+      {
+        id: 1,
+        organization_id: 1,
+        name: 'General Support',
+        description: 'Default customer support team',
+        created_at: '2026-09-05T12:00:00.000000Z',
+        members: [
+          {
+            id: 10,
+            organization_id: 1,
+            user_id: 1,
+            role: 'admin',
+            user: { id: 1, name: 'Alice Admin', email: 'alice@acme.test' },
+          },
+        ],
+      },
+    ]
+
+    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes('/api/workspace')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            organization: { id: 1, name: 'Acme Corporation', slug: 'acme' },
+            user: { id: 1, name: 'Alice Admin', email: 'alice@acme.test' },
+            role: 'admin',
+          }),
+        } as Response)
+      }
+
+      if (url.includes('/api/members')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ members: [] }),
+        } as Response)
+      }
+
+      if (url.endsWith('/api/teams') && (!init || init.method === 'GET')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ teams: mockTeams }),
+        } as Response)
+      }
+
+      if (url.endsWith('/api/teams') && init?.method === 'POST') {
+        const body = JSON.parse(init.body as string)
+        const newTeam = {
+          id: 2,
+          organization_id: 1,
+          name: body.name,
+          description: body.description || null,
+          created_at: '2026-09-05T12:30:00.000000Z',
+          members: [],
+        }
+        mockTeams.push(newTeam)
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => ({ message: 'Team created successfully.', team: newTeam }),
+        } as Response)
+      }
+
+      return Promise.reject(new Error(`Unhandled URL: ${url}`))
+    })
+
+    render(<App hostname="acme.localhost" />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('workspace-org-name')).toHaveTextContent('Acme Corporation')
+    })
+
+    // Click Teams nav item to navigate to /teams
+    const teamsNav = screen.getByTestId('nav-teams')
+    await user.click(teamsNav)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('teams-view')).toBeInTheDocument()
+      expect(screen.getByTestId('teams-grid')).toBeInTheDocument()
+      expect(screen.getByTestId('team-name-1')).toHaveTextContent('General Support')
+      const countChip = screen.getByTestId('team-agent-count-1')
+      expect(countChip).toHaveTextContent('1')
+      expect(countChip).toHaveClass('tabular-nums')
+    })
+
+    // Admin sees "+ Create Team" action button
+    const createBtn = screen.getByTestId('create-team-btn')
+    expect(createBtn).toBeInTheDocument()
+
+    // Clicking "+ Create Team" opens compound modal
+    await user.click(createBtn)
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      expect(screen.getByTestId('create-team-form')).toBeInTheDocument()
+    })
+
+    // Validate required fields: submit empty name
+    const submitBtn = screen.getByTestId('team-create-submit')
+    await user.click(submitBtn)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('team-create-error')).toHaveTextContent(/team name is required/i)
+    })
+
+    // Enter valid team info and submit
+    await user.type(screen.getByTestId('team-name-input'), 'Customer Success')
+    await user.type(screen.getByTestId('team-description-input'), 'Enterprise client onboarding')
+    await user.click(submitBtn)
+
+    // Modal closes and new team appears in grid
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByTestId('team-name-2')).toHaveTextContent('Customer Success')
+      expect(screen.getByTestId('team-description-2')).toHaveTextContent('Enterprise client onboarding')
     })
   }, 15000)
 })

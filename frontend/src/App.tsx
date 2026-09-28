@@ -457,8 +457,13 @@ function AppInner({
     })
   }, [orgMembers, teams, user])
 
-  const handleCreateTeam = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleCreateTeam = async (nameOrEvent?: string | React.FormEvent, desc?: string) => {
+    if (nameOrEvent && typeof nameOrEvent !== 'string' && 'preventDefault' in nameOrEvent) {
+      nameOrEvent.preventDefault()
+    }
+    const finalName = typeof nameOrEvent === 'string' ? nameOrEvent : newTeamName
+    const finalDesc = typeof desc === 'string' ? desc : newTeamDesc
+
     setCreateTeamError(null)
     setCreateTeamSuccess(null)
     setIsCreatingTeam(true)
@@ -472,15 +477,16 @@ function AppInner({
           Accept: 'application/json',
         },
         body: JSON.stringify({
-          name: newTeamName,
-          description: newTeamDesc || undefined,
+          name: finalName,
+          description: finalDesc || undefined,
         }),
       })
 
       const data = await res.json()
       if (!res.ok) {
-        setCreateTeamError(extractErrorMessage(data, 'Failed to create team.'))
-        return
+        const errorMsg = extractErrorMessage(data, 'Failed to create team.')
+        setCreateTeamError(errorMsg)
+        throw new Error(errorMsg)
       }
 
       setCreateTeamSuccess('Team created successfully.')
@@ -496,8 +502,13 @@ function AppInner({
       } else {
         loadTeams()
       }
-    } catch {
-      setCreateTeamError('Network error creating team.')
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message) {
+        setCreateTeamError(err.message)
+      } else {
+        setCreateTeamError('Network error creating team.')
+      }
+      throw err
     } finally {
       setIsCreatingTeam(false)
     }
@@ -891,8 +902,35 @@ function AppInner({
             {!loadingWorkspace && workspaceData && workspaceView === 'teams' && (
               <TeamsView
                 teams={teams}
+                orgMembers={orgMembers}
+                isAdmin={workspaceData.role === 'admin'}
                 isLoading={loadingTeams}
                 error={teamsError}
+                onCreateTeam={(data) => handleCreateTeam(data.name, data.description)}
+                isCreating={isCreatingTeam}
+                createError={createTeamError}
+                createSuccess={createTeamSuccess}
+                editingTeamId={editingTeamId}
+                editTeamName={editTeamName}
+                editTeamDescription={editTeamDesc}
+                isUpdating={isUpdatingTeam}
+                updateError={updateTeamError}
+                selectedMemberToAdd={selectedMemberToAdd}
+                addingMemberTeamId={addingMemberTeamId}
+                removingMemberKey={removingMemberKey}
+                deletingTeamId={deletingTeamId}
+                teamActionError={teamActionError}
+                onEditNameChange={setEditTeamName}
+                onEditDescChange={setEditTeamDesc}
+                onStartEdit={handleStartEditTeam}
+                onSaveEdit={handleSaveEditTeam}
+                onCancelEdit={() => setEditingTeamId(null)}
+                onDelete={handleDeleteTeam}
+                onSelectMember={(teamId, value) =>
+                  setSelectedMemberToAdd((prev) => ({ ...prev, [teamId]: value }))
+                }
+                onAddMember={handleAddMemberToTeam}
+                onRemoveMember={handleRemoveMemberFromTeam}
               />
             )}
 
