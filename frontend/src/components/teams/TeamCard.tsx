@@ -1,5 +1,6 @@
 import React from 'react'
-import { Pencil, Trash2, Users } from 'lucide-react'
+import { Pencil, Trash2, Users, Plus } from 'lucide-react'
+import { Button } from '../ui/Button'
 import type { Team, OrganizationMember } from './types'
 import { TeamRosterList } from './TeamRosterList'
 import { AssignMemberModal } from './AssignMemberModal'
@@ -16,6 +17,8 @@ export interface TeamCardProps {
   readonly onSaveEdit?: (teamId: number) => void
   readonly onCancelEdit?: () => void
   readonly onDelete?: (teamId: number) => void
+  readonly onOpenDeleteModal?: (team: Team) => void
+  readonly onOpenAssignModal?: (team: Team) => void
   readonly isUpdating?: boolean
   readonly isDeletingId?: number | null
   readonly updateError?: string | null
@@ -42,6 +45,8 @@ export const TeamCard: React.FC<TeamCardProps> = ({
   onSaveEdit,
   onCancelEdit,
   onDelete,
+  onOpenDeleteModal,
+  onOpenAssignModal,
   isUpdating = false,
   isDeletingId,
   updateError,
@@ -158,7 +163,7 @@ export const TeamCard: React.FC<TeamCardProps> = ({
                 <button
                   type="button"
                   data-testid={`delete-team-btn-${team.id}`}
-                  onClick={() => onDelete?.(team.id)}
+                  onClick={() => (onOpenDeleteModal ? onOpenDeleteModal(team) : onDelete?.(team.id))}
                   disabled={isDeleting}
                   className="h-8 px-3 text-label-regular font-label-regular bg-sentiment-negative/10 border border-sentiment-negative/30 text-sentiment-negative hover:bg-sentiment-negative/20 rounded transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -196,16 +201,30 @@ export const TeamCard: React.FC<TeamCardProps> = ({
 
         {isAdmin && (
           <div className="pt-2 border-t border-border-subtle">
-            <AssignMemberModal
-              teamId={team.id}
-              orgMembers={orgMembers}
-              currentMembers={team.members || []}
-              selectedMemberId={selectedMemberId}
-              onSelectMember={(value) => onSelectMember?.(team.id, value)}
-              onAddMember={onAddMember || (() => {})}
-              isAdding={isAddingToThis}
-              isLoadingMembers={isLoadingMembers}
-            />
+            {onOpenAssignModal ? (
+              <Button
+                type="button"
+                data-testid={`add-member-btn-${team.id}`}
+                variant="ghost"
+                size="compact"
+                onClick={() => onOpenAssignModal(team)}
+                leftIcon={<Plus className="w-3.5 h-3.5" />}
+                className="w-full justify-center gap-1.5 text-xs text-accent-glow hover:text-accent-glow/80 font-medium"
+              >
+                + Assign Member
+              </Button>
+            ) : (
+              <AssignMemberModal
+                teamId={team.id}
+                orgMembers={orgMembers}
+                currentMembers={team.members || []}
+                selectedMemberId={selectedMemberId}
+                onSelectMember={(value) => onSelectMember?.(team.id, value)}
+                onAddMember={onAddMember || (() => {})}
+                isAdding={isAddingToThis}
+                isLoadingMembers={isLoadingMembers}
+              />
+            )}
           </div>
         )}
       </div>

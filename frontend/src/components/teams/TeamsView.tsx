@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react'
+import React, { useState, useContext, useEffect } from 'react'
 import { Plus, Users2 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import apiClient from '../../lib/api-client'
@@ -8,6 +8,8 @@ import { WorkspaceShellContext } from '../workspace/WorkspaceShellContext'
 import type { Team, OrganizationMember } from './types'
 import { TeamCard } from './TeamCard'
 import { CreateTeamModal } from './CreateTeamModal'
+import { AssignMemberModal } from './AssignMemberModal'
+import { DeleteTeamModal } from './DeleteTeamModal'
 
 export interface TeamsViewProps {
   readonly teams: Team[]
@@ -34,10 +36,11 @@ export interface TeamsViewProps {
   readonly onStartEdit?: (team: Team) => void
   readonly onSaveEdit?: (teamId: number) => void
   readonly onCancelEdit?: () => void
-  readonly onDelete?: (teamId: number) => void
+  readonly onDelete?: (teamId: number) => Promise<void> | void
   readonly onSelectMember?: (teamId: number, value: string) => void
-  readonly onAddMember?: (teamId: number) => void
-  readonly onRemoveMember?: (teamId: number, memberId: number) => void
+  readonly onAddMember?: (teamId: number) => Promise<void> | void
+  readonly onAssignMember?: (teamId: number, memberId: number) => Promise<void> | void
+  readonly onRemoveMember?: (teamId: number, memberId: number) => Promise<void> | void
   readonly className?: string
 }
 
@@ -69,6 +72,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
   onDelete,
   onSelectMember,
   onAddMember,
+  onAssignMember,
   onRemoveMember,
   className = '',
 }) => {
@@ -80,13 +84,29 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
       ? isAdmin
       : (shellContext?.role || '').toLowerCase() === 'admin'
 
+  const [displayTeams, setDisplayTeams] = useState<Team[]>(teams)
+  useEffect(() => {
+    setDisplayTeams(teams)
+  }, [teams])
+
+  // Create Team Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSubmittingCreate, setIsSubmittingCreate] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+
+  // Assign Member Modal State
+  const [assigningTeam, setAssigningTeam] = useState<Team | null>(null)
+  const [isAssigningMember, setIsAssigningMember] = useState(false)
+  const [assignError, setAssignError] = useState<string | null>(null)
+
+  // Delete Team Modal State
+  const [deletingTeam, setDeletingTeam] = useState<Team | null>(null)
+  const [isDeletingTeam, setIsDeletingTeam] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const handleCreateTeamSubmit = async (data: { name: string; description?: string }) => {
     setCreateError(null)
-    setIsSubmitting(true)
+    setIsSubmittingCreate(true)
 
     try {
       if (onCreateTeam) {
@@ -106,7 +126,112 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
       setCreateError(msg)
       throw err
     } finally {
-      setIsSubmitting(false)
+      setIsSubmittingCreate(false)
+    }
+  }
+
+  const handleOpenAssignModal = (team: Team) => {
+    // Keep active team up-to-date from displayTeams
+    const current = displayTeams.find((t) => t.id === team.id) || team
+    setAssigningTeam(current)
+    setAssignError(null)
+  }
+
+  const handleCloseAssignModal = () => {
+    setAssigningTeam(null)
+    setAssignError(null)
+  }
+
+  const handleAssignMemberSubmit = async (teamId: number, memberId: number) => {
+    setIsAssigningMember(true)
+    setAssignError(null)
+
+    try {
+      if (onAssignMember) {
+        await onAssignMember(teamId, memberId)
+      } else if (onAddMember) {
+        await onAddMember(teamId)
+      } else {
+        await apiClient.post(`/api/teams/${teamId}/members`, {
+          organization_member_id: memberId,
+        })
+      }
+      queryClient.invalidateQueries({ queryKey: ['teams'] })
+      queryClient.invalidateQueries({ queryKey: ['workspace'] })
+      setAssigningTeam(null)
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { message?: string } }; message?: string }
+      const msg =
+        axiosError?.response?.data?.message ||
+        axiosError?.message ||
+        'Failed to assign member to team.'
+      setAssignError(msg)
+      throw err
+    } finally {
+      setIsAssigningMember(false)
+    }
+  }
+
+  const handleOpenDeleteModal = (team: Team) => {
+    const current = displayTeams.find((t) => t.id === team.id) || team
+    setDeletingTeam(current)
+    setDeleteError(null)
+  }
+
+  const handleCloseDeleteModal = () => {
+    setDeletingTeam(null)
+    setDeleteError(null)
+  }
+
+  const handleDeleteTeamConfirm = async (teamId: number) => {
+    setIsDeletingTeam(true)
+    setDeleteError(null)
+
+    try {
+      if (onDelete) {
+        await onDelete(teamId)
+      } else {
+        await apiClient.delete(`/api/teams/${teamId}`)
+      }
+      setDisplayTeams((prev) => prev.filter((t) => t.id !== teamId))
+      queryClient.invalidateQueries({ queryKey: ['teams'] })
+      queryClient.invalidateQueries({ queryKey: ['workspace'] })
+      setDeletingTeam(null)
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { message?: string } }; message?: string }
+      const msg =
+        axiosError?.response?.data?.message ||
+        axiosError?.message ||
+        'Failed to delete team.'
+      setDeleteError(msg)
+      throw err
+    } finally {
+      setIsDeletingTeam(false)
+    }
+  }
+
+  const handleRemoveMember = async (teamId: number, memberId: number) => {
+    const previous = displayTeams
+    // Optimistic detachment
+    setDisplayTeams((prev) =>
+      prev.map((t) =>
+        t.id === teamId
+          ? { ...t, members: (t.members || []).filter((m) => m.id !== memberId) }
+          : t
+      )
+    )
+
+    try {
+      if (onRemoveMember) {
+        await onRemoveMember(teamId, memberId)
+      } else {
+        await apiClient.delete(`/api/teams/${teamId}/members/${memberId}`)
+      }
+      queryClient.invalidateQueries({ queryKey: ['teams'] })
+      queryClient.invalidateQueries({ queryKey: ['workspace'] })
+    } catch (err) {
+      setDisplayTeams(previous) // Rollback optimistic update
+      throw err
     }
   }
 
@@ -129,7 +254,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
               <Users2 className="w-3.5 h-3.5 text-accent-glow" />
               <span>Teams:</span>
               <span className="font-mono tabular-nums font-semibold text-text-primary font-['JetBrains_Mono',monospace]">
-                {teams.length}
+                {displayTeams.length}
               </span>
             </div>
           </div>
@@ -156,7 +281,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
         )}
       </div>
 
-      {/* Strict RBAC: Compound Modal completely omitted from DOM for agents */}
+      {/* Strict RBAC: Create Compound Modal completely omitted from DOM for agents */}
       {effectiveIsAdmin && (
         <CreateTeamModal
           isOpen={isCreateModalOpen}
@@ -165,9 +290,34 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
             setCreateError(null)
           }}
           onSubmit={handleCreateTeamSubmit}
-          isSubmitting={isSubmitting || isCreating}
+          isSubmitting={isSubmittingCreate || isCreating}
           error={createError || propCreateError}
           success={propCreateSuccess}
+        />
+      )}
+
+      {/* Strict RBAC: Assign Member Compound Modal completely omitted from DOM for agents */}
+      {effectiveIsAdmin && (
+        <AssignMemberModal
+          isOpen={Boolean(assigningTeam)}
+          onClose={handleCloseAssignModal}
+          team={assigningTeam}
+          orgMembers={orgMembers}
+          onAssignMember={handleAssignMemberSubmit}
+          isSubmitting={isAssigningMember}
+          error={assignError}
+        />
+      )}
+
+      {/* Strict RBAC: Delete Team Compound Modal completely omitted from DOM for agents */}
+      {effectiveIsAdmin && (
+        <DeleteTeamModal
+          isOpen={Boolean(deletingTeam)}
+          onClose={handleCloseDeleteModal}
+          team={deletingTeam}
+          onConfirm={handleDeleteTeamConfirm}
+          isDeleting={isDeletingTeam}
+          error={deleteError}
         />
       )}
 
@@ -183,7 +333,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
         <div className="px-4 py-3 bg-sentiment-negative/10 border border-sentiment-negative/30 rounded-lg text-sentiment-negative text-body-default font-body-default">
           {error}
         </div>
-      ) : teams.length === 0 ? (
+      ) : displayTeams.length === 0 ? (
         <div
           data-testid="no-teams-message"
           className="flex flex-col items-center justify-center py-16 text-text-muted"
@@ -195,7 +345,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
           data-testid="teams-grid"
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
         >
-          {teams.map((team) => (
+          {displayTeams.map((team) => (
             <TeamCard
               key={team.id}
               team={team}
@@ -210,6 +360,8 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
               onSaveEdit={onSaveEdit}
               onCancelEdit={onCancelEdit}
               onDelete={onDelete}
+              onOpenAssignModal={effectiveIsAdmin ? handleOpenAssignModal : undefined}
+              onOpenDeleteModal={effectiveIsAdmin ? handleOpenDeleteModal : undefined}
               isUpdating={isUpdating}
               isDeletingId={deletingTeamId}
               updateError={updateError}
@@ -218,7 +370,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
               onAddMember={onAddMember}
               isAddingMemberId={addingMemberTeamId}
               removingMemberKey={removingMemberKey}
-              onRemoveMember={onRemoveMember}
+              onRemoveMember={handleRemoveMember}
               teamActionError={teamActionError?.[team.id]}
             />
           ))}
