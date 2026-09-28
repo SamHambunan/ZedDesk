@@ -3,6 +3,7 @@ import { Plus, Users2 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import apiClient from '../../lib/api-client'
 import { Button } from '../ui/Button'
+import { Badge } from '../ui/Badge'
 import { WorkspaceShellContext } from '../workspace/WorkspaceShellContext'
 import type { Team, OrganizationMember } from './types'
 import { TeamCard } from './TeamCard'
@@ -151,9 +152,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
             + Create Team
           </Button>
         ) : (
-          <span className="text-label-caps font-label-caps uppercase px-3 py-1 rounded-full border border-sentiment-positive/30 bg-sentiment-positive/10 text-sentiment-positive select-none">
-            Agent View — Read-Only
-          </span>
+          <Badge variant="positive">Agent View — Read-Only</Badge>
         )}
       </div>
 

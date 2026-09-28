@@ -91,15 +91,24 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
 
     if (!onSubmit) return
 
-    if (isCompoundModal) {
-      await (onSubmit as (data: CreateTeamData) => Promise<void> | void)({
-        name: trimmedName,
-        description: description.trim() || undefined,
-      })
-      setInternalName('')
-      setInternalDescription('')
-    } else {
-      ;(onSubmit as (e: React.FormEvent) => void)(e)
+    try {
+      if (isCompoundModal) {
+        await (onSubmit as (data: CreateTeamData) => Promise<void> | void)({
+          name: trimmedName,
+          description: description.trim() || undefined,
+        })
+        setInternalName('')
+        setInternalDescription('')
+      } else {
+        ;(onSubmit as (e: React.FormEvent) => void)(e)
+      }
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { message?: string } }; message?: string }
+      const msg =
+        axiosError?.response?.data?.message ||
+        axiosError?.message ||
+        'Failed to create team.'
+      setClientError(msg)
     }
   }
 
@@ -244,11 +253,11 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
           <div className="flex flex-col gap-1.5 flex-1 min-w-[14rem]">
             <label
               htmlFor="create-team-name"
-              className="text-label-regular font-label-regular text-text-secondary"
+              className="text-label-regular font-label-regular text-text-secondary text-xs"
             >
               Team Name
             </label>
-            <input
+            <Input
               id="create-team-name"
               data-testid="team-name-input"
               type="text"
@@ -256,39 +265,38 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
               placeholder="e.g. Tier 1 Support"
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
-              className="h-9 px-3 text-body-default font-body-default bg-surface-subpanel border border-border-prominent rounded text-text-primary placeholder:text-text-muted focus:border-accent-glow/60 focus:outline-none transition-colors"
             />
           </div>
 
           <div className="flex flex-col gap-1.5 flex-[2] min-w-[18rem]">
             <label
               htmlFor="create-team-desc"
-              className="text-label-regular font-label-regular text-text-secondary"
+              className="text-label-regular font-label-regular text-text-secondary text-xs"
             >
               Description
             </label>
-            <input
+            <Input
               id="create-team-desc"
               data-testid="team-description-input"
               type="text"
               placeholder="Team responsibilities or routing scope"
               value={description}
               onChange={(e) => handleDescChange(e.target.value)}
-              className="h-9 px-3 text-body-default font-body-default bg-surface-subpanel border border-border-prominent rounded text-text-primary placeholder:text-text-muted focus:border-accent-glow/60 focus:outline-none transition-colors"
             />
           </div>
         </div>
 
         <div>
-          <button
+          <Button
             type="submit"
             data-testid="team-create-submit"
-            disabled={submitting}
-            className="h-9 px-5 text-label-regular font-label-regular bg-primary-container hover:bg-primary-dark text-white rounded shadow-keylight-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            variant="amber"
+            isLoading={submitting}
+            leftIcon={!submitting ? <Plus className="w-4 h-4" /> : undefined}
+            className="gap-2 font-semibold"
           >
-            <Plus className="w-4 h-4" />
             {submitting ? 'Creating...' : 'Create Team'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>
