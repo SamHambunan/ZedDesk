@@ -1,5 +1,5 @@
-﻿import React from 'react'
-import { Pencil, Trash2 } from 'lucide-react'
+import React from 'react'
+import { Pencil, Trash2, Users } from 'lucide-react'
 import type { Team, OrganizationMember } from './types'
 import { TeamRosterList } from './TeamRosterList'
 import { AssignMemberModal } from './AssignMemberModal'
@@ -126,9 +126,23 @@ export const TeamCard: React.FC<TeamCardProps> = ({
               >
                 {team.description || 'No description provided'}
               </p>
-              <span className="text-label-caps font-label-caps text-text-muted uppercase mt-1">
-                {memberCount} {memberCount === 1 ? 'member' : 'members'}
-              </span>
+              <div className="mt-2 flex items-center gap-2">
+                <div
+                  data-testid={`team-agent-chip-${team.id}`}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-panel border border-border-subtle text-xs text-text-secondary w-fit"
+                >
+                  <Users className="w-3.5 h-3.5 text-accent-glow shrink-0" />
+                  <span
+                    data-testid={`team-agent-count-${team.id}`}
+                    className="font-mono tabular-nums font-semibold text-text-primary font-['JetBrains_Mono',monospace]"
+                  >
+                    {memberCount}
+                  </span>
+                  <span className="text-[11px] text-text-muted">
+                    {memberCount === 1 ? 'agent' : 'agents'}
+                  </span>
+                </div>
+              </div>
             </div>
             {isAdmin && (
               <div className="flex gap-2 shrink-0">
