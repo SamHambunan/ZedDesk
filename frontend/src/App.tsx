@@ -739,6 +739,10 @@ function AppInner({
         role: data.role,
         slug: data.organization.slug,
       })
+
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.href = getOrganizationUrl(data.organization.slug, data.token || token, '/overview')
+      }
     } catch {
       setAcceptError('Network error accepting invitation.')
     } finally {
@@ -802,6 +806,10 @@ function AppInner({
         role: acceptData.role,
         slug: acceptData.organization.slug,
       })
+
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.href = getOrganizationUrl(acceptData.organization.slug, authToken, '/overview')
+      }
     } catch {
       setAcceptError('Network error accepting invitation.')
     } finally {
@@ -834,6 +842,10 @@ function AppInner({
         role: acceptData.role,
         slug: acceptData.organization.slug,
       })
+
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.href = getOrganizationUrl(acceptData.organization.slug, token, '/overview')
+      }
     } catch {
       setAcceptError('Network error accepting invitation.')
     } finally {
@@ -883,7 +895,7 @@ function AppInner({
         onAcceptLoggedIn={handleAcceptLoggedIn}
         onLogout={handleLogout}
         onGoToWorkspace={(slug) => {
-          window.location.href = getOrganizationUrl(slug, token)
+          window.location.href = getOrganizationUrl(slug, token, '/overview')
         }}
         onGoToCentralHub={() => {
           window.location.href = getCentralHubUrl()

@@ -1,7 +1,7 @@
 import React from 'react'
 import { LayoutGrid, AlertCircle, ArrowLeft } from 'lucide-react'
 import { Button } from '../ui/Button'
-import { InvitationAcceptanceCard } from './InvitationAcceptanceCard'
+import { InvitationCard } from './InvitationCard'
 import { invitationsContentData } from '../../data/mockData'
 import type { PublicInvitationData, AuthenticatedUser, AcceptSuccessData } from './types'
 
@@ -56,8 +56,8 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
         </span>
       </header>
 
-      {/* Main Content Area */}
-      <main className="w-full max-w-[520px] flex flex-col items-center">
+      {/* Main Content Area: Centered 440px tactile card */}
+      <main className="w-full max-w-[440px] flex flex-col items-center">
         {isLoading ? (
           <div
             data-testid="invitation-loading"
@@ -102,7 +102,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
             </Button>
           </div>
         ) : invitation ? (
-          <InvitationAcceptanceCard
+          <InvitationCard
             invitation={invitation}
             currentUser={currentUser}
             acceptSuccess={acceptSuccess}
