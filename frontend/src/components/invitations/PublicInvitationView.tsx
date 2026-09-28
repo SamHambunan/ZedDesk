@@ -1,7 +1,6 @@
-import React from 'react'
-import { LayoutGrid, AlertCircle, ArrowLeft } from 'lucide-react'
-import { Button } from '../ui/Button'
-import { InvitationAcceptanceCard } from './InvitationAcceptanceCard'
+import React, { useState } from 'react'
+import { LayoutGrid } from 'lucide-react'
+import { InvitationCard, getInviterDisplayName } from './InvitationCard'
 import { invitationsContentData } from '../../data/mockData'
 import type { PublicInvitationData, AuthenticatedUser, AcceptSuccessData } from './types'
 
@@ -38,6 +37,8 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
   onGoToCentralHub,
   className = '',
 }) => {
+  const [activeTab, setActiveTab] = useState<'register' | 'login'>('register')
+
   return (
     <div
       data-testid="public-invitation-view"
@@ -56,64 +57,67 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
         </span>
       </header>
 
-      {/* Main Content Area */}
-      <main className="w-full max-w-[520px] flex flex-col items-center">
+      {/* Main Content Area: Centered 440px tactile card featuring compound <InvitationCard.*> */}
+      <main className="w-full max-w-[440px] flex flex-col items-center">
         {isLoading ? (
-          <div
-            data-testid="invitation-loading"
-            className="w-full bg-surface-subpanel rounded-xl border border-border-subtle p-12 text-center shadow-keylight flex flex-col items-center gap-3"
-          >
-            <div className="w-6 h-6 rounded-full border-2 border-primary-container border-t-transparent animate-spin" />
-            <span className="text-text-secondary text-sm">
-              {invitationsContentData.loadingMessage}
-            </span>
-          </div>
+          <InvitationCard.Loading />
         ) : error ? (
-          <div
-            data-testid="invitation-error-card"
-            className="w-full bg-surface-subpanel rounded-xl border border-sentiment-negative/30 p-8 text-center shadow-keylight flex flex-col items-center gap-4"
-          >
-            <div className="w-12 h-12 rounded-full bg-sentiment-negative/10 border border-sentiment-negative/30 flex items-center justify-center text-sentiment-negative">
-              <AlertCircle className="w-6 h-6" />
-            </div>
-
-            <div className="space-y-1">
-              <h2 className="font-headline-sm text-headline-sm text-text-primary font-semibold">
-                Invalid or Expired Invitation
-              </h2>
-              <p
-                data-testid="invitation-error"
-                className="text-xs text-text-secondary max-w-sm"
-              >
-                {error}
-              </p>
-            </div>
-
-            <Button
-              type="button"
-              variant="secondary"
-              size="compact"
-              data-testid="go-to-central-hub-btn"
-              onClick={onGoToCentralHub}
-              className="mt-2 gap-2 text-xs"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 text-text-muted" />
-              <span>{invitationsContentData.goToCentralHubBtn}</span>
-            </Button>
-          </div>
-        ) : invitation ? (
-          <InvitationAcceptanceCard
-            invitation={invitation}
-            currentUser={currentUser}
-            acceptSuccess={acceptSuccess}
-            error={acceptError}
-            isAccepting={isAccepting}
-            onAcceptRegister={onAcceptRegister}
-            onAcceptLogin={onAcceptLogin}
-            onAcceptLoggedIn={onAcceptLoggedIn}
-            onLogout={onLogout}
-            onGoToWorkspace={onGoToWorkspace}
+          <InvitationCard.Error
+            error={error}
+            onGoToCentralHub={onGoToCentralHub}
           />
+        ) : invitation ? (
+          <InvitationCard.Root>
+            <InvitationCard.Header
+              organizationName={invitation.organization_name}
+              role={invitation.role}
+              inviterName={getInviterDisplayName(invitation)}
+            />
+            <InvitationCard.LockedEmail email={invitation.email} />
+
+            <div className="p-6 pt-3">
+              {acceptSuccess ? (
+                <InvitationCard.Success
+                  acceptSuccess={acceptSuccess}
+                  onGoToWorkspace={onGoToWorkspace}
+                />
+              ) : currentUser ? (
+                <InvitationCard.AuthenticatedUser
+                  currentUser={currentUser}
+                  error={acceptError}
+                  isAccepting={isAccepting}
+                  onAcceptLoggedIn={onAcceptLoggedIn}
+                  onLogout={onLogout}
+                />
+              ) : (
+                <div>
+                  {/* Interactive Segmented Tab Toggle */}
+                  <InvitationCard.SegmentedToggle
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
+                  />
+
+                  {/* Active Form */}
+                  {activeTab === 'register' ? (
+                    <InvitationCard.RegisterForm
+                      onSubmit={(name, pw, conf) => onAcceptRegister?.(name, pw, conf)}
+                      onToggleExistingUser={() => setActiveTab('login')}
+                      isSubmitting={isAccepting}
+                      error={acceptError}
+                    />
+                  ) : (
+                    <InvitationCard.LoginForm
+                      defaultEmail={invitation.email}
+                      onSubmit={(pw, em) => onAcceptLogin?.(pw, em)}
+                      onToggleRegister={() => setActiveTab('register')}
+                      isSubmitting={isAccepting}
+                      error={acceptError}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          </InvitationCard.Root>
         ) : null}
       </main>
 

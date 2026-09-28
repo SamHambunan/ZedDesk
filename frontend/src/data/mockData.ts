@@ -467,6 +467,8 @@ export interface InvitationsContentData {
   readonly acceptedSuccessTitle: string
   readonly goToWorkspaceBtn: string
   readonly goToCentralHubBtn: string
+  readonly tabCreateAccount: string
+  readonly tabSignIn: string
 }
 
 export const invitationsContentData: InvitationsContentData = {
@@ -493,6 +495,8 @@ export const invitationsContentData: InvitationsContentData = {
   acceptedSuccessTitle: 'Invitation accepted successfully!',
   goToWorkspaceBtn: 'Launch Workspace',
   goToCentralHubBtn: 'Go to Central Hub',
+  tabCreateAccount: 'Create Account',
+  tabSignIn: 'Sign In with Existing Account',
 }
 
 

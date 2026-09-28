@@ -161,6 +161,11 @@ class InvitationController extends Controller
                 'organization_name' => $invitation->organization->name,
                 'organization_slug' => $invitation->organization->slug,
                 'expires_at' => $invitation->expires_at->toISOString(),
+                'invited_by' => $invitation->invitedByUser ? [
+                    'id' => $invitation->invitedByUser->id,
+                    'name' => $invitation->invitedByUser->name,
+                    'email' => $invitation->invitedByUser->email,
+                ] : null,
             ],
         ]);
     }
@@ -280,7 +285,7 @@ class InvitationController extends Controller
     private function findInvitationByToken(string $token): Invitation|JsonResponse
     {
         $invitation = Invitation::withoutGlobalScopes()
-            ->with('organization')
+            ->with(['organization', 'invitedByUser:id,name,email'])
             ->where('token', $token)
             ->first();
 

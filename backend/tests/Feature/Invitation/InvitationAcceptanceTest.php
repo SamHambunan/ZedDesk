@@ -51,7 +51,8 @@ test('invitee can view invitation details using valid token', function () {
             ],
         ]);
 
-    expect($response->json('invitation.expires_at'))->toBeString();
+    expect($response->json('invitation.expires_at'))->toBeString()
+        ->and($response->json('invitation.invited_by.name'))->toBe('Acme Admin');
 });
 
 test('viewing non-existent invitation token returns 404', function () {

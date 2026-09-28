@@ -8,6 +8,12 @@ export interface PublicInvitationData {
   readonly expires_at: string
   readonly token?: string
   readonly status?: string
+  readonly invited_by?: {
+    readonly id?: number
+    readonly name: string
+    readonly email?: string
+  } | null
+  readonly inviter_name?: string
 }
 
 export interface AuthenticatedUser {
