@@ -688,6 +688,12 @@ function AppInner({
     }
   }
 
+  const redirectToWorkspace = (slug: string, authToken?: string | null) => {
+    if (typeof window !== 'undefined' && window.location) {
+      window.location.href = getOrganizationUrl(slug, authToken, '/overview')
+    }
+  }
+
   const handleAcceptNewUser = async (
     eOrName?: React.FormEvent | string,
     pass?: string,
@@ -740,9 +746,7 @@ function AppInner({
         slug: data.organization.slug,
       })
 
-      if (typeof window !== 'undefined' && window.location) {
-        window.location.href = getOrganizationUrl(data.organization.slug, data.token || token, '/overview')
-      }
+      redirectToWorkspace(data.organization.slug, data.token || token)
     } catch {
       setAcceptError('Network error accepting invitation.')
     } finally {
@@ -807,9 +811,7 @@ function AppInner({
         slug: acceptData.organization.slug,
       })
 
-      if (typeof window !== 'undefined' && window.location) {
-        window.location.href = getOrganizationUrl(acceptData.organization.slug, authToken, '/overview')
-      }
+      redirectToWorkspace(acceptData.organization.slug, authToken)
     } catch {
       setAcceptError('Network error accepting invitation.')
     } finally {
@@ -843,9 +845,7 @@ function AppInner({
         slug: acceptData.organization.slug,
       })
 
-      if (typeof window !== 'undefined' && window.location) {
-        window.location.href = getOrganizationUrl(acceptData.organization.slug, token, '/overview')
-      }
+      redirectToWorkspace(acceptData.organization.slug, token)
     } catch {
       setAcceptError('Network error accepting invitation.')
     } finally {
@@ -894,9 +894,7 @@ function AppInner({
         onAcceptLogin={handleAcceptExistingUser}
         onAcceptLoggedIn={handleAcceptLoggedIn}
         onLogout={handleLogout}
-        onGoToWorkspace={(slug) => {
-          window.location.href = getOrganizationUrl(slug, token, '/overview')
-        }}
+        onGoToWorkspace={(slug) => redirectToWorkspace(slug, token)}
         onGoToCentralHub={() => {
           window.location.href = getCentralHubUrl()
         }}

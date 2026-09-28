@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Lock, ArrowRight, LogOut, CheckCircle2, AlertCircle, ArrowLeft } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
+import { Card } from '../ui/Card'
 import { InvitationRegisterForm } from './InvitationRegisterForm'
 import { InvitationLoginForm } from './InvitationLoginForm'
 import { invitationsContentData } from '../../data/mockData'
@@ -17,9 +18,7 @@ export function getOrgInitials(name: string): string {
 
 export function getInviterDisplayName(invitation?: PublicInvitationData | null): string {
   if (!invitation) return 'an administrator'
-  if (invitation.inviter_name) return invitation.inviter_name
-  if (invitation.invited_by?.name) return invitation.invited_by.name
-  return 'an administrator'
+  return invitation.invited_by?.name || invitation.inviter_name || 'an administrator'
 }
 
 // ----------------------------------------------------------------------
@@ -38,7 +37,7 @@ export const InvitationCardRoot: React.FC<InvitationCardRootProps> = ({
   ...props
 }) => {
   return (
-    <div
+    <Card
       data-testid={testId}
       className={cn(
         'w-full max-w-[440px] bg-surface-subpanel rounded-xl border border-border-subtle shadow-keylight overflow-hidden',
@@ -49,7 +48,7 @@ export const InvitationCardRoot: React.FC<InvitationCardRootProps> = ({
       <div data-testid="invitation-acceptance-card" className="w-full">
         {children}
       </div>
-    </div>
+    </Card>
   )
 }
 InvitationCardRoot.displayName = 'InvitationCard.Root'
@@ -109,7 +108,8 @@ export const InvitationCardHeader: React.FC<InvitationCardHeaderProps> = ({
       {/* Role and Invitation Text */}
       <p className="font-body-default text-body-default text-text-secondary">
         You have been invited to join as an{' '}
-        <span
+        <Badge
+          variant={isAdmin ? 'admin' : 'agent'}
           data-testid="invitation-role"
           className={cn(
             'inline-flex items-center px-2 py-0.5 rounded text-label-caps font-label-caps font-semibold uppercase',
@@ -119,7 +119,7 @@ export const InvitationCardHeader: React.FC<InvitationCardHeaderProps> = ({
           )}
         >
           {role}
-        </span>{' '}
+        </Badge>{' '}
         member.
       </p>
     </div>
@@ -512,7 +512,6 @@ export const InvitationCard = Object.assign(InvitationCardComponent, {
   Header: InvitationCardHeader,
   LockedEmail: InvitationCardLockedEmail,
   SegmentedToggle: InvitationCardSegmentedToggle,
-  Tabs: InvitationCardSegmentedToggle,
   RegisterForm: InvitationRegisterForm,
   LoginForm: InvitationLoginForm,
   AuthenticatedUser: InvitationCardAuthenticatedUser,

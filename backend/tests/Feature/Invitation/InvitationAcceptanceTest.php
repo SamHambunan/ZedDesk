@@ -52,7 +52,6 @@ test('invitee can view invitation details using valid token', function () {
         ]);
 
     expect($response->json('invitation.expires_at'))->toBeString()
-        ->and($response->json('invitation.inviter_name'))->toBe('Acme Admin')
         ->and($response->json('invitation.invited_by.name'))->toBe('Acme Admin');
 });
 

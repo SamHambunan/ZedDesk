@@ -166,7 +166,6 @@ class InvitationController extends Controller
                     'name' => $invitation->invitedByUser->name,
                     'email' => $invitation->invitedByUser->email,
                 ] : null,
-                'inviter_name' => $invitation->invitedByUser?->name,
             ],
         ]);
     }

@@ -35,7 +35,6 @@ describe('InvitationCard Compound Component', () => {
     expect(InvitationCard.Header).toBeDefined()
     expect(InvitationCard.LockedEmail).toBeDefined()
     expect(InvitationCard.SegmentedToggle).toBeDefined()
-    expect(InvitationCard.Tabs).toBeDefined()
     expect(InvitationCard.RegisterForm).toBeDefined()
     expect(InvitationCard.LoginForm).toBeDefined()
     expect(InvitationCard.AuthenticatedUser).toBeDefined()
