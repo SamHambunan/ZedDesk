@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 import type { TeamMember } from './types'
 
 export interface TeamRosterListProps {
@@ -65,7 +65,7 @@ export const TeamRosterList: React.FC<TeamRosterListProps> = ({
                 data-testid={`remove-member-btn-${teamId}-${member.id}`}
                 onClick={() => onRemoveMember?.(teamId, member.id)}
                 disabled={isRemoving}
-                className="ml-3 px-2 py-1 text-[11px] font-semibold bg-sentiment-negative/10 text-sentiment-negative border border-sentiment-negative/30 rounded hover:bg-sentiment-negative/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                className="ml-3 px-2 py-1 text-[11px] font-semibold bg-sentiment-negative/10 text-sentiment-negative border border-sentiment-negative/30 rounded hover:bg-sentiment-negative/20 active:scale-[0.98] disabled:active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer shrink-0"
               >
                 {isRemoving ? 'Removing...' : 'Remove'}
               </button>

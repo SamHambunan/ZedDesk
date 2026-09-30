@@ -50,7 +50,7 @@ export const CentralHubHeader: React.FC<CentralHubHeaderProps> = ({
         <button
           type="button"
           onClick={onHelpClick}
-          className="font-body-default text-body-default text-text-primary border border-border-prominent bg-surface-subpanel px-3 py-1.5 rounded shadow-keylight hover:bg-surface-container-high transition-colors flex items-center gap-1.5 cursor-pointer"
+          className="font-body-default text-body-default text-text-primary border border-border-prominent bg-surface-subpanel px-3 py-1.5 rounded shadow-keylight hover:bg-surface-container-high transition-all active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
         >
           <HelpCircle className="w-4 h-4 text-text-muted" />
           <span>{hubContentData.nav.help}</span>

@@ -29,19 +29,19 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseStyles =
-      'inline-flex items-center justify-center font-semibold rounded select-none transition-colors duration-150 relative ' +
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-indigo-glow focus-visible:ring-offset-2 focus-visible:ring-offset-surface-canvas ' +
-      'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none'
+      'inline-flex items-center justify-center font-semibold rounded select-none transition-all duration-150 relative cursor-pointer active:scale-[0.98] ' +
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B] focus-visible:ring-offset-2 focus-visible:ring-offset-surface-canvas ' +
+      'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none disabled:active:scale-100'
 
     const variantStyles: Record<ButtonVariant, string> = {
       primary:
-        'bg-primary-container hover:bg-primary-dark text-white shadow-keylight-primary border border-transparent',
+        'bg-primary-container hover:bg-primary-dark active:bg-[#B45309] text-[#0F1012] font-semibold shadow-keylight-primary border border-transparent',
       secondary:
         'bg-surface-subpanel hover:bg-surface-container-high text-on-surface border border-border-prominent shadow-keylight',
       ghost:
         'bg-transparent hover:bg-surface-subpanel text-on-surface-variant hover:text-on-surface border border-transparent',
       ai:
-        'bg-gradient-to-b from-accent-indigo-glow to-primary-container hover:brightness-110 text-white border border-secondary/40 shadow-keylight-primary',
+        'bg-gradient-to-b from-[#8B5CF6]/20 to-[#8B5CF6]/10 hover:brightness-110 text-[#C4B5FD] border border-secondary/40 shadow-keylight-primary',
       danger:
         'bg-sentiment-negative hover:bg-rose-600 text-white shadow-keylight-primary border border-transparent',
       amber:
@@ -69,11 +69,19 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
         ) : (
           <>
-            {isAiVariant && !leftIcon && <Sparkles className="w-4 h-4 text-secondary-light flex-shrink-0" />}
+            {isAiVariant && !leftIcon && (
+              <Sparkles className={cn(size === 'compact' ? 'w-3.5 h-3.5' : 'w-4 h-4', 'text-secondary-light flex-shrink-0')} />
+            )}
             {leftIcon && <span className="flex-shrink-0">{leftIcon}</span>}
           </>
         )}
-        <span>{children}</span>
+        {children !== undefined && children !== null && (
+          typeof children === 'string' || typeof children === 'number' ? (
+            <span>{children}</span>
+          ) : (
+            children
+          )
+        )}
         {!isLoading && rightIcon && <span className="flex-shrink-0">{rightIcon}</span>}
       </button>
     )

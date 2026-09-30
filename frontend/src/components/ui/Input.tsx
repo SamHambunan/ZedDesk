@@ -51,7 +51,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             className={cn(
               'w-full h-9 bg-surface-subpanel text-on-surface text-xs md:text-sm rounded px-3 py-1.5',
               'border border-border-subtle placeholder:text-outline transition-all duration-150',
-              'focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-accent-indigo-glow/30',
+              'focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-[#F59E0B]',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               leadingIcon ? 'pl-9' : 'pl-3',
               trailingBadge ? 'pr-12' : 'pr-3',

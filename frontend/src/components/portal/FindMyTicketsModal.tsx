@@ -55,7 +55,7 @@ export const FindMyTicketsModal: React.FC<FindMyTicketsModalProps> = ({
       onClose={handleReset}
       title={
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-accent-indigo-glow" />
+          <Sparkles className="w-4 h-4 text-accent-ai" />
           <span>Find My Tickets</span>
         </div>
       }

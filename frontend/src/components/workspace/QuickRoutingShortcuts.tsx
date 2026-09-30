@@ -51,7 +51,7 @@ export const QuickRoutingShortcuts: React.FC<QuickRoutingShortcutsProps> = ({
                 onTeamClick?.(team.id)
               }
             }}
-            className="block bg-surface-subpanel rounded-xl border border-border-subtle shadow-keylight p-4 hover:border-accent-glow/50 transition-colors group cursor-pointer text-left"
+            className="block bg-surface-subpanel rounded-lg border border-border-subtle shadow-keylight p-4 hover:border-accent-glow/50 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-glow transition-all group cursor-pointer text-left"
           >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -79,7 +79,7 @@ export const QuickRoutingShortcuts: React.FC<QuickRoutingShortcutsProps> = ({
                 onPendingInvitationsClick?.()
               }
             }}
-            className="block bg-surface-container-high rounded-xl border border-border-subtle p-4 border-dashed hover:border-text-secondary transition-colors group mt-1 cursor-pointer text-left"
+            className="block bg-surface-container-high rounded-lg border border-border-subtle p-4 border-dashed hover:border-text-secondary active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-glow transition-all group mt-1 cursor-pointer text-left shadow-keylight"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

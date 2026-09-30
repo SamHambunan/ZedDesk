@@ -4,18 +4,18 @@
 
 :root {
   color-scheme: dark;
-  --bg-canvas: #0B0F19;
-  --text-primary: #F8FAFC;
-  --text-muted: #94A3B8;
-  --border-subtle: #1E293B;
-  --border-prominent: #334155;
-  --primary: #4F46E5;
+  --bg-canvas: #0F1012;
+  --text-primary: #F1F3F7;
+  --text-muted: #8890A0;
+  --border-subtle: #282A33;
+  --border-prominent: #3B3F4D;
+  --primary: #F59E0B;
 }
 
 body {
   margin: 0;
-  background-color: #0B0F19;
-  color: #F8FAFC;
+  background-color: #0F1012;
+  color: #F1F3F7;
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -26,16 +26,16 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Kinetic Operational Dark micro-borders and top inset highlights */
+/* Industrial Graphite & Cadmium Amber micro-borders and top inset highlights */
 .chiseled-btn {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.20);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .surface-level-2 {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .glass-panel {
-  background-color: rgba(30, 41, 59, 0.7);
+  background-color: rgba(22, 24, 28, 0.85);
   backdrop-filter: blur(12px);
 }

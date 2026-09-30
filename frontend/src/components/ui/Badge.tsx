@@ -43,8 +43,8 @@ const variantStyles: Record<BadgeVariant, { container: string; dot: string }> = 
     dot: 'bg-workflow-n8n-orange',
   },
   primary: {
-    container: 'text-[#C3C0FF] bg-primary-container/12 border-primary-container/25',
-    dot: 'bg-[#C3C0FF]',
+    container: 'text-primary-container bg-primary-container/12 border-primary-container/25',
+    dot: 'bg-primary-container',
   },
   admin: {
     container: 'bg-[#8B5CF6]/15 text-[#C4B5FD] border-[#8B5CF6]/30',

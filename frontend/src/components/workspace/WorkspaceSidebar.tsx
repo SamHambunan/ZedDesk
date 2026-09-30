@@ -49,9 +49,9 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   const isAdmin = (role || '').toLowerCase() === 'admin'
 
   const navItemClass = (isActive: boolean) =>
-    `flex items-center gap-3 px-3 py-2 rounded-r transition-colors text-body-default font-body-default w-full text-left cursor-pointer border-l-2 ${
+    `flex items-center gap-3 px-3 py-2 rounded-r transition-all text-body-default font-body-default w-full text-left cursor-pointer border-l-2 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#F59E0B] ${
       isActive
-        ? 'bg-surface-subpanel text-text-primary border-sentiment-warning border-[#F59E0B] font-medium'
+        ? 'bg-surface-subpanel text-text-primary border-sentiment-warning border-[#F59E0B] font-medium shadow-keylight'
         : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-subpanel/50'
     }`
 

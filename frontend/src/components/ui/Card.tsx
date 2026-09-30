@@ -30,7 +30,7 @@ export const CardTitle = forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTM
   ({ className, ...props }, ref) => (
     <h3
       ref={ref}
-      className={cn('text-base font-semibold text-on-surface tracking-tight leading-6', className)}
+      className={cn('font-title-md text-title-md font-semibold text-on-surface tracking-tight', className)}
       {...props}
     />
   )
@@ -41,7 +41,7 @@ export const CardDescription = forwardRef<HTMLParagraphElement, React.HTMLAttrib
   ({ className, ...props }, ref) => (
     <p
       ref={ref}
-      className={cn('text-xs text-on-surface-variant leading-relaxed', className)}
+      className={cn('font-body-compact text-body-compact text-on-surface-variant leading-relaxed', className)}
       {...props}
     />
   )
@@ -52,7 +52,7 @@ export const CardContent = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLD
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('p-5 pt-2 text-sm text-on-surface', className)}
+      className={cn('p-5 pt-2 font-body-default text-body-default text-on-surface', className)}
       {...props}
     />
   )

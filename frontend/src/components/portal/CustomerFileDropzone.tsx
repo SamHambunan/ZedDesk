@@ -84,7 +84,7 @@ export const CustomerFileDropzone: React.FC<CustomerFileDropzoneProps> = ({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-label-sm font-medium text-text-secondary">
+        <label className="text-label-regular font-label-regular font-medium text-text-secondary">
           Attachments <span className="text-text-muted text-xs font-normal">(Optional, max {maxFiles} files, 10MB each)</span>
         </label>
         <span className="text-xs text-text-muted">
@@ -119,7 +119,7 @@ export const CustomerFileDropzone: React.FC<CustomerFileDropzoneProps> = ({
           <UploadCloud className="w-5 h-5" />
         </div>
         <div>
-          <p className="text-body-sm text-text-primary font-medium">
+          <p className="text-body-compact font-body-compact text-text-primary font-medium">
             <span className="text-accent-indigo-glow underline underline-offset-2">Click to upload</span> or drag and drop
           </p>
           <p className="text-xs text-text-muted mt-0.5">Images, PDF, documents, spreadsheets, or archives up to 10MB</p>
@@ -139,7 +139,7 @@ export const CustomerFileDropzone: React.FC<CustomerFileDropzoneProps> = ({
             <li
               key={`${file.name}-${idx}`}
               data-testid={`portal-attached-file-${idx}`}
-              className="flex items-center justify-between p-2.5 bg-surface-subpanel border border-border-subtle rounded-lg text-body-sm"
+              className="flex items-center justify-between p-2.5 bg-surface-subpanel border border-border-subtle rounded-lg text-body-compact font-body-compact shadow-keylight"
             >
               <div className="flex items-center gap-2.5 truncate">
                 <FileText className="w-4 h-4 text-accent-indigo-glow flex-shrink-0" />
@@ -154,7 +154,7 @@ export const CustomerFileDropzone: React.FC<CustomerFileDropzoneProps> = ({
                   e.stopPropagation()
                   handleRemoveFile(idx)
                 }}
-                className="p-1 text-text-muted hover:text-sentiment-negative rounded transition-colors"
+                className="p-1 text-text-muted hover:text-sentiment-negative rounded transition-colors cursor-pointer disabled:opacity-50"
                 title="Remove attachment"
               >
                 <X className="w-4 h-4" />

@@ -41,7 +41,7 @@ export const InvitationCardRoot: React.FC<InvitationCardRootProps> = ({
     <Card
       data-testid={testId}
       className={cn(
-        'w-full max-w-[440px] bg-surface-subpanel rounded-xl border border-border-subtle shadow-keylight overflow-hidden',
+        'w-full max-w-[440px] bg-surface-subpanel rounded-lg border border-border-subtle shadow-keylight overflow-hidden',
         className
       )}
       {...props}
@@ -81,8 +81,8 @@ export const InvitationCardHeader: React.FC<InvitationCardHeaderProps> = ({
       )}
     >
       {/* Tactile Organization Avatar */}
-      <div className="w-16 h-16 bg-surface-container-highest rounded-full border border-border-prominent flex items-center justify-center mb-4 shadow-[0_0_15px_rgba(99,102,241,0.15)]">
-        <span className="font-headline-md text-headline-md text-primary font-semibold select-none">
+      <div className="w-16 h-16 bg-surface-panel rounded-full border border-border-prominent flex items-center justify-center mb-4 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
+        <span className="font-headline-md text-headline-md text-primary-container font-semibold select-none font-mono">
           {orgInitials}
         </span>
       </div>
@@ -261,7 +261,7 @@ export const InvitationCardAuthenticatedUser: React.FC<InvitationCardAuthenticat
       >
         {isAccepting ? (
           <>
-            <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+            <div className="w-4 h-4 rounded-full border-2 border-[#0F1012] border-t-transparent animate-spin" />
             <span>{invitationsContentData.acceptingBtn}</span>
           </>
         ) : (
@@ -347,7 +347,7 @@ export const InvitationCardError: React.FC<InvitationCardErrorProps> = ({
     <div
       data-testid="invitation-error-card"
       className={cn(
-        'w-full max-w-[440px] bg-surface-subpanel rounded-xl border border-sentiment-negative/30 p-8 text-center shadow-keylight flex flex-col items-center gap-4',
+        'w-full max-w-[440px] bg-surface-subpanel rounded-lg border border-sentiment-negative/30 p-8 text-center shadow-keylight flex flex-col items-center gap-4',
         className
       )}
     >
@@ -396,7 +396,7 @@ export const InvitationCardLoading: React.FC<InvitationCardLoadingProps> = ({
     <div
       data-testid="invitation-loading"
       className={cn(
-        'w-full max-w-[440px] bg-surface-subpanel rounded-xl border border-border-subtle p-12 text-center shadow-keylight flex flex-col items-center gap-3',
+        'w-full max-w-[440px] bg-surface-subpanel rounded-lg border border-border-subtle p-12 text-center shadow-keylight flex flex-col items-center gap-3',
         className
       )}
     >

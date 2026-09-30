@@ -238,15 +238,18 @@ const AssignMemberModalInner: React.FC<AssignMemberModalProps> = ({
           </option>
         ))}
       </select>
-      <button
+      <Button
         type="button"
+        variant="primary"
+        size="standard"
         data-testid={`add-member-btn-${effectiveTeamId}`}
         onClick={() => onAddMember?.(effectiveTeamId)}
         disabled={!selectedId || isAdding}
-        className="h-9 px-4 text-label-regular font-label-regular bg-primary-container hover:bg-primary-dark text-white rounded shadow-keylight-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+        isLoading={isAdding}
+        className="h-9 px-4 shrink-0 font-semibold"
       >
         {isAdding ? 'Adding...' : 'Add Member'}
-      </button>
+      </Button>
     </div>
   )
 }

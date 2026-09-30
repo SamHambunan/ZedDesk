@@ -63,12 +63,12 @@ export const CustomerTicketConfirmation: React.FC<CustomerTicketConfirmationProp
         </div>
       </div>
 
-      <div className="bg-surface-subpanel border border-border-subtle rounded-xl p-5 space-y-4">
+      <div className="bg-surface-subpanel border border-border-subtle rounded-lg shadow-keylight p-5 space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
           <span className="text-xs uppercase font-semibold tracking-wider text-text-muted">Ticket Number</span>
           <span
             data-testid="portal-submitted-ticket-number"
-            className="text-headline-sm font-bold text-accent-indigo-glow font-mono"
+            className="text-headline-sm font-bold text-primary-container font-mono tabular-nums"
           >
             #{ticketNumber}
           </span>
@@ -119,7 +119,7 @@ export const CustomerTicketConfirmation: React.FC<CustomerTicketConfirmationProp
             <span className="text-text-muted text-xs">Customer Access Token:</span>
             <code
               data-testid="portal-access-token"
-              className="text-xs bg-surface-canvas p-2 rounded break-all text-accent-indigo-glow font-mono select-all"
+              className="text-xs bg-surface-canvas p-2 rounded break-all text-primary-container font-mono select-all"
             >
               {token}
             </code>
@@ -144,7 +144,7 @@ export const CustomerTicketConfirmation: React.FC<CustomerTicketConfirmationProp
           target="_blank"
           rel="noopener noreferrer"
           data-testid="portal-view-ticket-link"
-          className="w-full h-10 bg-surface-container-high hover:bg-surface-container-highest border border-border-prominent text-text-primary text-label-md font-medium rounded-lg transition-colors inline-flex items-center justify-center gap-2"
+          className="w-full h-10 bg-surface-container-high hover:bg-surface-container-highest border border-border-prominent text-text-primary text-label-md font-medium rounded-lg shadow-keylight transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 cursor-pointer"
         >
           <span>View Ticket Status</span>
           <ExternalLink className="w-4 h-4 text-text-muted" />

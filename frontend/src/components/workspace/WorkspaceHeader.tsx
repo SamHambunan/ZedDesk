@@ -195,11 +195,11 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
       {/* Left: ZedDesk Branding & Global Command Search */}
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-2">
-          <span className="font-headline-sm text-headline-sm font-bold text-primary dark:text-primary tracking-tight">
+          <span className="font-headline-sm text-headline-sm font-bold text-text-primary tracking-tight">
             {workspaceContentData.brand.name}
           </span>
-          <div className="bg-secondary/20 border border-secondary/40 text-secondary-light rounded-full px-2 py-0.5 text-[10px] font-mono font-semibold flex items-center gap-1">
-            <Sparkles className="w-2.5 h-2.5 text-accent-glow" />
+          <div className="bg-[#8B5CF6]/15 border border-[#8B5CF6]/30 text-[#C4B5FD] rounded-full px-2 py-0.5 text-[10px] font-mono font-semibold flex items-center gap-1">
+            <Sparkles className="w-2.5 h-2.5 text-[#C4B5FD]" />
             <span>{workspaceContentData.brand.badge}</span>
           </div>
         </div>
@@ -213,7 +213,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
             value={searchQuery}
             onChange={handleSearchChange}
             placeholder={workspaceContentData.brand.searchPlaceholder}
-            className="h-[32px] w-[220px] lg:w-[260px] bg-surface-container-low border border-transparent rounded pl-9 pr-10 text-body-compact text-text-primary focus:border-accent-glow/40 focus:outline-none transition-colors placeholder:text-text-muted"
+            className="h-[32px] w-[220px] lg:w-[260px] bg-surface-container-low border border-border-subtle rounded pl-9 pr-10 text-body-compact text-text-primary focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] focus:outline-none transition-colors placeholder:text-text-muted"
           />
           <span className="absolute right-2 text-[10px] font-mono-data text-text-muted bg-surface-subpanel px-1.5 py-0.5 rounded border border-border-subtle">
             {workspaceContentData.brand.searchShortcut}
@@ -227,9 +227,9 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
         <button
           type="button"
           onClick={onCopilotClick}
-          className="h-[32px] px-3 bg-gradient-to-r from-accent-indigo-glow to-primary-container rounded border border-primary-dark text-label-regular font-label-regular text-white flex items-center gap-1.5 hover:opacity-90 transition-opacity shadow-keylight cursor-pointer"
+          className="h-[32px] px-3 bg-[#8B5CF6]/15 hover:bg-[#8B5CF6]/25 rounded border border-[#8B5CF6]/40 text-label-regular font-label-regular text-[#C4B5FD] flex items-center gap-1.5 transition-all active:scale-[0.98] shadow-keylight cursor-pointer"
         >
-          <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+          <Sparkles className="w-3.5 h-3.5 text-[#C4B5FD] animate-pulse" />
           <span>{workspaceContentData.brand.copilotLabel}</span>
         </button>
 
@@ -245,7 +245,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
               setShowProfileMenu(false)
             }}
             title={`Switch tenant (${organizationSlug})`}
-            className="h-[32px] px-3 bg-surface-container-low hover:bg-surface-subpanel rounded border border-border-subtle text-label-regular font-label-regular text-text-secondary flex items-center gap-1.5 transition-colors cursor-pointer select-none"
+            className="h-[32px] px-3 bg-surface-container-low hover:bg-surface-subpanel rounded border border-border-subtle text-label-regular font-label-regular text-text-secondary flex items-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer select-none"
           >
             <span
               data-testid="workspace-org-name"
@@ -304,7 +304,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <Badge
-                            variant={isOrgAdmin ? 'ai' : 'neutral'}
+                            variant={isOrgAdmin ? 'admin' : 'agent'}
                             className="font-mono uppercase text-[10px] px-1.5 py-0.5 tracking-wider"
                           >
                             {orgRole}

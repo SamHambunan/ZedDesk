@@ -294,7 +294,7 @@ const WorkspaceShellDefaultContent: React.FC<WorkspaceShellProps> = (props) => {
               <OverviewDashboardContent onInviteMemberClick={onInviteMemberClick} />
             ) : (
               <div className="max-w-7xl mx-auto py-8">
-                <div className="bg-surface-subpanel border border-border-subtle rounded-xl p-8 shadow-card text-center">
+                <div className="bg-surface-subpanel border border-border-subtle rounded-lg p-8 shadow-keylight text-center">
                   <h2 className="text-headline-sm font-semibold text-text-primary mb-2 capitalize">
                     {activeView.replace('-', ' ')}
                   </h2>
@@ -335,9 +335,9 @@ function OverviewDashboardContent({ onInviteMemberClick }: { onInviteMemberClick
               onNavigate?.('invitations')
             }
           }}
-          className="h-[32px] px-4 bg-primary-container hover:bg-primary-dark rounded text-label-regular font-label-regular text-white transition-colors shadow-keylight flex items-center gap-2 cursor-pointer shrink-0"
+          className="h-[32px] px-4 bg-primary-container hover:bg-primary-dark active:scale-[0.98] rounded text-label-regular font-label-regular text-[#0F1012] font-semibold transition-all shadow-keylight-primary flex items-center gap-2 cursor-pointer shrink-0"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-4 h-4 text-[#0F1012]" />
           <span>{workspaceContentData.hero.inviteMember}</span>
         </button>
       </div>

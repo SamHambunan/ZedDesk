@@ -205,7 +205,7 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
                       aria-label={`Actions for ${userName}`}
                       data-testid={`member-actions-btn-${member.id}`}
                       onClick={() => onActionClick?.(member)}
-                      className="text-text-muted hover:text-text-primary p-1 rounded hover:bg-surface-container-high transition-colors focus:outline-none"
+                      className="text-text-muted hover:text-text-primary p-1 rounded hover:bg-surface-container-high transition-all active:scale-95 focus:outline-none cursor-pointer"
                     >
                       <MoreVertical className="w-4 h-4" />
                     </button>

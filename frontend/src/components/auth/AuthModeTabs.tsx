@@ -29,9 +29,9 @@ export const AuthModeTabs: React.FC<AuthModeTabsProps> = ({
         aria-selected={activeTab === 'login'}
         aria-label="Log In"
         onClick={() => onTabChange('login')}
-        className={`py-1.5 text-xs font-medium rounded transition-colors cursor-pointer select-none ${
+        className={`py-1.5 text-xs font-medium rounded transition-all active:scale-[0.98] cursor-pointer select-none ${
           activeTab === 'login'
-            ? 'bg-[#1E2026] text-[#F1F3F7] shadow-sm font-semibold'
+            ? 'bg-[#1E2026] text-[#F1F3F7] shadow-keylight font-semibold'
             : 'text-[#8890A0] hover:text-[#F1F3F7]'
         }`}
       >
@@ -44,9 +44,9 @@ export const AuthModeTabs: React.FC<AuthModeTabsProps> = ({
         aria-selected={activeTab === 'register'}
         aria-label="Register"
         onClick={() => onTabChange('register')}
-        className={`py-1.5 text-xs font-medium rounded transition-colors cursor-pointer select-none ${
+        className={`py-1.5 text-xs font-medium rounded transition-all active:scale-[0.98] cursor-pointer select-none ${
           activeTab === 'register'
-            ? 'bg-[#1E2026] text-[#F1F3F7] shadow-sm font-semibold'
+            ? 'bg-[#1E2026] text-[#F1F3F7] shadow-keylight font-semibold'
             : 'text-[#8890A0] hover:text-[#F1F3F7]'
         }`}
       >

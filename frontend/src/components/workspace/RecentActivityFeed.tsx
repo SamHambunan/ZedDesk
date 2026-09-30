@@ -31,7 +31,7 @@ export const RecentActivityFeed: React.FC<RecentActivityFeedProps> = ({
   return (
     <div
       data-testid={testId}
-      className={`bg-surface-subpanel rounded-xl border border-border-subtle shadow-keylight p-6 flex flex-col h-[400px] ${className}`}
+      className={`bg-surface-subpanel rounded-lg border border-border-subtle shadow-keylight p-6 flex flex-col h-[400px] ${className}`}
     >
       <h2 className="text-title-md font-title-md text-text-primary mb-4 font-semibold">
         {title}

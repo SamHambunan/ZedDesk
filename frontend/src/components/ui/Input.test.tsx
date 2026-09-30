@@ -62,6 +62,6 @@ describe('Input Primitive', () => {
     render(<Input placeholder="Focus test" />)
     const input = screen.getByPlaceholderText('Focus test')
     expect(input.className).toContain('focus:border-primary-container')
-    expect(input.className).toContain('focus:ring-accent-indigo-glow/30')
+    expect(input.className).toContain('focus:ring-[#F59E0B]')
   })
 })

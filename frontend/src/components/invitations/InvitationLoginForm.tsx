@@ -114,7 +114,7 @@ export const InvitationLoginForm: React.FC<InvitationLoginFormProps> = ({
       >
         {isSubmitting ? (
           <>
-            <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+            <div className="w-4 h-4 rounded-full border-2 border-[#0F1012] border-t-transparent animate-spin" />
             <span>{invitationsContentData.signingInBtn}</span>
           </>
         ) : (

@@ -27,7 +27,7 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = ({
   return (
     <div
       data-testid="user-profile-card"
-      className={`bg-surface-panel border border-border-subtle rounded-xl p-5 flex flex-col gap-5 text-left shadow-sm ${className}`}
+      className={`bg-surface-panel border border-border-subtle rounded-lg p-5 flex flex-col gap-5 text-left shadow-keylight ${className}`}
     >
       <div className="flex items-center gap-4">
         {avatarSrc ? (
@@ -88,7 +88,7 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = ({
             type="button"
             disabled={isLoggingOut}
             onClick={onLogout}
-            className="flex items-center gap-2 text-text-secondary hover:text-sentiment-critical transition-colors font-body-default text-body-default px-2 py-1.5 rounded hover:bg-surface-subpanel w-full mt-1 border border-transparent hover:border-sentiment-critical/20 text-left cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-2 text-text-secondary hover:text-sentiment-critical active:scale-[0.98] transition-all font-body-default text-body-default px-2 py-1.5 rounded hover:bg-surface-subpanel w-full mt-1 border border-transparent hover:border-sentiment-critical/20 text-left cursor-pointer disabled:opacity-50"
           >
             <LogOut className="w-[18px] h-[18px] shrink-0" />
             <span>{isLoggingOut ? 'Logging out...' : hubContentData.profile.logout}</span>

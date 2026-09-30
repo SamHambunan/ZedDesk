@@ -198,7 +198,7 @@ export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = (
                         type="button"
                         data-testid={`copy-invitation-link-${inv.id}`}
                         onClick={() => onCopyLink?.(inv)}
-                        className={`inline-flex items-center gap-1 text-[11px] font-label-caps font-semibold uppercase tracking-wider transition-colors cursor-pointer ${
+                        className={`inline-flex items-center gap-1 text-[11px] font-label-caps font-semibold uppercase tracking-wider transition-all active:scale-[0.98] cursor-pointer ${
                           isCopied
                             ? 'text-sentiment-positive'
                             : 'text-accent-glow hover:text-primary-fixed'
@@ -226,7 +226,7 @@ export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = (
                           data-testid={`revoke-invitation-btn-${inv.id}`}
                           disabled={isRevoking}
                           onClick={() => onRevoke?.(inv.id)}
-                          className="inline-flex items-center gap-1 text-sentiment-critical hover:text-red-400 font-label-caps text-[11px] uppercase tracking-wider transition-colors p-1 disabled:opacity-50 cursor-pointer"
+                          className="inline-flex items-center gap-1 text-sentiment-critical hover:text-red-400 font-label-caps text-[11px] uppercase tracking-wider transition-all active:scale-[0.98] p-1 disabled:opacity-50 cursor-pointer"
                         >
                           <Trash2 className="w-3 h-3 sm:hidden" />
                           <span className="hidden sm:inline">

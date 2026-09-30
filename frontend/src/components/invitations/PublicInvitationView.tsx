@@ -47,12 +47,12 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
       {/* Minimal Header */}
       <header className="mb-8 flex items-center gap-3">
         <div className="w-8 h-8 bg-primary-container rounded-lg flex items-center justify-center shadow-keylight-primary">
-          <LayoutGrid className="w-4 h-4 text-white" />
+          <LayoutGrid className="w-4 h-4 text-[#0F1012]" />
         </div>
         <span className="font-headline-sm text-headline-sm text-text-primary font-semibold">
           {invitationsContentData.brandName}
         </span>
-        <span className="px-2 py-0.5 rounded-full bg-accent-glow/20 border border-accent-glow/30 text-primary font-label-caps text-label-caps font-semibold">
+        <span className="px-2 py-0.5 rounded-full bg-accent-glow/20 border border-accent-glow/30 text-primary-container font-label-caps text-label-caps font-semibold">
           {invitationsContentData.aiBadge}
         </span>
       </header>

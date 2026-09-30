@@ -53,7 +53,7 @@ export const Toast: React.FC<ToastProps> = ({
           type="button"
           onClick={onClose}
           aria-label="Dismiss toast"
-          className="ml-1 p-0.5 text-text-muted hover:text-text-primary rounded transition-colors cursor-pointer"
+          className="ml-1 p-0.5 text-text-muted hover:text-text-primary rounded transition-all active:scale-90 cursor-pointer"
         >
           <X className="w-3.5 h-3.5" />
         </button>

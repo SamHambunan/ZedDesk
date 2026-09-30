@@ -981,7 +981,7 @@ function AppInner({
             )}
 
             {!loadingWorkspace && workspaceData && workspaceView === 'team-management' && workspaceData.role !== 'admin' && (
-              <div data-testid="team-management-forbidden" className="bg-surface-subpanel border border-sentiment-negative/30 rounded-xl p-8 text-center">
+              <div data-testid="team-management-forbidden" className="bg-surface-subpanel border border-sentiment-negative/30 rounded-lg p-8 text-center shadow-keylight">
                 <h3 className="text-headline-sm font-headline-sm text-sentiment-negative mb-2">Access Denied</h3>
                 <p className="text-body-default text-text-secondary mb-6">
                   Team management is restricted to Administrators.
@@ -989,7 +989,7 @@ function AppInner({
                 <button
                   type="button"
                   onClick={() => setWorkspaceView('teams')}
-                  className="h-9 px-5 text-label-regular font-label-regular bg-primary-container hover:bg-primary-dark text-white rounded shadow-keylight-primary transition-colors"
+                  className="h-9 px-5 text-label-regular font-label-regular bg-primary-container hover:bg-primary-dark text-[#0F1012] font-semibold rounded shadow-keylight-primary transition-all active:scale-[0.98] cursor-pointer"
                 >
                   View Teams
                 </button>

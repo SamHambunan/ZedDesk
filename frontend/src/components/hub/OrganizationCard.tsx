@@ -42,12 +42,12 @@ export const OrganizationCard: React.FC<OrganizationCardProps> = ({
   return (
     <div
       data-testid={`org-card-${organization.slug}`}
-      className={`bg-surface-subpanel border border-border-prominent rounded-xl p-5 shadow-keylight flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:border-accent-glow/50 transition-colors ${className}`}
+      className={`bg-surface-subpanel border border-border-prominent rounded-lg p-5 shadow-keylight flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:border-accent-glow/50 transition-colors ${className}`}
     >
       <div className="flex items-center gap-4">
         {/* Org Avatar Box */}
         <div className="w-12 h-12 rounded-lg bg-surface-panel border border-border-subtle flex items-center justify-center shrink-0">
-          <span className="font-headline-md text-headline-md text-accent-glow font-semibold select-none">
+          <span className="font-headline-md text-headline-md text-primary-container font-semibold select-none font-mono">
             {initial}
           </span>
         </div>
@@ -63,8 +63,8 @@ export const OrganizationCard: React.FC<OrganizationCardProps> = ({
               data-testid="role-badge"
               className={`font-label-caps text-label-caps uppercase px-2 py-0.5 rounded-full border select-none leading-none font-semibold text-[11px] tracking-wider ${
                 isAdmin
-                  ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]'
-                  : 'bg-[#1E2026] border-[#3B3F4D] text-[#94A3B8]'
+                  ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/30 text-[#C4B5FD]'
+                  : 'bg-[#1E2026] border-[#282A33] text-[#8890A0]'
               }`}
             >
               {organization.role}
@@ -93,7 +93,7 @@ export const OrganizationCard: React.FC<OrganizationCardProps> = ({
           type="button"
           onClick={handleLaunchClick}
           aria-label={`Launch Workspace for ${organization.name}`}
-          className="bg-primary-container text-white font-body-default text-body-default px-4 py-2 rounded shadow-keylight-primary hover:bg-primary-dark transition-colors flex items-center gap-2 h-9 cursor-pointer active:scale-[0.98]"
+          className="bg-primary-container text-[#0F1012] font-semibold text-body-default px-4 py-2 rounded shadow-keylight-primary hover:bg-primary-dark transition-colors flex items-center gap-2 h-9 cursor-pointer active:scale-[0.98]"
         >
           <span>{hubContentData.organizations.launchWorkspace}</span>
           <ArrowRight className="w-4 h-4" />

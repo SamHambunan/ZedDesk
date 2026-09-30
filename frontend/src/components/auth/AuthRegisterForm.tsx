@@ -307,7 +307,7 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
         type="submit"
         disabled={isLoading}
         aria-label="Register"
-        className="w-full h-10 mt-2 bg-[#F59E0B] hover:bg-[#D97706] active:bg-[#B45309] text-[#0F1012] font-semibold text-xs rounded shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full h-10 mt-2 bg-[#F59E0B] hover:bg-[#D97706] active:bg-[#B45309] text-[#0F1012] font-semibold text-xs rounded shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] transition-all active:scale-[0.98] disabled:active:scale-100 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <span>{isLoading ? 'Registering...' : 'Register User'}</span>
         <ArrowRight className="w-3.5 h-3.5" />

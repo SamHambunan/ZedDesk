@@ -67,7 +67,7 @@ export const TeamCard: React.FC<TeamCardProps> = ({
   return (
     <div
       data-testid={`team-card-${team.id}`}
-      className="bg-surface-subpanel border border-border-subtle rounded-xl shadow-keylight flex flex-col gap-0 overflow-hidden"
+      className="bg-surface-subpanel border border-border-subtle rounded-lg shadow-keylight flex flex-col gap-0 overflow-hidden hover:border-border-prominent transition-colors"
     >
       {/* Card Header */}
       <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-border-subtle">
@@ -97,23 +97,28 @@ export const TeamCard: React.FC<TeamCardProps> = ({
               />
             </div>
             <div className="flex gap-2">
-              <button
+              <Button
                 type="button"
+                variant="primary"
+                size="compact"
                 data-testid={`save-team-btn-${team.id}`}
                 onClick={() => onSaveEdit?.(team.id)}
                 disabled={isUpdating}
-                className="h-8 px-4 text-label-regular font-label-regular bg-primary-container hover:bg-primary-dark text-white rounded shadow-keylight-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                isLoading={isUpdating}
+                className="h-8 px-4 text-label-regular font-label-regular font-semibold"
               >
                 {isUpdating ? 'Saving...' : 'Save'}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="secondary"
+                size="compact"
                 data-testid={`cancel-edit-team-btn-${team.id}`}
                 onClick={onCancelEdit}
-                className="h-8 px-4 text-label-regular font-label-regular bg-surface-panel border border-border-prominent text-text-secondary hover:text-text-primary rounded transition-colors"
+                className="h-8 px-4 text-label-regular font-label-regular"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         ) : (

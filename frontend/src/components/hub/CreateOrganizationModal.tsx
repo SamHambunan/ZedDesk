@@ -226,21 +226,21 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
           <button
             type="button"
             onClick={onClose}
-            className="h-8 px-4 font-label-regular text-label-regular text-text-secondary hover:text-text-primary hover:bg-surface-container-high rounded transition-colors focus:outline-none focus:ring-2 focus:ring-accent-glow cursor-pointer"
+            className="h-8 px-4 font-label-regular text-label-regular text-text-secondary hover:text-text-primary hover:bg-surface-container-high active:scale-[0.98] rounded transition-all focus:outline-none focus:ring-2 focus:ring-accent-glow cursor-pointer"
           >
             {createOrgModalData.cancelButton}
           </button>
           <button
             type="submit"
             disabled={isSubmitting || !isAvailable || !name.trim()}
-            className="h-8 px-4 bg-primary-container text-white font-label-regular text-label-regular rounded shadow-keylight-primary hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all focus:outline-none focus:ring-2 focus:ring-accent-glow focus:ring-offset-2 focus:ring-offset-surface-subpanel flex items-center gap-2 cursor-pointer"
+            className="h-8 px-4 bg-primary-container text-[#0F1012] font-semibold text-label-regular rounded shadow-keylight-primary hover:bg-primary-dark active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 transition-all focus:outline-none focus:ring-2 focus:ring-accent-glow focus:ring-offset-2 focus:ring-offset-surface-subpanel flex items-center gap-2 cursor-pointer"
           >
             <span>
               {isSubmitting
                 ? createOrgModalData.submittingButton
                 : createOrgModalData.submitButton}
             </span>
-            <Rocket className="w-4 h-4" />
+            <Rocket className="w-4 h-4 text-[#0F1012]" />
           </button>
         </Modal.Footer>
       </form>

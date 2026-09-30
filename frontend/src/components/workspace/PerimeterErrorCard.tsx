@@ -106,7 +106,7 @@ export const PerimeterErrorCard: React.FC<PerimeterErrorCardProps> = ({
           type="submit"
           data-testid="direct-login-submit-btn"
           disabled={isSubmitting}
-          className="flex-1 h-9 bg-primary-container hover:bg-primary-dark text-white rounded font-label-regular text-label-regular font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
+          className="flex-1 h-9 bg-primary-container hover:bg-primary-dark text-[#0F1012] rounded font-label-regular text-label-regular font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
         >
           <LogIn className="w-4 h-4" />
           <span>{isSubmitting ? 'Signing In...' : 'Sign In'}</span>
@@ -127,7 +127,7 @@ export const PerimeterErrorCard: React.FC<PerimeterErrorCardProps> = ({
       <div className={`max-w-md mx-auto my-12 w-full px-4 ${className}`}>
         <div
           data-testid="workspace-unauthenticated"
-          className="bg-surface-subpanel border border-border-subtle shadow-card rounded-xl p-8 text-center flex flex-col items-center"
+          className="bg-surface-subpanel border border-border-subtle shadow-keylight rounded-lg p-8 text-center flex flex-col items-center"
         >
           <div className="w-12 h-12 rounded-full bg-surface-container-high border border-border-prominent flex items-center justify-center mb-4">
             <ShieldAlert className="w-6 h-6 text-accent-glow" />
@@ -146,7 +146,7 @@ export const PerimeterErrorCard: React.FC<PerimeterErrorCardProps> = ({
                 href={hubTarget}
                 onClick={onLoginClick}
                 data-testid="login-redirect-btn"
-                className="inline-flex items-center justify-center h-9 px-5 bg-primary-container hover:bg-primary-dark text-white rounded font-label-regular text-label-regular font-semibold shadow-keylight transition-colors"
+                className="inline-flex items-center justify-center h-9 px-5 bg-primary-container hover:bg-primary-dark active:scale-[0.98] text-[#0F1012] rounded font-label-regular text-label-regular font-semibold shadow-keylight-primary transition-all cursor-pointer"
               >
                 Log In at Central Hub
               </a>
@@ -154,7 +154,7 @@ export const PerimeterErrorCard: React.FC<PerimeterErrorCardProps> = ({
                 type="button"
                 data-testid="toggle-direct-login-btn"
                 onClick={() => setShowDirectLogin(true)}
-                className="inline-flex items-center justify-center gap-2 h-9 px-5 bg-surface-container-high hover:bg-surface-panel border border-border-prominent text-text-secondary hover:text-text-primary rounded font-label-regular text-label-regular font-medium transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center gap-2 h-9 px-5 bg-surface-container-high hover:bg-surface-panel active:scale-[0.98] border border-border-prominent text-text-secondary hover:text-text-primary rounded font-label-regular text-label-regular font-medium transition-all cursor-pointer shadow-keylight"
               >
                 <KeyRound className="w-4 h-4 text-text-muted" />
                 <span>Sign In Directly</span>
@@ -173,7 +173,7 @@ export const PerimeterErrorCard: React.FC<PerimeterErrorCardProps> = ({
       <div className={`max-w-md mx-auto my-12 w-full px-4 ${className}`}>
         <div
           data-testid="workspace-403"
-          className="bg-surface-subpanel border border-sentiment-critical/30 shadow-card rounded-xl p-8 text-center flex flex-col items-center"
+          className="bg-surface-subpanel border border-sentiment-critical/30 shadow-keylight rounded-lg p-8 text-center flex flex-col items-center"
         >
           <div className="w-12 h-12 rounded-full bg-sentiment-critical/10 border border-sentiment-critical/30 flex items-center justify-center mb-4">
             <AlertTriangle className="w-6 h-6 text-sentiment-critical" />
@@ -190,7 +190,7 @@ export const PerimeterErrorCard: React.FC<PerimeterErrorCardProps> = ({
             <div className="flex flex-col gap-3 w-full">
               <a
                 href={centralHubUrl}
-                className="inline-flex items-center gap-2 justify-center h-9 px-5 bg-surface-container-high hover:bg-surface-panel border border-border-prominent text-text-primary rounded font-label-regular text-label-regular font-medium transition-colors"
+                className="inline-flex items-center gap-2 justify-center h-9 px-5 bg-surface-container-high hover:bg-surface-panel active:scale-[0.98] border border-border-prominent text-text-primary rounded font-label-regular text-label-regular font-medium transition-all shadow-keylight cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4 text-text-muted" />
                 <span>Return to Central Hub</span>
@@ -205,7 +205,7 @@ export const PerimeterErrorCard: React.FC<PerimeterErrorCardProps> = ({
                   }
                   setShowDirectLogin(true)
                 }}
-                className="inline-flex items-center justify-center gap-2 h-9 px-5 bg-transparent hover:bg-surface-container-high border border-border-prominent text-text-secondary hover:text-text-primary rounded font-label-regular text-label-regular font-medium transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center gap-2 h-9 px-5 bg-transparent hover:bg-surface-container-high active:scale-[0.98] border border-border-prominent text-text-secondary hover:text-text-primary rounded font-label-regular text-label-regular font-medium transition-all cursor-pointer"
               >
                 <KeyRound className="w-4 h-4 text-text-muted" />
                 <span>Switch Account / Sign In</span>
@@ -224,7 +224,7 @@ export const PerimeterErrorCard: React.FC<PerimeterErrorCardProps> = ({
       <div className={`max-w-md mx-auto my-12 w-full px-4 ${className}`}>
         <div
           data-testid="workspace-404"
-          className="bg-surface-subpanel border border-border-subtle shadow-card rounded-xl p-8 text-center flex flex-col items-center"
+          className="bg-surface-subpanel border border-border-subtle shadow-keylight rounded-lg p-8 text-center flex flex-col items-center"
         >
           <div className="w-12 h-12 rounded-full bg-surface-container-high border border-border-prominent flex items-center justify-center mb-4">
             <HelpCircle className="w-6 h-6 text-text-muted" />
@@ -240,7 +240,7 @@ export const PerimeterErrorCard: React.FC<PerimeterErrorCardProps> = ({
 
           <a
             href={centralHubUrl}
-            className="inline-flex items-center gap-2 justify-center h-9 px-5 bg-surface-container-high hover:bg-surface-panel border border-border-prominent text-text-primary rounded font-label-regular text-label-regular font-medium transition-colors"
+            className="inline-flex items-center gap-2 justify-center h-9 px-5 bg-surface-container-high hover:bg-surface-panel active:scale-[0.98] border border-border-prominent text-text-primary rounded font-label-regular text-label-regular font-medium transition-all shadow-keylight cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4 text-text-muted" />
             <span>Return to Central Hub</span>
@@ -254,7 +254,7 @@ export const PerimeterErrorCard: React.FC<PerimeterErrorCardProps> = ({
     <div className={`max-w-md mx-auto my-12 w-full px-4 ${className}`}>
       <div
         data-testid="workspace-error"
-        className="bg-surface-subpanel border border-border-subtle shadow-card rounded-xl p-8 text-center flex flex-col items-center"
+        className="bg-surface-subpanel border border-border-subtle shadow-keylight rounded-lg p-8 text-center flex flex-col items-center"
       >
         <div className="w-12 h-12 rounded-full bg-surface-container-high border border-border-prominent flex items-center justify-center mb-4">
           <AlertTriangle className="w-6 h-6 text-sentiment-warning" />
@@ -269,7 +269,7 @@ export const PerimeterErrorCard: React.FC<PerimeterErrorCardProps> = ({
 
         <a
           href={centralHubUrl}
-          className="inline-flex items-center gap-2 justify-center h-9 px-5 bg-surface-container-high hover:bg-surface-panel border border-border-prominent text-text-primary rounded font-label-regular text-label-regular font-medium transition-colors"
+          className="inline-flex items-center gap-2 justify-center h-9 px-5 bg-surface-container-high hover:bg-surface-panel active:scale-[0.98] border border-border-prominent text-text-primary rounded font-label-regular text-label-regular font-medium transition-all shadow-keylight cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4 text-text-muted" />
           <span>Return to Central Hub</span>

@@ -86,7 +86,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
         <h1 className="text-headline-md font-headline-md text-text-primary tracking-tight">
           Submit a Support Request
         </h1>
-        <p className="text-body-sm text-text-secondary mt-1.5 leading-relaxed">
+        <p className="text-body-compact font-body-compact text-text-secondary mt-1.5 leading-relaxed">
           Describe your inquiry below and our support agents will assist you promptly.
         </p>
       </header>
@@ -95,7 +95,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
       {error && (
         <div
           data-testid="portal-error-message"
-          className="p-4 bg-sentiment-negative/10 border border-sentiment-negative/30 rounded-xl text-sentiment-negative text-body-sm flex items-start gap-3 animate-in fade-in duration-150"
+          className="p-4 bg-sentiment-negative/10 border border-sentiment-negative/30 rounded-lg text-sentiment-negative text-body-compact font-body-compact shadow-keylight flex items-start gap-3 animate-in fade-in duration-150"
         >
           <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
@@ -111,7 +111,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
           <div>
             <label
               htmlFor="portal-name"
-              className="block text-label-sm font-medium text-text-secondary mb-1.5"
+              className="block text-label-regular font-label-regular font-medium text-text-secondary mb-1.5"
             >
               Your Full Name <span className="text-sentiment-negative">*</span>
             </label>
@@ -127,7 +127,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
                 if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: undefined }))
               }}
               placeholder="e.g. Alice Freeman"
-              className={`w-full h-10 px-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-accent-indigo-glow transition-colors ${
+              className={`w-full h-10 px-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-compact font-body-compact focus:outline-none focus:border-accent-indigo-glow transition-colors ${
                 fieldErrors.name ? 'border-sentiment-negative' : 'border-border-subtle'
               }`}
             />
@@ -141,7 +141,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
           <div>
             <label
               htmlFor="portal-email"
-              className="block text-label-sm font-medium text-text-secondary mb-1.5"
+              className="block text-label-regular font-label-regular font-medium text-text-secondary mb-1.5"
             >
               Email Address <span className="text-sentiment-negative">*</span>
             </label>
@@ -157,7 +157,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
                 if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }))
               }}
               placeholder="e.g. alice@example.com"
-              className={`w-full h-10 px-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-accent-indigo-glow transition-colors ${
+              className={`w-full h-10 px-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-compact font-body-compact focus:outline-none focus:border-accent-indigo-glow transition-colors ${
                 fieldErrors.email ? 'border-sentiment-negative' : 'border-border-subtle'
               }`}
             />
@@ -174,7 +174,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
           <div className="sm:col-span-2">
             <label
               htmlFor="portal-subject"
-              className="block text-label-sm font-medium text-text-secondary mb-1.5"
+              className="block text-label-regular font-label-regular font-medium text-text-secondary mb-1.5"
             >
               Subject <span className="text-sentiment-negative">*</span>
             </label>
@@ -190,7 +190,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
                 if (fieldErrors.subject) setFieldErrors((prev) => ({ ...prev, subject: undefined }))
               }}
               placeholder="Brief summary of your inquiry"
-              className={`w-full h-10 px-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-accent-indigo-glow transition-colors ${
+              className={`w-full h-10 px-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-compact font-body-compact focus:outline-none focus:border-accent-indigo-glow transition-colors ${
                 fieldErrors.subject ? 'border-sentiment-negative' : 'border-border-subtle'
               }`}
             />
@@ -204,7 +204,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
           <div>
             <label
               htmlFor="portal-priority"
-              className="block text-label-sm font-medium text-text-secondary mb-1.5"
+              className="block text-label-regular font-label-regular font-medium text-text-secondary mb-1.5"
             >
               Priority
             </label>
@@ -214,7 +214,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
               disabled={isSubmitting}
               value={priority}
               onChange={(e) => setPriority(e.target.value as TicketPriorityType)}
-              className="w-full h-10 px-3 bg-surface-canvas border border-border-subtle rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-accent-indigo-glow transition-colors"
+              className="w-full h-10 px-3 bg-surface-canvas border border-border-subtle rounded-lg text-text-primary text-body-compact font-body-compact focus:outline-none focus:border-accent-indigo-glow transition-colors"
             >
               <option value="low">Low</option>
               <option value="medium">Medium</option>
@@ -228,7 +228,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
         <div>
           <label
             htmlFor="portal-message"
-            className="block text-label-sm font-medium text-text-secondary mb-1.5"
+            className="block text-label-regular font-label-regular font-medium text-text-secondary mb-1.5"
           >
             Detailed Message <span className="text-sentiment-negative">*</span>
           </label>
@@ -244,7 +244,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
               if (fieldErrors.message) setFieldErrors((prev) => ({ ...prev, message: undefined }))
             }}
             placeholder="Describe your inquiry in detail..."
-            className={`w-full p-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-accent-indigo-glow transition-colors ${
+            className={`w-full p-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-compact font-body-compact focus:outline-none focus:border-accent-indigo-glow transition-colors ${
               fieldErrors.message ? 'border-sentiment-negative' : 'border-border-subtle'
             }`}
           />

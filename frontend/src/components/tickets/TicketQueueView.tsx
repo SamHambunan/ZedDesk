@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react'
+import { RefreshCw } from 'lucide-react'
+import { Button } from '../ui/Button'
 
 export interface TicketCustomer {
   readonly id: string
@@ -90,13 +92,13 @@ export const TicketQueueView: React.FC<TicketQueueViewProps> = ({ apiUrl, token 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-subtle pb-4">
         <div>
           <h2 className="text-headline-md font-headline-md text-text-primary">Tickets Queue</h2>
-          <p className="text-body-sm text-text-secondary">
+          <p className="text-body-compact font-body-compact text-text-secondary">
             Manage, triage, and collaborate on customer inquiries across your organization.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <label htmlFor="status-filter" className="text-label-sm text-text-muted">
+          <label htmlFor="status-filter" className="text-label-regular font-label-regular text-text-muted">
             Status:
           </label>
           <select
@@ -104,7 +106,7 @@ export const TicketQueueView: React.FC<TicketQueueViewProps> = ({ apiUrl, token 
             data-testid="ticket-status-filter"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-9 px-3 bg-surface-panel border border-border-subtle rounded-lg text-body-sm text-text-primary focus:outline-none focus:border-accent-indigo-glow"
+            className="h-9 px-3 bg-surface-panel border border-border-subtle rounded text-body-compact font-body-compact text-text-primary focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container"
           >
             <option value="all">All Statuses</option>
             <option value="new">New</option>
@@ -113,21 +115,24 @@ export const TicketQueueView: React.FC<TicketQueueViewProps> = ({ apiUrl, token 
             <option value="resolved">Resolved</option>
             <option value="closed">Closed</option>
           </select>
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="standard"
             data-testid="refresh-tickets-btn"
             onClick={fetchTickets}
-            className="h-9 px-3 bg-surface-subpanel hover:bg-surface-canvas border border-border-subtle rounded-lg text-body-sm text-text-secondary transition-colors"
+            isLoading={isLoading}
+            leftIcon={!isLoading ? <RefreshCw className="w-3.5 h-3.5" /> : undefined}
           >
             Refresh
-          </button>
+          </Button>
         </div>
       </div>
 
       {error && (
         <div
           data-testid="tickets-error"
-          className="p-4 bg-sentiment-negative/10 border border-sentiment-negative/30 rounded-lg text-sentiment-negative text-body-sm"
+          className="p-4 bg-sentiment-negative/10 border border-sentiment-negative/30 rounded-lg text-sentiment-negative text-body-compact font-body-compact shadow-keylight"
         >
           {error}
         </div>
@@ -135,25 +140,25 @@ export const TicketQueueView: React.FC<TicketQueueViewProps> = ({ apiUrl, token 
 
       {isLoading ? (
         <div data-testid="tickets-loading" className="py-12 flex flex-col items-center justify-center gap-3 text-text-muted">
-          <div className="w-8 h-8 border-2 border-accent-indigo-glow border-t-transparent rounded-full animate-spin" />
-          <span className="text-body-sm">Loading tickets queue...</span>
+          <div className="w-8 h-8 border-2 border-primary-container border-t-transparent rounded-full animate-spin" />
+          <span className="text-body-compact font-body-compact">Loading tickets queue...</span>
         </div>
       ) : tickets.length === 0 ? (
         <div
           data-testid="tickets-empty"
-          className="py-12 text-center bg-surface-panel border border-border-subtle rounded-xl p-8"
+          className="py-12 text-center bg-surface-subpanel border border-border-subtle rounded-lg p-8 shadow-keylight"
         >
-          <h3 className="text-headline-sm text-text-primary mb-1">No Tickets Found</h3>
-          <p className="text-body-sm text-text-muted">
+          <h3 className="text-headline-sm font-headline-sm text-text-primary mb-1">No Tickets Found</h3>
+          <p className="text-body-compact font-body-compact text-text-muted">
             {statusFilter !== 'all' ? `No tickets found with status "${statusFilter}".` : 'There are no active tickets in this organization.'}
           </p>
         </div>
       ) : (
-        <div className="bg-surface-panel border border-border-subtle rounded-xl overflow-hidden shadow-card">
+        <div className="bg-surface-panel border border-border-subtle rounded-lg overflow-hidden shadow-keylight">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse" data-testid="tickets-table">
               <thead>
-                <tr className="border-b border-border-subtle bg-surface-subpanel text-label-sm font-semibold text-text-muted uppercase tracking-wider">
+                <tr className="border-b border-border-subtle bg-surface-subpanel text-label-regular font-label-regular font-semibold text-text-muted uppercase tracking-wider">
                   <th className="py-3 px-4">Number</th>
                   <th className="py-3 px-4">Subject</th>
                   <th className="py-3 px-4">Customer</th>
@@ -168,18 +173,18 @@ export const TicketQueueView: React.FC<TicketQueueViewProps> = ({ apiUrl, token 
                     data-testid={`ticket-row-${ticket.id}`}
                     className="hover:bg-surface-subpanel/50 transition-colors"
                   >
-                    <td className="py-3.5 px-4 text-body-sm font-mono text-text-muted">
+                    <td className="py-3.5 px-4 text-body-compact font-body-compact font-mono text-text-muted">
                       <span data-testid={`ticket-number-${ticket.id}`}>#{ticket.ticket_number}</span>
                     </td>
-                    <td className="py-3.5 px-4 text-body-sm font-medium text-text-primary">
+                    <td className="py-3.5 px-4 text-body-compact font-body-compact font-medium text-text-primary">
                       <span data-testid={`ticket-subject-${ticket.id}`}>{ticket.subject}</span>
                     </td>
-                    <td className="py-3.5 px-4 text-body-sm text-text-secondary">
+                    <td className="py-3.5 px-4 text-body-compact font-body-compact text-text-secondary">
                       <span data-testid={`ticket-customer-${ticket.id}`}>
                         {ticket.customer?.name || ticket.customer?.email || 'Unknown'}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-body-sm">
+                    <td className="py-3.5 px-4 text-body-compact font-body-compact">
                       <span
                         data-testid={`ticket-priority-${ticket.id}`}
                         className={`uppercase text-xs tracking-wider ${getPriorityBadgeClass(ticket.priority)}`}
@@ -187,7 +192,7 @@ export const TicketQueueView: React.FC<TicketQueueViewProps> = ({ apiUrl, token 
                         {ticket.priority}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-body-sm">
+                    <td className="py-3.5 px-4 text-body-compact font-body-compact">
                       <span
                         data-testid={`ticket-status-${ticket.id}`}
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border uppercase tracking-wider ${getStatusBadgeClass(ticket.status)}`}

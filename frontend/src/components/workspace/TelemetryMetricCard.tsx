@@ -40,7 +40,7 @@ export const TelemetryMetricCard: React.FC<TelemetryMetricCardProps> = ({
   return (
     <div
       data-testid={testId}
-      className={`bg-surface-subpanel rounded-xl p-5 border border-border-subtle shadow-keylight flex flex-col gap-2 transition-colors ${className}`}
+      className={`bg-surface-subpanel rounded-lg p-5 border border-border-subtle shadow-keylight flex flex-col gap-2 transition-colors hover:border-border-prominent ${className}`}
     >
       <div className="text-label-caps font-label-caps text-text-secondary flex items-center gap-2 uppercase">
         {icon && <span className="shrink-0">{icon}</span>}
