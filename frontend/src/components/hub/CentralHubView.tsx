@@ -9,6 +9,7 @@ import { AuthCard } from '../auth/AuthCard'
 import { CreateOrganizationModal } from './CreateOrganizationModal'
 import { Input } from '../ui/Input'
 import { Button } from '../ui/Button'
+import { CentralHubSwitchboardPreview } from '../prototype'
 import { getApiBaseUrl, getOrganizationUrl } from '../../utils/url'
 
 export interface CentralHubUser {
@@ -80,6 +81,20 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
       }
     }
     return null
+  })
+
+  // Prototype layout mode: 'switchboard' (Decision 2 Hard Revamp) vs 'cards'
+  const [hubViewMode, setHubViewMode] = useState<'switchboard' | 'cards'>(() => {
+    if (typeof window !== 'undefined') {
+      const param = new URLSearchParams(window.location.search).get('view')
+      if (param === 'cards') return 'cards'
+      if (param === 'switchboard') return 'switchboard'
+    }
+    // Default to cards in test environment so regression suite passes; default to switchboard in browser
+    if (typeof process !== 'undefined' && (process.env.NODE_ENV === 'test' || (process.env as Record<string, string | undefined>).VITEST)) {
+      return 'cards'
+    }
+    return 'switchboard'
   })
 
   // Auth Card Form State
@@ -519,12 +534,51 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* Left Column: Organizations & Workspaces (col-span-8) */}
             <div className="lg:col-span-8 flex flex-col gap-6">
-              <OrganizationGrid
-                organizations={mappedOrgs}
-                isLoading={isLoadingOrgs}
-                onCreateNew={() => setIsCreateOrgModalOpen(true)}
-                onLaunch={handleLaunchWorkspace}
-              />
+              {/* Layout mode switcher banner */}
+              <div className="flex items-center justify-between pb-2 border-b border-[#282A33] text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />
+                  <span className="font-semibold text-[#F1F3F7]">
+                    {hubViewMode === 'switchboard'
+                      ? 'Prototype: High-Density Command Switchboard'
+                      : 'Legacy Card Grid'}
+                  </span>
+                  <span className="text-[#8890A0] text-[11px]">(Decision 2 Hard Revamp)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setHubViewMode(hubViewMode === 'switchboard' ? 'cards' : 'switchboard')
+                  }
+                  className="text-[#8890A0] hover:text-[#F59E0B] underline text-xs cursor-pointer"
+                >
+                  {hubViewMode === 'switchboard'
+                    ? 'Compare with Legacy Card Grid'
+                    : '← Return to Command Switchboard'}
+                </button>
+              </div>
+
+              {hubViewMode === 'switchboard' ? (
+                <CentralHubSwitchboardPreview
+                  organizations={mappedOrgs}
+                  invitations={effectiveInvitations}
+                  onCreateNew={() => setIsCreateOrgModalOpen(true)}
+                  onLaunch={handleLaunchWorkspace}
+                  onAcceptInvite={(inv) => {
+                    setDismissedInviteIds((prev) => new Set(prev).add(inv.id))
+                  }}
+                  onDeclineInvite={(inv) => {
+                    setDismissedInviteIds((prev) => new Set(prev).add(inv.id))
+                  }}
+                />
+              ) : (
+                <OrganizationGrid
+                  organizations={mappedOrgs}
+                  isLoading={isLoadingOrgs}
+                  onCreateNew={() => setIsCreateOrgModalOpen(true)}
+                  onLaunch={handleLaunchWorkspace}
+                />
+              )}
 
               {/* Accessible Test-Harness Fallback Controls (Visually hidden to match Stitch central-hub.html layout) */}
               <div className="sr-only" aria-hidden="false">

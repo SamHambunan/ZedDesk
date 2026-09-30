@@ -311,94 +311,219 @@ const WorkspaceShellDefaultContent: React.FC<WorkspaceShellProps> = (props) => {
   )
 }
 
+import {
+  PrototypeSwitcher,
+  OverviewVariantA,
+  OverviewVariantB,
+  OverviewVariantC,
+  type OverviewVariantKey,
+} from '../prototype'
+
 function OverviewDashboardContent({ onInviteMemberClick }: { onInviteMemberClick?: () => void }) {
   const { organization, onNavigate } = useWorkspaceShell()
 
+  // Read variant and zero-state from URL search params or default
+  const [variant, setVariant] = useState<OverviewVariantKey>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const v = (params.get('variant') || '').toUpperCase()
+      if (v === 'A' || v === 'B' || v === 'C') return v as OverviewVariantKey
+    }
+    return 'A'
+  })
+
+  const [isZeroState, setIsZeroState] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      return params.get('zeroState') === 'true'
+    }
+    return false
+  })
+
+  const [isLegacyMode, setIsLegacyMode] = useState(false)
+
+  const handleVariantChange = (newVariant: OverviewVariantKey) => {
+    setVariant(newVariant)
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      url.searchParams.set('variant', newVariant)
+      window.history.replaceState({}, '', url.toString())
+    }
+  }
+
+  const handleToggleZeroState = () => {
+    setIsZeroState((prev) => {
+      const next = !prev
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href)
+        if (next) {
+          url.searchParams.set('zeroState', 'true')
+        } else {
+          url.searchParams.delete('zeroState')
+        }
+        window.history.replaceState({}, '', url.toString())
+      }
+      return next
+    })
+  }
+
+  if (isLegacyMode) {
+    return (
+      <div className="max-w-7xl mx-auto space-y-6 relative z-10">
+        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
+          <span className="text-xs text-[#8890A0]">Legacy Test-Harness Dashboard View</span>
+          <button
+            type="button"
+            onClick={() => setIsLegacyMode(false)}
+            className="text-xs text-[#F59E0B] hover:underline font-semibold cursor-pointer"
+          >
+            ← Return to Hard Revamp Prototype
+          </button>
+        </div>
+
+        {/* Workspace Hero */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border-subtle pb-6">
+          <div>
+            <h1 className="text-headline-md font-headline-md font-semibold text-text-primary tracking-tight">
+              {workspaceContentData.hero.title}
+            </h1>
+            <p className="text-body-default font-body-default text-text-secondary mt-1 font-mono-data">
+              {organization.slug}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (onInviteMemberClick) {
+                onInviteMemberClick()
+              } else {
+                onNavigate?.('invitations')
+              }
+            }}
+            className="h-[32px] px-4 bg-primary-container hover:bg-primary-dark active:scale-[0.98] rounded text-label-regular font-label-regular text-[#0F1012] font-semibold transition-all shadow-keylight-primary flex items-center gap-2 cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4 text-[#0F1012]" />
+            <span>{workspaceContentData.hero.inviteMember}</span>
+          </button>
+        </div>
+
+        {/* Telemetry Metric Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <TelemetryMetricCard
+            title={workspaceContentData.telemetry.totalMembers}
+            value={workspaceContentData.telemetry.totalMembersValue}
+            icon={<Users className="w-4 h-4 text-text-secondary" />}
+            trend={{
+              text: workspaceContentData.telemetry.totalMembersTrend,
+              isPositive: true,
+            }}
+          />
+
+          <TelemetryMetricCard
+            title={workspaceContentData.telemetry.activeTeams}
+            value={workspaceContentData.telemetry.activeTeamsValue}
+            icon={<Network className="w-4 h-4 text-text-secondary" />}
+          />
+
+          <TelemetryMetricCard
+            title={workspaceContentData.telemetry.openTickets}
+            value={workspaceContentData.telemetry.openTicketsValue}
+            icon={<Inbox className="w-4 h-4 text-text-secondary" />}
+            priorityIndicators={[
+              { color: 'critical', label: 'High Priority' },
+              { color: 'warning', label: 'Medium Priority' },
+            ]}
+          />
+
+          <TelemetryMetricCard
+            title={workspaceContentData.telemetry.slaStatus}
+            value={workspaceContentData.telemetry.slaValue}
+            icon={<Gauge className="w-4 h-4 text-text-secondary" />}
+            valueColor="positive"
+          />
+        </div>
+
+        {/* Activity & Quick Routing Split View */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <RecentActivityFeed
+              title={workspaceContentData.activity.title}
+              activities={workspaceContentData.activity.items}
+            />
+          </div>
+          <div className="lg:col-span-1">
+            <QuickRoutingShortcuts
+              title={workspaceContentData.routing.title}
+              teams={workspaceContentData.routing.shortcuts}
+              pendingInvitationsCount={workspaceContentData.routing.pendingInvitationsCount}
+              onTeamClick={() => onNavigate?.('teams')}
+              onPendingInvitationsClick={() => onNavigate?.('invitations')}
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="max-w-7xl mx-auto space-y-6 relative z-10">
-      {/* Workspace Hero */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border-subtle pb-6">
-        <div>
-          <h1 className="text-headline-md font-headline-md font-semibold text-text-primary tracking-tight">
-            {workspaceContentData.hero.title}
-          </h1>
-          <p className="text-body-default font-body-default text-text-secondary mt-1 font-mono-data">
-            {organization.slug}
-          </p>
+    <div className="relative">
+      {/* Top Banner with Toggle to inspect Legacy harness */}
+      <div className="max-w-[1600px] mx-auto mb-4 flex items-center justify-between px-2 text-xs">
+        <div className="flex items-center gap-2 text-[#8890A0]">
+          <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />
+          <span className="font-semibold text-[#F1F3F7]">
+            Hard Revamp Operational Prototype
+          </span>
+          <span className="text-[#525866]">•</span>
+          <span>
+            Variant {variant} ({variant === 'A' ? '65/35 Split-Pane' : variant === 'B' ? 'Command Stream' : 'Tri-Pane Cockpit'})
+          </span>
         </div>
         <button
           type="button"
-          onClick={() => {
-            if (onInviteMemberClick) {
-              onInviteMemberClick()
-            } else {
-              onNavigate?.('invitations')
-            }
-          }}
-          className="h-[32px] px-4 bg-primary-container hover:bg-primary-dark active:scale-[0.98] rounded text-label-regular font-label-regular text-[#0F1012] font-semibold transition-all shadow-keylight-primary flex items-center gap-2 cursor-pointer shrink-0"
+          onClick={() => setIsLegacyMode(true)}
+          className="text-[#8890A0] hover:text-[#F59E0B] underline transition-colors cursor-pointer text-[11px]"
         >
-          <Plus className="w-4 h-4 text-[#0F1012]" />
-          <span>{workspaceContentData.hero.inviteMember}</span>
+          Compare with Legacy Cards Grid
         </button>
       </div>
 
-      {/* Telemetry Metric Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <TelemetryMetricCard
-          title={workspaceContentData.telemetry.totalMembers}
-          value={workspaceContentData.telemetry.totalMembersValue}
-          icon={<Users className="w-4 h-4 text-text-secondary" />}
-          trend={{
-            text: workspaceContentData.telemetry.totalMembersTrend,
-            isPositive: true,
-          }}
+      {/* Render the Active Variant */}
+      {variant === 'A' && (
+        <OverviewVariantA
+          organization={organization}
+          isZeroState={isZeroState}
+          onNavigate={onNavigate}
+          onInviteClick={onInviteMemberClick}
+          onCreateTeamClick={() => onNavigate?.('teams')}
         />
-
-        <TelemetryMetricCard
-          title={workspaceContentData.telemetry.activeTeams}
-          value={workspaceContentData.telemetry.activeTeamsValue}
-          icon={<Network className="w-4 h-4 text-text-secondary" />}
+      )}
+      {variant === 'B' && (
+        <OverviewVariantB
+          organization={organization}
+          isZeroState={isZeroState}
+          onNavigate={onNavigate}
+          onInviteClick={onInviteMemberClick}
+          onCreateTeamClick={() => onNavigate?.('teams')}
         />
-
-        <TelemetryMetricCard
-          title={workspaceContentData.telemetry.openTickets}
-          value={workspaceContentData.telemetry.openTicketsValue}
-          icon={<Inbox className="w-4 h-4 text-text-secondary" />}
-          priorityIndicators={[
-            { color: 'critical', label: 'High Priority' },
-            { color: 'warning', label: 'Medium Priority' },
-          ]}
+      )}
+      {variant === 'C' && (
+        <OverviewVariantC
+          organization={organization}
+          isZeroState={isZeroState}
+          onNavigate={onNavigate}
+          onInviteClick={onInviteMemberClick}
+          onCreateTeamClick={() => onNavigate?.('teams')}
         />
+      )}
 
-        <TelemetryMetricCard
-          title={workspaceContentData.telemetry.slaStatus}
-          value={workspaceContentData.telemetry.slaValue}
-          icon={<Gauge className="w-4 h-4 text-text-secondary" />}
-          valueColor="positive"
-        />
-      </div>
-
-      {/* Activity & Quick Routing Split View */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Pane: Recent Activity Feed (2 Cols) */}
-        <div className="lg:col-span-2">
-          <RecentActivityFeed
-            title={workspaceContentData.activity.title}
-            activities={workspaceContentData.activity.items}
-          />
-        </div>
-
-        {/* Right Pane: Quick Routing Shortcuts (1 Col) */}
-        <div className="lg:col-span-1">
-          <QuickRoutingShortcuts
-            title={workspaceContentData.routing.title}
-            teams={workspaceContentData.routing.shortcuts}
-            pendingInvitationsCount={workspaceContentData.routing.pendingInvitationsCount}
-            onTeamClick={() => onNavigate?.('teams')}
-            onPendingInvitationsClick={() => onNavigate?.('invitations')}
-          />
-        </div>
-      </div>
+      {/* Floating Prototype Switcher */}
+      <PrototypeSwitcher
+        currentVariant={variant}
+        onVariantChange={handleVariantChange}
+        isZeroState={isZeroState}
+        onToggleZeroState={handleToggleZeroState}
+      />
     </div>
   )
 }
