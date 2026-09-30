@@ -19,7 +19,6 @@ import {
   PROTOTYPE_TEAMS,
   PROTOTYPE_TRIAGE_TICKETS,
   PROTOTYPE_PENDING_INVITES,
-  PROTOTYPE_SERVICES,
 } from './mockPrototypeData'
 import type { OverviewVariantProps } from './OverviewVariantA'
 
@@ -449,23 +448,49 @@ export const OverviewVariantB: React.FC<OverviewVariantProps> = ({
             </Button>
           </div>
 
-          {/* Infrastructure Health Diagnostics */}
+          {/* Quick Dispatch & Routing Shortcuts */}
           <div className="bg-[#16181C] border border-[#282A33] rounded-lg p-5 shadow-keylight space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-[#8890A0] font-['JetBrains_Mono',monospace]">
-              Infrastructure Diagnostics
+              Operational Shortcuts
             </h3>
-            <div className="space-y-2 text-xs">
-              {PROTOTYPE_SERVICES.map((s) => (
-                <div
-                  key={s.name}
-                  className="flex items-center justify-between p-2 rounded bg-[#1E2026] border border-[#282A33]"
-                >
-                  <span className="text-[#F1F3F7] font-medium">{s.name}</span>
-                  <span className="text-[#10B981] font-['JetBrains_Mono',monospace]">
-                    {s.latency}
-                  </span>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => onNavigate?.('members')}
+                className="p-2.5 rounded bg-[#1E2026] hover:bg-[#282A33] border border-[#282A33] text-left transition-colors cursor-pointer group"
+              >
+                <div className="font-semibold text-[#F1F3F7] group-hover:text-[#F59E0B]">Staff Roster</div>
+                <div className="text-[10px] text-[#8890A0] mt-0.5">Directory &amp; RBAC</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigate?.('teams')}
+                className="p-2.5 rounded bg-[#1E2026] hover:bg-[#282A33] border border-[#282A33] text-left transition-colors cursor-pointer group"
+              >
+                <div className="font-semibold text-[#F1F3F7] group-hover:text-[#F59E0B]">Routing Rules</div>
+                <div className="text-[10px] text-[#8890A0] mt-0.5">3 Active Lanes</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined') window.open('/portal', '_blank')
+                }}
+                className="p-2.5 rounded bg-[#1E2026] hover:bg-[#282A33] border border-[#282A33] text-left transition-colors cursor-pointer group flex items-center justify-between"
+              >
+                <div>
+                  <div className="font-semibold text-[#F1F3F7] group-hover:text-[#F59E0B]">Customer Portal</div>
+                  <div className="text-[10px] text-[#8890A0] mt-0.5">Test Intake</div>
                 </div>
-              ))}
+                <ExternalLink className="w-3 h-3 text-[#525866]" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigate?.('tickets')}
+                className="p-2.5 rounded bg-[#1E2026] hover:bg-[#282A33] border border-[#282A33] text-left transition-colors cursor-pointer group"
+              >
+                <div className="font-semibold text-[#F1F3F7] group-hover:text-[#F59E0B]">Ticket Queue</div>
+                <div className="text-[10px] text-[#8890A0] mt-0.5 font-['JetBrains_Mono',monospace]">24 Open</div>
+              </button>
             </div>
           </div>
         </div>

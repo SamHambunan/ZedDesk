@@ -38,6 +38,16 @@ export interface PrototypePendingInvite {
   token: string
 }
 
+export interface PrototypeOnDutyAgent {
+  id: number
+  name: string
+  initials: string
+  role: 'admin' | 'agent'
+  lane: string
+  activeTickets: number
+  status: 'active' | 'in_call' | 'triage'
+}
+
 export interface PrototypeServiceHealth {
   name: string
   status: 'connected' | 'operational' | 'degraded'
@@ -163,6 +173,13 @@ export const PROTOTYPE_PENDING_INVITES: PrototypePendingInvite[] = [
     expiresIn: '6 days',
     token: 'inv_rostova_4120b',
   },
+]
+
+export const PROTOTYPE_ON_DUTY_AGENTS: PrototypeOnDutyAgent[] = [
+  { id: 101, name: 'Jane Doe', initials: 'JD', role: 'admin', lane: 'Tier-1 Support', activeTickets: 3, status: 'triage' },
+  { id: 102, name: 'Sam Chen', initials: 'SC', role: 'agent', lane: 'Tier-1 Support', activeTickets: 2, status: 'active' },
+  { id: 105, name: 'Tom Bradley', initials: 'TB', role: 'agent', lane: 'Billing & Ops', activeTickets: 1, status: 'active' },
+  { id: 107, name: 'Sam Hambunan', initials: 'SH', role: 'admin', lane: 'Critical Escalations', activeTickets: 2, status: 'triage' },
 ]
 
 export const PROTOTYPE_SERVICES: PrototypeServiceHealth[] = [

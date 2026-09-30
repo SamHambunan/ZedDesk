@@ -74,9 +74,9 @@ describe('Frontend Hard Revamp Prototype Suite', () => {
       expect(screen.getByText('4 Awaiting Triage')).toBeInTheDocument()
       expect(screen.getByText('#1048')).toBeInTheDocument()
 
-      // 35% Action & Pulse: Tenant Health & Pending Invites
-      expect(screen.getByText('Tenant Health Pulse')).toBeInTheDocument()
-      expect(screen.getByText('PostgreSQL 16')).toBeInTheDocument()
+      // 35% Action & Dispatch: On-Duty Shift Roster & Pending Invites
+      expect(screen.getByText('On-Duty Shift Roster')).toBeInTheDocument()
+      expect(screen.getByText('4 ONLINE')).toBeInTheDocument()
       expect(screen.getByText('Pending Invites')).toBeInTheDocument()
     })
 
@@ -131,7 +131,7 @@ describe('Frontend Hard Revamp Prototype Suite', () => {
       expect(screen.getByText('Tri-Pane Multi-Monitor Cockpit')).toBeInTheDocument()
       expect(screen.getByText(/Routing Lanes/)).toBeInTheDocument()
       expect(screen.getByText('Operational Triage Deck')).toBeInTheDocument()
-      expect(screen.getByText('Infrastructure')).toBeInTheDocument()
+      expect(screen.getByText('On-Duty Shift')).toBeInTheDocument()
     })
   })
 

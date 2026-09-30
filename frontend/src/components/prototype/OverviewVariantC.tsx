@@ -17,7 +17,7 @@ import {
   PROTOTYPE_TEAMS,
   PROTOTYPE_TRIAGE_TICKETS,
   PROTOTYPE_PENDING_INVITES,
-  PROTOTYPE_SERVICES,
+  PROTOTYPE_ON_DUTY_AGENTS,
 } from './mockPrototypeData'
 import type { OverviewVariantProps } from './OverviewVariantA'
 
@@ -274,20 +274,25 @@ export const OverviewVariantC: React.FC<OverviewVariantProps> = ({
 
         {/* Pane 3 (25% Width): Pulse, Pending Invites & Diagnostics */}
         <div className="lg:col-span-3 space-y-4">
-          {/* Health Pulse */}
+          {/* On-Duty Shift Roster */}
           <div className="bg-[#16181C] border border-[#282A33] rounded-lg p-4 shadow-keylight space-y-3">
             <div className="flex items-center justify-between border-b border-[#282A33] pb-2">
               <span className="text-xs font-semibold uppercase tracking-wider text-[#8890A0] font-['JetBrains_Mono',monospace]">
-                Infrastructure
+                On-Duty Shift
               </span>
-              <span className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" />
+              <span className="text-[10px] text-[#10B981] font-bold font-['JetBrains_Mono',monospace]">
+                {PROTOTYPE_ON_DUTY_AGENTS.length} Active
+              </span>
             </div>
             <div className="space-y-2 text-xs">
-              {PROTOTYPE_SERVICES.map((s) => (
-                <div key={s.name} className="flex justify-between">
-                  <span className="text-[#8890A0]">{s.name}</span>
-                  <span className="text-[#10B981] font-['JetBrains_Mono',monospace]">
-                    {s.latency}
+              {PROTOTYPE_ON_DUTY_AGENTS.map((agent) => (
+                <div key={agent.id} className="flex justify-between items-center">
+                  <div className="flex items-center gap-1.5 truncate max-w-[140px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
+                    <span className="text-[#F1F3F7] font-medium truncate">{agent.name}</span>
+                  </div>
+                  <span className="text-[#8890A0] font-['JetBrains_Mono',monospace] text-[11px]">
+                    {agent.activeTickets} tickets
                   </span>
                 </div>
               ))}

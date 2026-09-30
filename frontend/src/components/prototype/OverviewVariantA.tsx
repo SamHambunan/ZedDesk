@@ -22,10 +22,11 @@ import {
   PROTOTYPE_TEAMS,
   PROTOTYPE_TRIAGE_TICKETS,
   PROTOTYPE_PENDING_INVITES,
-  PROTOTYPE_SERVICES,
+  PROTOTYPE_ON_DUTY_AGENTS,
   type PrototypeTeamCapacity,
   type PrototypeTriageTicket,
   type PrototypePendingInvite,
+  type PrototypeOnDutyAgent,
 } from './mockPrototypeData'
 
 export interface OverviewVariantProps {
@@ -457,44 +458,59 @@ export const OverviewVariantA: React.FC<OverviewVariantProps> = ({
           )}
         </div>
 
-        {/* ================= RIGHT 35%: ACTION & PULSE ================= */}
+        {/* ================= RIGHT 35%: ACTION & DISPATCH LEDGER ================= */}
         <div className="lg:col-span-4 space-y-6">
-          {/* Tenant Health Pulse Card */}
+          {/* Active Shift & On-Duty Roster Card */}
           <div className="bg-[#16181C] border border-[#282A33] rounded-lg p-5 shadow-keylight space-y-4">
             <div className="flex items-center justify-between border-b border-[#282A33] pb-3">
               <div className="flex items-center gap-2">
-                <Radio className="w-4 h-4 text-[#10B981] animate-pulse" />
+                <Users className="w-4 h-4 text-[#10B981]" />
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-[#8890A0] font-['JetBrains_Mono',monospace]">
-                  Tenant Health Pulse
+                  On-Duty Shift Roster
                 </h3>
               </div>
               <span className="px-1.5 py-0.5 rounded bg-[#10B981]/15 text-[#10B981] text-[10px] font-bold">
-                100% HEALTHY
+                {PROTOTYPE_ON_DUTY_AGENTS.length} ONLINE
               </span>
             </div>
 
-            <div className="space-y-3">
-              {PROTOTYPE_SERVICES.map((srv) => (
+            <div className="space-y-2.5">
+              {PROTOTYPE_ON_DUTY_AGENTS.map((agent) => (
                 <div
-                  key={srv.name}
-                  className="flex items-center justify-between p-2 rounded bg-[#1E2026] border border-[#282A33] text-xs"
+                  key={agent.id}
+                  className="flex items-center justify-between p-2.5 rounded bg-[#1E2026] border border-[#282A33] text-xs hover:border-[#3B3F4D] transition-colors"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
-                    <span className="font-medium text-[#F1F3F7]">{srv.name}</span>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="w-6 h-6 rounded-full bg-[#282A33] text-[#F1F3F7] font-bold text-[10px] flex items-center justify-center font-['JetBrains_Mono',monospace]">
+                      {agent.initials}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-medium text-[#F1F3F7] truncate">{agent.name}</div>
+                      <div className="text-[10px] text-[#8890A0] truncate">{agent.lane}</div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 font-['JetBrains_Mono',monospace]">
-                    <span className="text-[#10B981] text-[11px]">{srv.status}</span>
-                    <span className="text-[#525866]">({srv.latency})</span>
+
+                  <div className="flex items-center gap-3 text-right shrink-0">
+                    <div>
+                      <div className="font-['JetBrains_Mono',monospace] font-semibold text-[#F1F3F7]">
+                        {agent.activeTickets}
+                      </div>
+                      <div className="text-[9px] text-[#8890A0]">tickets</div>
+                    </div>
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        agent.status === 'triage' ? 'bg-[#F59E0B] animate-pulse' : 'bg-[#10B981]'
+                      }`}
+                      title={agent.status === 'triage' ? 'In Active Triage' : 'Available'}
+                    />
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Micro heartbeat sparkline graphic */}
-            <div className="pt-2 border-t border-[#282A33] flex items-center justify-between text-[11px] text-[#525866]">
-              <span>Ingestion heartbeat: 60s window</span>
-              <span className="text-[#10B981] font-['JetBrains_Mono',monospace]">0 packet loss</span>
+            <div className="pt-2 border-t border-[#282A33] flex items-center justify-between text-[11px] text-[#8890A0]">
+              <span>Triage Hand-off Window</span>
+              <span className="font-['JetBrains_Mono',monospace] text-[#F1F3F7]">Active (Shift 1)</span>
             </div>
           </div>
 
