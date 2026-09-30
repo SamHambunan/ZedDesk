@@ -1,9 +1,10 @@
 export * from './SystemHealthPill'
 export * from './PendingInvitesBanner'
 export * from './OrganizationCard'
-export * from './OrganizationGrid'
+export * from './CentralHubSwitchboard'
 export * from './UserProfileCard'
 export * from './CentralHubHeader'
 export * from './CentralHubView'
 export * from './CreateOrganizationModal'
 export * from './SubdomainPreviewBox'
+

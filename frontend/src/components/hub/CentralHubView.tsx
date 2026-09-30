@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CentralHubHeader } from './CentralHubHeader'
-import { OrganizationGrid } from './OrganizationGrid'
-import { PendingInvitesBanner, type PendingInvitationItem } from './PendingInvitesBanner'
+import { CentralHubSwitchboard } from './CentralHubSwitchboard'
+import { type PendingInvitationItem } from './PendingInvitesBanner'
 import { UserProfileCard } from './UserProfileCard'
-import type { HubOrganizationItem } from './OrganizationCard'
+import type { HubOrganizationItem } from './CentralHubSwitchboard'
 import { AuthCard } from '../auth/AuthCard'
-import { CreateOrganizationModal } from './CreateOrganizationModal'
-import { Input } from '../ui/Input'
-import { Button } from '../ui/Button'
 import { getApiBaseUrl, getOrganizationUrl } from '../../utils/url'
 
 export interface CentralHubUser {
@@ -116,16 +113,10 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
 
   // Create Org Modal State
   const [isCreateOrgModalOpen, setIsCreateOrgModalOpen] = useState(false)
-  const [newOrgName, setNewOrgName] = useState('')
-  const [newOrgSlug, setNewOrgSlug] = useState('')
   const [createOrgError, setCreateOrgError] = useState<string | null>(null)
 
   // Pending Invitations & Alert Banner State
-  const [isBannerDismissed, setIsBannerDismissed] = useState(false)
   const [dismissedInviteIds, setDismissedInviteIds] = useState<Set<number | string>>(() => new Set())
-
-  // Organization Switcher State
-  const [selectedOrgSlug, setSelectedOrgSlug] = useState('')
 
   // Health Telemetry Query
   const { data: healthData, isError: isHealthError, error: healthError, isLoading: isLoadingHealth } = useQuery<{
@@ -378,8 +369,6 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['organizations'] })
       setIsCreateOrgModalOpen(false)
-      setNewOrgName('')
-      setNewOrgSlug('')
       setCreateOrgError(null)
 
       const targetSlug = data?.organization?.slug || variables?.slug
@@ -396,16 +385,6 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
       setCreateOrgError(err.message)
     },
   })
-
-  const handleCreateOrgSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setCreateOrgError(null)
-    if (!newOrgName.trim() || !newOrgSlug.trim()) {
-      setCreateOrgError('Organization name and subdomain slug are required.')
-      return
-    }
-    createOrgMutation.mutate({ name: newOrgName.trim(), slug: newOrgSlug.trim().toLowerCase() })
-  }
 
   const handleLogoutClick = async () => {
     try {
@@ -502,89 +481,39 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
       {/* Main Content: 12-column layout */}
       <main className="flex-1 overflow-auto py-8">
         <div className="max-w-6xl mx-auto px-margin-mobile md:px-margin-desktop flex flex-col gap-6">
-          {/* Dismissible Cadmium Amber alert banner at the top of Central Hub */}
-          {!isBannerDismissed && effectiveInvitations.length > 0 && (
-            <PendingInvitesBanner
-              invitations={effectiveInvitations}
-              onDismiss={() => setIsBannerDismissed(true)}
-              onAccept={(inv) => {
-                setDismissedInviteIds((prev) => new Set(prev).add(inv.id))
-              }}
-              onDecline={(inv) => {
-                setDismissedInviteIds((prev) => new Set(prev).add(inv.id))
-              }}
-            />
-          )}
-
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* Left Column: Organizations & Workspaces (col-span-8) */}
+            {/* Left Column: Command Switchboard (col-span-8) */}
             <div className="lg:col-span-8 flex flex-col gap-6">
-              <OrganizationGrid
+              <CentralHubSwitchboard
                 organizations={mappedOrgs}
-                isLoading={isLoadingOrgs}
-                onCreateNew={() => setIsCreateOrgModalOpen(true)}
+                invitations={effectiveInvitations}
                 onLaunch={handleLaunchWorkspace}
+                onCreateNew={() => setIsCreateOrgModalOpen(true)}
+                onCreateWorkspace={async ({ name, slug }) => {
+                  setCreateOrgError(null)
+                  try {
+                    await createOrgMutation.mutateAsync({ name, slug })
+                  } catch {
+                    // Handled by mutation onError callback
+                  }
+                }}
+                isCreateModalOpen={isCreateOrgModalOpen}
+                onCloseCreateModal={() => {
+                  setIsCreateOrgModalOpen(false)
+                  setCreateOrgError(null)
+                }}
+                isSubmittingCreate={createOrgMutation.isPending}
+                createError={createOrgError}
+                onClearCreateError={() => setCreateOrgError(null)}
+                apiUrl={resolvedApiUrl}
+                token={token}
+                onAcceptInvite={(inv) => {
+                  setDismissedInviteIds((prev) => new Set(prev).add(inv.id))
+                }}
+                onDeclineInvite={(inv) => {
+                  setDismissedInviteIds((prev) => new Set(prev).add(inv.id))
+                }}
               />
-
-              {/* Accessible Test-Harness Fallback Controls (Visually hidden to match Stitch central-hub.html layout) */}
-              <div className="sr-only" aria-hidden="false">
-                {organizations.length > 0 && (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault()
-                      const targetSlug = selectedOrgSlug || organizations[0]?.slug
-                      if (targetSlug) {
-                        handleLaunchWorkspace({ id: 0, name: '', slug: targetSlug, role: '' })
-                      }
-                    }}
-                  >
-                    <h3>Select Organization</h3>
-                    <label htmlFor="org-select">Organization:</label>
-                    <select
-                      id="org-select"
-                      value={selectedOrgSlug || (organizations[0]?.slug ?? '')}
-                      onChange={(e) => setSelectedOrgSlug(e.target.value)}
-                    >
-                      {organizations.map((org) => (
-                        <option key={org.id} value={org.slug}>
-                          {org.name} ({org.slug}) - {org.role.toUpperCase()}
-                        </option>
-                      ))}
-                    </select>
-                    <Button type="submit" variant="primary" size="compact">
-                      Navigate to Subdomain
-                    </Button>
-                  </form>
-                )}
-
-                <div>
-                  <h3>Create Organization</h3>
-                  <form onSubmit={handleCreateOrgSubmit}>
-                    <label htmlFor="org-name">Organization Name</label>
-                    <Input
-                      id="org-name"
-                      type="text"
-                      value={newOrgName}
-                      onChange={(e) => {
-                        setNewOrgName(e.target.value)
-                        if (!newOrgSlug) {
-                          setNewOrgSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '-'))
-                        }
-                      }}
-                    />
-                    <label htmlFor="org-slug">Subdomain Slug</label>
-                    <Input
-                      id="org-slug"
-                      type="text"
-                      value={newOrgSlug}
-                      onChange={(e) => setNewOrgSlug(e.target.value.toLowerCase())}
-                    />
-                    <Button type="submit" variant="primary">
-                      Create Organization
-                    </Button>
-                  </form>
-                </div>
-              </div>
             </div>
 
             {/* Right Column: Profile Card (col-span-4) */}
@@ -601,24 +530,6 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
           </div>
         </div>
       </main>
-
-      {/* Create Organization Modal */}
-      <CreateOrganizationModal
-        isOpen={isCreateOrgModalOpen}
-        onClose={() => {
-          setIsCreateOrgModalOpen(false)
-          setCreateOrgError(null)
-        }}
-        onSubmit={({ name, slug }) => {
-          setCreateOrgError(null)
-          createOrgMutation.mutate({ name, slug })
-        }}
-        isSubmitting={createOrgMutation.isPending}
-        error={createOrgError}
-        onClearError={() => setCreateOrgError(null)}
-        apiUrl={resolvedApiUrl}
-        token={token}
-      />
       {/* Baseline Telemetry for Test Harness */}
       <div style={{ display: 'none' }} aria-hidden="true">
         <span data-testid="frontend-status">Operational</span>
