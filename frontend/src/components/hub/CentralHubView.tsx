@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CentralHubHeader } from './CentralHubHeader'
 import { CentralHubSwitchboard } from './CentralHubSwitchboard'
-import { type PendingInvitationItem } from './PendingInvitesBanner'
+import { PendingInvitesBanner, type PendingInvitationItem } from './PendingInvitesBanner'
 import { UserProfileCard } from './UserProfileCard'
 import type { HubOrganizationItem } from './CentralHubSwitchboard'
+import { CreateOrganizationModal } from './CreateOrganizationModal'
 import { AuthCard } from '../auth/AuthCard'
 import { getApiBaseUrl, getOrganizationUrl } from '../../utils/url'
 
@@ -116,6 +117,7 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
   const [createOrgError, setCreateOrgError] = useState<string | null>(null)
 
   // Pending Invitations & Alert Banner State
+  const [isBannerDismissed, setIsBannerDismissed] = useState(false)
   const [dismissedInviteIds, setDismissedInviteIds] = useState<Set<number | string>>(() => new Set())
 
   // Health Telemetry Query
@@ -481,38 +483,27 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
       {/* Main Content: 12-column layout */}
       <main className="flex-1 overflow-auto py-8">
         <div className="max-w-6xl mx-auto px-margin-mobile md:px-margin-desktop flex flex-col gap-6">
+          {/* Persistent Cadmium Amber alert banner at the top of Central Hub */}
+          {!isBannerDismissed && effectiveInvitations.length > 0 && (
+            <PendingInvitesBanner
+              invitations={effectiveInvitations}
+              onDismiss={() => setIsBannerDismissed(true)}
+              onAccept={(inv) => {
+                setDismissedInviteIds((prev) => new Set(prev).add(inv.id))
+              }}
+              onDecline={(inv) => {
+                setDismissedInviteIds((prev) => new Set(prev).add(inv.id))
+              }}
+            />
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* Left Column: Command Switchboard (col-span-8) */}
             <div className="lg:col-span-8 flex flex-col gap-6">
               <CentralHubSwitchboard
                 organizations={mappedOrgs}
-                invitations={effectiveInvitations}
                 onLaunch={handleLaunchWorkspace}
                 onCreateNew={() => setIsCreateOrgModalOpen(true)}
-                onCreateWorkspace={async ({ name, slug }) => {
-                  setCreateOrgError(null)
-                  try {
-                    await createOrgMutation.mutateAsync({ name, slug })
-                  } catch {
-                    // Handled by mutation onError callback
-                  }
-                }}
-                isCreateModalOpen={isCreateOrgModalOpen}
-                onCloseCreateModal={() => {
-                  setIsCreateOrgModalOpen(false)
-                  setCreateOrgError(null)
-                }}
-                isSubmittingCreate={createOrgMutation.isPending}
-                createError={createOrgError}
-                onClearCreateError={() => setCreateOrgError(null)}
-                apiUrl={resolvedApiUrl}
-                token={token}
-                onAcceptInvite={(inv) => {
-                  setDismissedInviteIds((prev) => new Set(prev).add(inv.id))
-                }}
-                onDeclineInvite={(inv) => {
-                  setDismissedInviteIds((prev) => new Set(prev).add(inv.id))
-                }}
               />
             </div>
 
@@ -530,6 +521,24 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
           </div>
         </div>
       </main>
+
+      {/* Hoisted Create Organization Modal */}
+      <CreateOrganizationModal
+        isOpen={isCreateOrgModalOpen}
+        onClose={() => {
+          setIsCreateOrgModalOpen(false)
+          setCreateOrgError(null)
+        }}
+        onSubmit={({ name, slug }) => {
+          setCreateOrgError(null)
+          createOrgMutation.mutate({ name, slug })
+        }}
+        isSubmitting={createOrgMutation.isPending}
+        error={createOrgError}
+        onClearError={() => setCreateOrgError(null)}
+        apiUrl={resolvedApiUrl}
+        token={token}
+      />
       {/* Baseline Telemetry for Test Harness */}
       <div style={{ display: 'none' }} aria-hidden="true">
         <span data-testid="frontend-status">Operational</span>
