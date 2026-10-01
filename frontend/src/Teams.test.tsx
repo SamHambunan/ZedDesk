@@ -77,12 +77,10 @@ describe('Workspace Teams and Member Assignment', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('teams-view')).toBeInTheDocument()
+      expect(screen.getByTestId('teams-tabular-ledger')).toBeInTheDocument()
       expect(screen.getByTestId('team-name-1')).toHaveTextContent('Tier 1 Support')
       expect(screen.getByTestId('team-description-1')).toHaveTextContent('First line incident response')
-      expect(screen.getByTestId('team-member-1-20')).toHaveTextContent('Bob Agent')
-      expect(screen.getByTestId('team-member-1-20')).toHaveTextContent('bob@acme.test')
-      expect(screen.getByTestId('teams-grid')).toBeInTheDocument()
-      const countChip = screen.getByTestId('team-agent-count-1')
+      const countChip = screen.getByTestId('team-member-count-1')
       expect(countChip).toHaveTextContent('1')
       expect(countChip).toHaveClass('tabular-nums')
     })
@@ -93,8 +91,7 @@ describe('Workspace Teams and Member Assignment', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByTestId('delete-team-btn-1')).not.toBeInTheDocument()
     expect(screen.queryByTestId('edit-team-btn-1')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('add-member-btn-1')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('remove-member-btn-1-20')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('manage-members-btn-1')).not.toBeInTheDocument()
   })
 
   it('allows admin to view, create, edit, delete teams and manage member assignments', async () => {
@@ -249,62 +246,72 @@ describe('Workspace Teams and Member Assignment', () => {
       expect(screen.getByTestId('workspace-org-name')).toHaveTextContent('Acme Corporation')
     })
 
-    // Navigate to Team Management
-    const teamMgmtNav = screen.getByTestId('nav-team-management')
-    await user.click(teamMgmtNav)
+    // Navigate to Teams
+    const teamsNav = screen.getByTestId('nav-teams')
+    await user.click(teamsNav)
 
     await waitFor(() => {
-      expect(screen.getByTestId('team-management-view')).toBeInTheDocument()
-      expect(screen.getByTestId('create-team-form')).toBeInTheDocument()
+      expect(screen.getByTestId('teams-view')).toBeInTheDocument()
+      expect(screen.getByTestId('teams-tabular-ledger')).toBeInTheDocument()
       expect(screen.getByTestId('team-name-1')).toHaveTextContent('General Support')
     })
 
-    // Step 1: Create a new Team
+    // Step 1: Create a new Team via compound modal
+    await user.click(screen.getByTestId('create-team-btn'))
     await user.type(screen.getByTestId('team-name-input'), 'Escalations Team')
     await user.type(screen.getByTestId('team-description-input'), 'High priority cases')
     await user.click(screen.getByTestId('team-create-submit'))
 
     await waitFor(() => {
-      expect(screen.getByTestId('team-create-success')).toHaveTextContent(/team created successfully/i)
       expect(screen.getByTestId('team-name-2')).toHaveTextContent('Escalations Team')
     })
 
-    // Step 2: Edit the new Team
+    // Step 2: Edit the new Team via EditTeamModal
     await user.click(screen.getByTestId('edit-team-btn-2'))
-    const nameEditInput = screen.getByTestId('edit-team-name-input-2')
+    const nameEditInput = screen.getByTestId('edit-team-name-input')
     await user.clear(nameEditInput)
     await user.type(nameEditInput, 'Critical Escalations')
-    await user.click(screen.getByTestId('save-team-btn-2'))
+    await user.click(screen.getByTestId('save-team-submit-btn'))
 
     await waitFor(() => {
       expect(screen.getByTestId('team-name-2')).toHaveTextContent('Critical Escalations')
     })
 
-    // Step 3: Assign Member to Team 1
-    const memberSelect = screen.getByTestId('add-member-select-1')
-    await user.selectOptions(memberSelect, '20')
-    await user.click(screen.getByTestId('add-member-btn-1'))
+    // Step 3: Assign Member to Team 1 via TeamInspectorModal autocomplete
+    await user.click(screen.getByTestId('manage-members-btn-1'))
+    await waitFor(() => {
+      expect(screen.getByTestId('inspector-modal-title')).toBeInTheDocument()
+    })
+    const searchInput = screen.getByTestId('autocomplete-search-input')
+    await user.type(searchInput, 'Bob')
+    await user.click(screen.getByTestId('assign-member-btn-20'))
+
+    // Step 4: Detach Member from Team 1 in Inspector
+    await waitFor(() => {
+      expect(screen.getByTestId('subledger-member-20')).toBeInTheDocument()
+    })
+    await user.click(screen.getByTestId('detach-member-btn-20'))
 
     await waitFor(() => {
-      expect(screen.getByTestId('team-member-1-20')).toHaveTextContent('Bob Agent')
+      expect(screen.queryByTestId('subledger-member-20')).not.toBeInTheDocument()
     })
 
-    // Step 4: Remove Member from Team 1
-    await user.click(screen.getByTestId('remove-member-btn-1-20'))
+    // Close Inspector
+    await user.click(screen.getByRole('button', { name: /done/i }))
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('team-member-1-20')).not.toBeInTheDocument()
-    })
-
-    // Step 5: Delete Team 2
+    // Step 5: Delete Team 2 via DeleteTeamModal
     await user.click(screen.getByTestId('delete-team-btn-2'))
+    await waitFor(() => {
+      expect(screen.getByTestId('confirm-delete-team-btn')).not.toBeDisabled()
+    })
+    await user.click(screen.getByTestId('confirm-delete-team-btn'))
 
     await waitFor(() => {
       expect(screen.queryByTestId('team-name-2')).not.toBeInTheDocument()
     })
   }, 15000)
 
-  it('allows admin to view teams grid, open compound modal, validate inputs, and create a team via POST /api/teams', async () => {
+  it('allows admin to view teams tabular ledger, open compound modal, validate inputs, and create a team via POST /api/teams', async () => {
     const user = userEvent.setup()
     window.location.hostname = 'acme.localhost'
     localStorage.setItem('zeddesk_token', 'mock-admin-token')
@@ -390,9 +397,9 @@ describe('Workspace Teams and Member Assignment', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('teams-view')).toBeInTheDocument()
-      expect(screen.getByTestId('teams-grid')).toBeInTheDocument()
+      expect(screen.getByTestId('teams-tabular-ledger')).toBeInTheDocument()
       expect(screen.getByTestId('team-name-1')).toHaveTextContent('General Support')
-      const countChip = screen.getByTestId('team-agent-count-1')
+      const countChip = screen.getByTestId('team-member-count-1')
       expect(countChip).toHaveTextContent('1')
       expect(countChip).toHaveClass('tabular-nums')
     })
@@ -422,7 +429,7 @@ describe('Workspace Teams and Member Assignment', () => {
     await user.type(screen.getByTestId('team-description-input'), 'Enterprise client onboarding')
     await user.click(submitBtn)
 
-    // Modal closes and new team appears in grid
+    // Modal closes and new team appears in table
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(screen.getByTestId('team-name-2')).toHaveTextContent('Customer Success')
@@ -571,45 +578,43 @@ describe('Workspace Teams and Member Assignment', () => {
       expect(screen.getByTestId('teams-view')).toBeInTheDocument()
       expect(screen.getByTestId('team-name-1')).toHaveTextContent('General Support')
       expect(screen.getByTestId('team-name-2')).toHaveTextContent('Empty Team')
-      expect(screen.getByTestId('team-agent-count-1')).toHaveTextContent('1')
-      expect(screen.getByTestId('team-agent-count-2')).toHaveTextContent('0')
+      expect(screen.getByTestId('team-member-count-1')).toHaveTextContent('1')
+      expect(screen.getByTestId('team-member-count-2')).toHaveTextContent('0')
     })
 
-    // 1. Assign Member via Compound Modal
-    const assignBtn = screen.getByTestId('add-member-btn-1')
-    expect(assignBtn).toHaveTextContent(/assign member/i)
-    await user.click(assignBtn)
+    // 1. Assign Member via TeamInspectorModal
+    const manageBtn = screen.getByTestId('manage-members-btn-1')
+    await user.click(manageBtn)
 
     await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
-      expect(screen.getByTestId('assign-member-title')).toHaveTextContent(/general support/i)
+      expect(screen.getByTestId('inspector-modal-title')).toHaveTextContent(/general support/i)
     })
 
-    // Verify Alice Admin (already assigned) is excluded, Bob Agent is available
-    const memberSelect = screen.getByTestId('assign-member-select')
-    const options = Array.from(memberSelect.querySelectorAll('option')).map((o) => o.textContent)
-    expect(options.some((t) => t?.includes('Alice Admin'))).toBe(false)
-    expect(options.some((t) => t?.includes('Bob Agent'))).toBe(true)
+    // Verify Bob Agent is in unassigned candidates
+    const searchInput = screen.getByTestId('autocomplete-search-input')
+    await user.type(searchInput, 'Bob')
+    expect(screen.getByTestId('candidate-member-20')).toHaveTextContent('Bob Agent')
 
-    // Select Bob Agent and submit
-    await user.selectOptions(memberSelect, '20')
-    await user.click(screen.getByTestId('assign-member-submit'))
+    // Click 1-click assign
+    await user.click(screen.getByTestId('assign-member-btn-20'))
 
-    // Modal closes and roster updates
+    // Roster updates
     await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-      expect(screen.getByTestId('team-member-1-20')).toHaveTextContent('Bob Agent')
-      expect(screen.getByTestId('team-agent-count-1')).toHaveTextContent('2')
+      expect(screen.getByTestId('subledger-member-20')).toHaveTextContent('Bob Agent')
+      expect(screen.getByTestId('team-member-count-1')).toHaveTextContent('2')
     })
 
-    // 2. Remove Member with Optimistic UI Update
-    const removeBtn = screen.getByTestId('remove-member-btn-1-20')
-    await user.click(removeBtn)
+    // 2. Remove Member with 1-click Detach in Inspector
+    const detachBtn = screen.getByTestId('detach-member-btn-20')
+    await user.click(detachBtn)
 
     await waitFor(() => {
-      expect(screen.queryByTestId('team-member-1-20')).not.toBeInTheDocument()
-      expect(screen.getByTestId('team-agent-count-1')).toHaveTextContent('1')
+      expect(screen.queryByTestId('subledger-member-20')).not.toBeInTheDocument()
+      expect(screen.getByTestId('team-member-count-1')).toHaveTextContent('1')
     })
+
+    // Close Inspector
+    await user.click(screen.getByRole('button', { name: /done/i }))
 
     // 3. Delete Team with Active Members (Validation prevents deletion)
     await user.click(screen.getByTestId('delete-team-btn-1'))
@@ -638,7 +643,7 @@ describe('Workspace Teams and Member Assignment', () => {
 
     await user.click(screen.getByTestId('confirm-delete-team-btn'))
 
-    // Team 2 is deleted and removed from the grid
+    // Team 2 is deleted and removed from the table
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(screen.queryByTestId('team-name-2')).not.toBeInTheDocument()
