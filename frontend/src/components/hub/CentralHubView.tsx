@@ -150,7 +150,6 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
   // Organizations Query via TanStack Query
   const {
     data: organizations = [],
-    isLoading: isLoadingOrgs,
   } = useQuery<RawOrganization[]>({
     queryKey: ['organizations', token, resolvedApiUrl],
     queryFn: async () => {

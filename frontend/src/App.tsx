@@ -1,7 +1,7 @@
 import { useEffect, useState, useContext, useMemo } from 'react'
 import { QueryClientContext, QueryClientProvider } from '@tanstack/react-query'
 import { queryClient as defaultQueryClient } from './lib/query-client'
-import { CentralHubView, CentralHubSwitchboard } from './components/hub'
+import { CentralHubView } from './components/hub'
 import { WorkspaceShell, type WorkspaceShellUser } from './components/workspace'
 import { TeamsView, TeamManagementView } from './components/teams'
 import { MembersView } from './components/members'

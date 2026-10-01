@@ -10,8 +10,9 @@ export interface HubOrganizationItem {
   readonly id: number
   readonly name: string
   readonly slug: string
-  readonly role: string
+  readonly role: 'admin' | 'agent' | string
   readonly agentsCount?: number
+  readonly membersCount?: number
 }
 
 export interface CentralHubSwitchboardProps {

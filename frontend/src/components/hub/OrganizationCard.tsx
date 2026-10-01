@@ -2,15 +2,7 @@ import React from 'react'
 import { ArrowRight } from 'lucide-react'
 import { hubContentData } from '../../data/mockData'
 import { getOrganizationUrl } from '../../utils/url'
-
-export interface HubOrganizationItem {
-  readonly id: number
-  readonly name: string
-  readonly slug: string
-  readonly role: 'admin' | 'agent' | string
-  readonly membersCount?: number
-  readonly agentsCount?: number
-}
+import type { HubOrganizationItem } from './CentralHubSwitchboard'
 
 export interface OrganizationCardProps {
   readonly organization: HubOrganizationItem
