@@ -5,8 +5,6 @@ import { Button } from '../ui/Button'
 import { getInitials } from '../../lib/utils'
 import type { Team, OrganizationMember } from './types'
 
-export { getInitials }
-
 export interface TeamsTabularLedgerProps {
   readonly teams: readonly Team[]
   readonly orgMembers?: readonly OrganizationMember[]

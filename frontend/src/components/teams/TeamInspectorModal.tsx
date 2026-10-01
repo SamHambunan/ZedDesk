@@ -5,7 +5,7 @@ import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Badge } from '../ui/Badge'
 import { getInitials } from '../../lib/utils'
-import type { Team, OrganizationMember, TeamMember } from './types'
+import type { Team, OrganizationMember } from './types'
 
 // 1. Compound Context
 interface TeamInspectorContextValue {
@@ -214,27 +214,30 @@ export const TeamInspectorModalAssignAutocomplete: React.FC<{ readonly className
   const { team, orgMembers, isAdmin, onAssignMember, isAssigningId } = useTeamInspectorContext()
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Strict DOM RBAC: omitted for agents
-  if (!isAdmin || !team) return null
-
-  const activeMembers: TeamMember[] = team.members || []
+  const activeMembers = team?.members
 
   // Derive unassigned members without useEffect (rerender-derived-state-no-effect)
   const unassignedMembers = useMemo(() => {
+    if (!isAdmin || !team) return []
+    const members = activeMembers ?? []
     return orgMembers.filter(
-      (om) => !activeMembers.some((tm) => tm.id === om.id || tm.user_id === om.user_id)
+      (om) => !members.some((tm) => tm.id === om.id || tm.user_id === om.user_id)
     )
-  }, [orgMembers, activeMembers])
+  }, [isAdmin, team, activeMembers, orgMembers])
 
   const normalizedQuery = searchQuery.toLowerCase().trim()
   const filteredCandidates = useMemo(() => {
+    if (!isAdmin || !team) return []
     if (!normalizedQuery) return unassignedMembers
     return unassignedMembers.filter(
       (m) =>
         (m.user?.name || '').toLowerCase().includes(normalizedQuery) ||
         (m.user?.email || '').toLowerCase().includes(normalizedQuery)
     )
-  }, [unassignedMembers, normalizedQuery])
+  }, [isAdmin, team, unassignedMembers, normalizedQuery])
+
+  // Strict DOM RBAC: omitted for agents
+  if (!isAdmin || !team) return null
 
   const handleAssign = (memberId: number) => {
     onAssignMember?.(team.id, memberId)

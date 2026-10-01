@@ -1,5 +1,5 @@
 export { TeamsView } from './TeamsView'
-export { TeamsTabularLedger, getInitials } from './TeamsTabularLedger'
+export { TeamsTabularLedger } from './TeamsTabularLedger'
 export { TeamInspectorModal } from './TeamInspectorModal'
 export { CreateTeamModal } from './CreateTeamModal'
 export { EditTeamModal } from './EditTeamModal'
