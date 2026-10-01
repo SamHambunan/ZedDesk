@@ -207,27 +207,19 @@ describe('Tenant Subdomain Workspace Shell', () => {
       expect(screen.getByTestId('workspace-slug')).toHaveTextContent('acme')
     })
 
-    // Stitch Screen 58931638cff14be4843b2db8e097606c: Operational Overview Dashboard elements
-    expect(screen.getByText('Operational Overview')).toBeInTheDocument()
-    expect(screen.getByText('Invite Member')).toBeInTheDocument()
+    // Bilateral 65/35 Operational Console
+    expect(screen.getByTestId('workspace-overview')).toBeInTheDocument()
+    expect(screen.getByTestId('operations-ledger-65')).toBeInTheDocument()
+    expect(screen.getByTestId('action-dispatch-ledger-35')).toBeInTheDocument()
 
-    // Telemetry metric cards
-    expect(screen.getByText('Total Members')).toBeInTheDocument()
-    expect(screen.getByText('14')).toBeInTheDocument()
-    expect(screen.getByText('+2 this week')).toBeInTheDocument()
-    expect(screen.getByText('Active Teams')).toBeInTheDocument()
-    expect(screen.getByText('3')).toBeInTheDocument()
-    expect(screen.getByText('Open Tickets')).toBeInTheDocument()
-    expect(screen.getByText('24')).toBeInTheDocument()
-    expect(screen.getByText('SLA Status')).toBeInTheDocument()
-    expect(screen.getByText('99.4%')).toBeInTheDocument()
+    // Context ribbon with organization name, subdomain badge, and primary Cadmium Amber + Invite Member CTA
+    expect(screen.getByTestId('context-ribbon-org-name')).toHaveTextContent('Acme Corp Support')
+    expect(screen.getByTestId('context-ribbon-subdomain')).toHaveTextContent('acme.zeddesk.app')
+    expect(screen.getByRole('button', { name: /\+ Invite Member/i })).toHaveClass('bg-[#F59E0B]')
 
-    // Recent activity & quick routing
-    expect(screen.getByText('Recent Activity')).toBeInTheDocument()
-    expect(screen.getByText('Sarah Jenkins joined the workspace.')).toBeInTheDocument()
-    expect(screen.getByText('Quick Routing')).toBeInTheDocument()
-    expect(screen.getAllByText('Support Tier 1').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText('12 active agents • 8 tickets open')).toBeInTheDocument()
+    // Stage 2 Triage Queue Bridge & Quick Dispatch Shortcuts
+    expect(screen.getByTestId('stage2-triage-queue-bridge')).toBeInTheDocument()
+    expect(screen.getByTestId('quick-dispatch-shortcuts')).toBeInTheDocument()
 
     // Active route highlight on Overview with 2px #F59E0B Cadmium Amber border
     const overviewBtn = screen.getByTestId('nav-overview')

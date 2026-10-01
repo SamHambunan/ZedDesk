@@ -4,9 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import { WorkspaceHeader, type WorkspaceOrganization } from './WorkspaceHeader'
 import { WorkspaceSidebar } from './WorkspaceSidebar'
-import { TelemetryMetricCard } from './TelemetryMetricCard'
-import { RecentActivityFeed } from './RecentActivityFeed'
-import { QuickRoutingShortcuts } from './QuickRoutingShortcuts'
+import { WorkspaceOverview } from '../overview/WorkspaceOverview'
 import { PerimeterErrorCard } from './PerimeterErrorCard'
 import { CreateOrganizationModal } from '../hub/CreateOrganizationModal'
 import { workspaceContentData } from '../../data/mockData'
@@ -290,8 +288,8 @@ const WorkspaceShellDefaultContent: React.FC<WorkspaceShellProps> = (props) => {
             {React.Children.toArray(children).length > 0 ? (
               children
             ) : activeView === 'overview' ? (
-              /* Stitch Screen 58931638cff14be4843b2db8e097606c: Operational Overview Dashboard */
-              <OverviewDashboardContent onInviteMemberClick={onInviteMemberClick} />
+              /* Bilateral 65/35 Operational Console */
+              <WorkspaceOverview onInviteMemberClick={onInviteMemberClick} />
             ) : (
               <div className="max-w-7xl mx-auto py-8">
                 <div className="bg-surface-subpanel border border-border-subtle rounded-xl p-8 shadow-card text-center">
@@ -308,98 +306,6 @@ const WorkspaceShellDefaultContent: React.FC<WorkspaceShellProps> = (props) => {
         </div>
       </WorkspaceShellRoot>
     </WorkspaceShellProvider>
-  )
-}
-
-function OverviewDashboardContent({ onInviteMemberClick }: { onInviteMemberClick?: () => void }) {
-  const { organization, onNavigate } = useWorkspaceShell()
-
-  return (
-    <div className="max-w-7xl mx-auto space-y-6 relative z-10">
-      {/* Workspace Hero */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border-subtle pb-6">
-        <div>
-          <h1 className="text-headline-md font-headline-md font-semibold text-text-primary tracking-tight">
-            {workspaceContentData.hero.title}
-          </h1>
-          <p className="text-body-default font-body-default text-text-secondary mt-1 font-mono-data">
-            {organization.slug}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            if (onInviteMemberClick) {
-              onInviteMemberClick()
-            } else {
-              onNavigate?.('invitations')
-            }
-          }}
-          className="h-[32px] px-4 bg-primary-container hover:bg-primary-dark rounded text-label-regular font-label-regular text-white transition-colors shadow-keylight flex items-center gap-2 cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{workspaceContentData.hero.inviteMember}</span>
-        </button>
-      </div>
-
-      {/* Telemetry Metric Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <TelemetryMetricCard
-          title={workspaceContentData.telemetry.totalMembers}
-          value={workspaceContentData.telemetry.totalMembersValue}
-          icon={<Users className="w-4 h-4 text-text-secondary" />}
-          trend={{
-            text: workspaceContentData.telemetry.totalMembersTrend,
-            isPositive: true,
-          }}
-        />
-
-        <TelemetryMetricCard
-          title={workspaceContentData.telemetry.activeTeams}
-          value={workspaceContentData.telemetry.activeTeamsValue}
-          icon={<Network className="w-4 h-4 text-text-secondary" />}
-        />
-
-        <TelemetryMetricCard
-          title={workspaceContentData.telemetry.openTickets}
-          value={workspaceContentData.telemetry.openTicketsValue}
-          icon={<Inbox className="w-4 h-4 text-text-secondary" />}
-          priorityIndicators={[
-            { color: 'critical', label: 'High Priority' },
-            { color: 'warning', label: 'Medium Priority' },
-          ]}
-        />
-
-        <TelemetryMetricCard
-          title={workspaceContentData.telemetry.slaStatus}
-          value={workspaceContentData.telemetry.slaValue}
-          icon={<Gauge className="w-4 h-4 text-text-secondary" />}
-          valueColor="positive"
-        />
-      </div>
-
-      {/* Activity & Quick Routing Split View */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Pane: Recent Activity Feed (2 Cols) */}
-        <div className="lg:col-span-2">
-          <RecentActivityFeed
-            title={workspaceContentData.activity.title}
-            activities={workspaceContentData.activity.items}
-          />
-        </div>
-
-        {/* Right Pane: Quick Routing Shortcuts (1 Col) */}
-        <div className="lg:col-span-1">
-          <QuickRoutingShortcuts
-            title={workspaceContentData.routing.title}
-            teams={workspaceContentData.routing.shortcuts}
-            pendingInvitationsCount={workspaceContentData.routing.pendingInvitationsCount}
-            onTeamClick={() => onNavigate?.('teams')}
-            onPendingInvitationsClick={() => onNavigate?.('invitations')}
-          />
-        </div>
-      </div>
-    </div>
   )
 }
 
