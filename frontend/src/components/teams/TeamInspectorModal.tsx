@@ -31,7 +31,8 @@ function useTeamInspectorContext(): TeamInspectorContextValue {
 
 // 2. Root Component
 export interface TeamInspectorModalRootProps {
-  readonly open: boolean
+  readonly open?: boolean
+  readonly isOpen?: boolean
   readonly onClose: () => void
   readonly team: Team | null
   readonly orgMembers?: readonly OrganizationMember[]
@@ -47,6 +48,7 @@ export interface TeamInspectorModalRootProps {
 
 export const TeamInspectorModalRoot: React.FC<TeamInspectorModalRootProps> = ({
   open,
+  isOpen,
   onClose,
   team,
   orgMembers = [],
@@ -59,6 +61,8 @@ export const TeamInspectorModalRoot: React.FC<TeamInspectorModalRootProps> = ({
   children,
   className = '',
 }) => {
+  const activeOpen = open ?? isOpen ?? false
+
   const contextValue = useMemo<TeamInspectorContextValue>(
     () => ({
       team,
@@ -77,7 +81,7 @@ export const TeamInspectorModalRoot: React.FC<TeamInspectorModalRootProps> = ({
 
   return (
     <TeamInspectorContext.Provider value={contextValue}>
-      <Modal.Root open={open} onClose={onClose} className={`max-w-xl ${className}`}>
+      <Modal.Root open={activeOpen} onClose={onClose} className={`max-w-xl ${className}`}>
         {children}
       </Modal.Root>
     </TeamInspectorContext.Provider>
