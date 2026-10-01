@@ -4,7 +4,7 @@ import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Badge } from '../ui/Badge'
-import { getInitials } from './TeamsTabularLedger'
+import { getInitials } from '../../lib/utils'
 import type { Team, OrganizationMember, TeamMember } from './types'
 
 // 1. Compound Context

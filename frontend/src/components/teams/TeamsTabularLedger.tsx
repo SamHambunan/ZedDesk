@@ -2,7 +2,10 @@ import React from 'react'
 import { Users2, Pencil, Trash2 } from 'lucide-react'
 import { Table } from '../ui/Table'
 import { Button } from '../ui/Button'
+import { getInitials } from '../../lib/utils'
 import type { Team, OrganizationMember } from './types'
+
+export { getInitials }
 
 export interface TeamsTabularLedgerProps {
   readonly teams: readonly Team[]
@@ -12,15 +15,6 @@ export interface TeamsTabularLedgerProps {
   readonly onEditTeam?: (team: Team) => void
   readonly onDeleteTeam?: (team: Team) => void
   readonly className?: string
-}
-
-export function getInitials(name?: string | null): string {
-  if (!name || !name.trim()) return '??'
-  const parts = name.trim().split(/\s+/)
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase()
-  }
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
 const AVATAR_BG_COLORS = [
@@ -52,7 +46,7 @@ export const TeamsTabularLedger: React.FC<TeamsTabularLedgerProps> = ({
             <Table.Head className="w-[28%] text-left text-xs font-semibold text-text-secondary">
               Team Name
             </Table.Head>
-            <Table.Head className="w-[32%] text-left text-xs font-semibold text-text-secondary">
+            <Table.Head className="w-[30%] text-left text-xs font-semibold text-text-secondary">
               Routing Description
             </Table.Head>
             <Table.Head className="w-[18%] text-left text-xs font-semibold text-text-secondary">
@@ -61,8 +55,8 @@ export const TeamsTabularLedger: React.FC<TeamsTabularLedgerProps> = ({
             <Table.Head className="w-[10%] text-left text-xs font-semibold text-text-secondary">
               Members
             </Table.Head>
-            <Table.Head align="right" className="w-[12%] text-right text-xs font-semibold text-text-secondary">
-              Actions
+            <Table.Head align="right" className="w-[14%] text-right text-xs font-semibold text-text-secondary">
+              Actions Menu
             </Table.Head>
           </Table.Row>
         </Table.Header>
@@ -161,7 +155,10 @@ export const TeamsTabularLedger: React.FC<TeamsTabularLedgerProps> = ({
                   {/* Column 5: Actions Menu */}
                   <Table.Cell align="right">
                     {isAdmin ? (
-                      <div className="flex items-center justify-end gap-1.5">
+                      <div
+                        data-testid={`team-actions-menu-${team.id}`}
+                        className="flex items-center justify-end gap-1.5"
+                      >
                         <Button
                           type="button"
                           variant="ghost"
@@ -172,7 +169,7 @@ export const TeamsTabularLedger: React.FC<TeamsTabularLedgerProps> = ({
                           className="h-7 px-2 text-[11px] gap-1 text-text-secondary hover:text-text-primary"
                         >
                           <Users2 className="w-3.5 h-3.5" />
-                          <span>Members</span>
+                          <span>Manage Members</span>
                         </Button>
                         <Button
                           type="button"

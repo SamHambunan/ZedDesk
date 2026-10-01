@@ -4,8 +4,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import apiClient from '../../lib/api-client'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
+import { extractApiErrorMessage } from '../../lib/utils'
 import { WorkspaceShellContext } from '../workspace/WorkspaceShellContext'
-import type { Team, OrganizationMember } from './types'
+import type { Team, OrganizationMember, TeamMember } from './types'
 import { TeamsTabularLedger } from './TeamsTabularLedger'
 import { TeamInspectorModal } from './TeamInspectorModal'
 import { CreateTeamModal } from './CreateTeamModal'
@@ -28,22 +29,8 @@ export interface TeamsViewProps {
   readonly onDelete?: (teamId: number) => Promise<void> | void
   readonly onAssignMember?: (teamId: number, memberId: number) => Promise<void> | void
   readonly onRemoveMember?: (teamId: number, memberId: number) => Promise<void> | void
-  readonly className?: string
-  // Legacy compatibility props (safely ignored)
-  readonly editingTeamId?: number | null
-  readonly editTeamName?: string
-  readonly editTeamDescription?: string
-  readonly deletingTeamId?: number | null
-  readonly selectedMemberToAdd?: Record<number, string>
-  readonly addingMemberTeamId?: number | null
-  readonly removingMemberKey?: string | null
-  readonly teamActionError?: Record<number, string | null>
-  readonly onEditNameChange?: (v: string) => void
-  readonly onEditDescChange?: (v: string) => void
-  readonly onStartEdit?: (team: Team) => void
-  readonly onCancelEdit?: () => void
-  readonly onSelectMember?: (teamId: number, value: string) => void
   readonly onAddMember?: (teamId: number, memberId?: number) => Promise<void> | void
+  readonly className?: string
 }
 
 export const TeamsView: React.FC<TeamsViewProps> = ({
@@ -73,18 +60,24 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
       ? isAdmin
       : (shellContext?.role || '').toLowerCase() === 'admin'
 
-  // Optimistic tracking without props-to-state useEffect synchronization
+  // Symmetric optimistic tracking without useEffect (rerender-derived-state-no-effect)
   const [removedMemberKeys, setRemovedMemberKeys] = useState<Set<string>>(new Set())
+  const [addedMembersByTeamId, setAddedMembersByTeamId] = useState<Record<number, TeamMember[]>>({})
   const [deletedTeamIds, setDeletedTeamIds] = useState<Set<number>>(new Set())
 
   const displayTeams = useMemo(() => {
     return teams
       .filter((t) => !deletedTeamIds.has(t.id))
-      .map((t) => ({
-        ...t,
-        members: (t.members || []).filter((m) => !removedMemberKeys.has(`${t.id}-${m.id}`)),
-      }))
-  }, [teams, deletedTeamIds, removedMemberKeys])
+      .map((t) => {
+        const teamAdded = addedMembersByTeamId[t.id] || []
+        const baseMembers = t.members || []
+        const merged = [...baseMembers, ...teamAdded.filter((am) => !baseMembers.some((bm) => bm.id === am.id))]
+        return {
+          ...t,
+          members: merged.filter((m) => !removedMemberKeys.has(`${t.id}-${m.id}`)),
+        }
+      })
+  }, [teams, deletedTeamIds, removedMemberKeys, addedMembersByTeamId])
 
   // 1. Create Team Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -128,11 +121,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
       queryClient.invalidateQueries({ queryKey: ['workspace'] })
       setIsCreateModalOpen(false)
     } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { message?: string } }; message?: string }
-      const msg =
-        axiosError?.response?.data?.message ||
-        axiosError?.message ||
-        'Failed to create team.'
+      const msg = extractApiErrorMessage(err, 'Failed to create team.')
       setCreateError(msg)
       throw err
     } finally {
@@ -154,11 +143,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
       queryClient.invalidateQueries({ queryKey: ['workspace'] })
       setEditingTeam(null)
     } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { message?: string } }; message?: string }
-      const msg =
-        axiosError?.response?.data?.message ||
-        axiosError?.message ||
-        'Failed to update team.'
+      const msg = extractApiErrorMessage(err, 'Failed to update team.')
       setEditError(msg)
       throw err
     } finally {
@@ -189,11 +174,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
         next.delete(teamId)
         return next
       })
-      const axiosError = err as { response?: { data?: { message?: string } }; message?: string }
-      const msg =
-        axiosError?.response?.data?.message ||
-        axiosError?.message ||
-        'Failed to delete team.'
+      const msg = extractApiErrorMessage(err, 'Failed to delete team.')
       setDeleteError(msg)
     } finally {
       setIsDeletingTeam(false)
@@ -203,6 +184,15 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
   const handleAssignMemberSubmit = async (teamId: number, memberId: number) => {
     setIsAssigningMemberId(memberId)
     setInspectorError(null)
+
+    // Optimistically append candidate to local derived view
+    const candidate = orgMembers.find((m) => m.id === memberId || m.user_id === memberId)
+    if (candidate) {
+      setAddedMembersByTeamId((prev) => ({
+        ...prev,
+        [teamId]: [...(prev[teamId] || []), candidate as TeamMember],
+      }))
+    }
 
     try {
       if (onAssignMember) {
@@ -217,11 +207,12 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
       queryClient.invalidateQueries({ queryKey: ['teams'] })
       queryClient.invalidateQueries({ queryKey: ['workspace'] })
     } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { message?: string } }; message?: string }
-      const msg =
-        axiosError?.response?.data?.message ||
-        axiosError?.message ||
-        'Failed to assign member to team.'
+      // Rollback optimistic assignment
+      setAddedMembersByTeamId((prev) => ({
+        ...prev,
+        [teamId]: (prev[teamId] || []).filter((m) => m.id !== memberId && m.user_id !== memberId),
+      }))
+      const msg = extractApiErrorMessage(err, 'Failed to assign member to team.')
       setInspectorError(msg)
       throw err
     } finally {
@@ -252,11 +243,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
         next.delete(key)
         return next
       })
-      const axiosError = err as { response?: { data?: { message?: string } }; message?: string }
-      const msg =
-        axiosError?.response?.data?.message ||
-        axiosError?.message ||
-        'Failed to detach member from team.'
+      const msg = extractApiErrorMessage(err, 'Failed to detach member from team.')
       setInspectorError(msg)
       throw err
     } finally {
@@ -342,9 +329,10 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
         error={inspectorError}
       />
 
-      {/* Strict RBAC: Edit Team Modal completely omitted from DOM for agents */}
-      {effectiveIsAdmin && (
+      {/* Strict RBAC: Edit Team Modal keyed to editing team ID (rerender-derived-state-no-effect) */}
+      {effectiveIsAdmin && editingTeam && (
         <EditTeamModal
+          key={editingTeam.id}
           isOpen={Boolean(editingTeam)}
           onClose={() => {
             setEditingTeam(null)
@@ -396,9 +384,9 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
           teams={displayTeams}
           orgMembers={orgMembers}
           isAdmin={effectiveIsAdmin}
-          onInspectTeam={(team) => setInspectingTeam(team)}
-          onEditTeam={(team) => setEditingTeam(team)}
-          onDeleteTeam={(team) => setDeletingTeam(team)}
+          onInspectTeam={setInspectingTeam}
+          onEditTeam={setEditingTeam}
+          onDeleteTeam={setDeletingTeam}
         />
       )}
     </div>

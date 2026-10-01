@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Pencil, AlertCircle } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
+import { extractApiErrorMessage } from '../../lib/utils'
 import type { Team } from './types'
 
 export interface EditTeamModalProps {
@@ -24,18 +25,10 @@ export const EditTeamModal: React.FC<EditTeamModalProps> = ({
   error = null,
   className = '',
 }) => {
+  // Direct state initialization on mount/keyed instance (rerender-derived-state-no-effect)
   const [name, setName] = useState(team?.name || '')
   const [description, setDescription] = useState(team?.description || '')
   const [clientError, setClientError] = useState<string | null>(null)
-
-  // Update internal state when target team changes
-  useEffect(() => {
-    if (team) {
-      setName(team.name)
-      setDescription(team.description || '')
-      setClientError(null)
-    }
-  }, [team])
 
   if (!team) return null
 
@@ -56,12 +49,7 @@ export const EditTeamModal: React.FC<EditTeamModalProps> = ({
       })
       onClose()
     } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { message?: string } }; message?: string }
-      const msg =
-        axiosError?.response?.data?.message ||
-        axiosError?.message ||
-        'Failed to update team.'
-      setClientError(msg)
+      setClientError(extractApiErrorMessage(err, 'Failed to update team.'))
     }
   }
 

@@ -134,7 +134,7 @@ describe('TeamsTabularLedger Component', () => {
     expect(screen.getByRole('columnheader', { name: 'Routing Description' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Assigned Agents' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Members' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: /actions/i })).toBeInTheDocument()
 
     // Verify Row 1: Tier 1 Triage
     const row1 = screen.getByTestId('team-row-1')
