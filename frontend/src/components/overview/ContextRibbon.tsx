@@ -1,5 +1,6 @@
 import React from 'react'
-import { Plus, ShieldCheck } from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
+import { Button } from '../ui/Button'
 
 export interface ContextRibbonProps {
   readonly organizationName: string
@@ -64,16 +65,15 @@ export const ContextRibbon: React.FC<ContextRibbonProps> = ({
 
       {isAdmin && (
         <div className="flex items-center shrink-0">
-          <button
+          <Button
             type="button"
+            variant="amber"
+            size="standard"
             data-testid="invite-member-button"
             onClick={onInviteMemberClick}
-            className="h-9 px-4 bg-[#F59E0B] hover:bg-[#d97706] text-black font-semibold rounded text-label-regular shadow-keylight transition-all flex items-center gap-1.5 cursor-pointer select-none active:scale-[0.98]"
-            style={{ color: '#0B0F19' }}
           >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>+ Invite Member</span>
-          </button>
+            + Invite Member
+          </Button>
         </div>
       )}
     </div>

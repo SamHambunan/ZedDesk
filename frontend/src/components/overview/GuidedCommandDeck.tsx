@@ -1,5 +1,6 @@
 import React from 'react'
 import { Sparkles, Network, UserPlus, Globe, CheckCircle2, ArrowRight } from 'lucide-react'
+import { Button } from '../ui/Button'
 
 export interface GuidedCommandDeckProps {
   readonly teamsCount: number
@@ -87,15 +88,17 @@ export const GuidedCommandDeck: React.FC<GuidedCommandDeckProps> = ({
                 <span>{teamsCount} Routing Lanes Active</span>
               </div>
             ) : (
-              <button
+              <Button
                 type="button"
+                variant="primary"
+                size="compact"
                 data-testid="step-trigger-routing-lanes"
                 onClick={onCreateTeamClick}
-                className="w-full h-8 px-3 bg-primary-container hover:bg-primary-dark text-white rounded text-xs font-label-regular shadow-keylight transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
+                className="w-full"
               >
-                <span>Create Functional Routing Lanes</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+                Create Functional Routing Lanes
+              </Button>
             )}
           </div>
         </div>
@@ -134,16 +137,17 @@ export const GuidedCommandDeck: React.FC<GuidedCommandDeckProps> = ({
                 <span>{membersCount} Dispatch Agents Onboarded</span>
               </div>
             ) : (
-              <button
+              <Button
                 type="button"
+                variant="amber"
+                size="compact"
                 data-testid="step-trigger-dispatch-agents"
                 onClick={onInviteMemberClick}
-                className="w-full h-8 px-3 bg-[#F59E0B] hover:bg-[#d97706] text-black font-semibold rounded text-xs font-label-regular shadow-keylight transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                style={{ color: '#0B0F19' }}
+                rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
+                className="w-full"
               >
-                <span>Onboard Dispatch Agents</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+                Onboard Dispatch Agents
+              </Button>
             )}
           </div>
         </div>
@@ -182,15 +186,17 @@ export const GuidedCommandDeck: React.FC<GuidedCommandDeckProps> = ({
                 <span>{ticketsCount} Intake Inquiries Active</span>
               </div>
             ) : (
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="compact"
                 data-testid="step-trigger-customer-intake"
                 onClick={onVerifyIntakeClick}
-                className="w-full h-8 px-3 bg-surface-container hover:bg-surface-container-high border border-border-prominent text-text-primary rounded text-xs font-label-regular transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
+                className="w-full"
               >
-                <span>Verify Customer Intake Ingestion</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+                Verify Customer Intake Ingestion
+              </Button>
             )}
           </div>
         </div>

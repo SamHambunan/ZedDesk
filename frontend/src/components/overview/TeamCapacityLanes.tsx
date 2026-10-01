@@ -1,17 +1,11 @@
 import React from 'react'
 import { Network, Target, Ticket } from 'lucide-react'
 import type { OverviewTeam } from './types'
+import { getInitials } from './types'
 
 export interface TeamCapacityLanesProps {
   readonly teams: readonly OverviewTeam[]
   readonly onTeamClick?: (teamId: number) => void
-}
-
-function getInitials(name?: string): string {
-  if (!name) return '?'
-  const parts = name.trim().split(/\s+/)
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
 function getCapacityColor(percentage: number): {

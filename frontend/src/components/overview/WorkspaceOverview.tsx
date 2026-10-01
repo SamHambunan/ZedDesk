@@ -1,6 +1,14 @@
-import React, { useState, useEffect, useMemo, useContext } from 'react'
-import { QueryClientContext } from '@tanstack/react-query'
-import { useWorkspaceShell } from '../workspace/WorkspaceShellContext'
+import React, { useState, useMemo, useContext } from 'react'
+import {
+  QueryClientContext,
+  QueryClientProvider,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query'
+import { queryClient as defaultQueryClient } from '../../lib/query-client'
+import apiClient, { getAuthToken } from '../../lib/api-client'
+import { WorkspaceShellContext } from '../workspace/WorkspaceShellContext'
 import { ContextRibbon } from './ContextRibbon'
 import { TeamCapacityLanes } from './TeamCapacityLanes'
 import { TriageQueueBridge } from './TriageQueueBridge'
@@ -19,17 +27,9 @@ import type {
   OverviewInvitation,
 } from './types'
 
-export const WorkspaceOverview: React.FC<WorkspaceOverviewProps> = (props) => {
-  // Gracefully fallback to WorkspaceShellContext if available
-  let shellContext: ReturnType<typeof useWorkspaceShell> | null = null
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    shellContext = useWorkspaceShell()
-  } catch {
-    // Shell context not mounted (e.g. standalone test)
-  }
-
-  const queryClient = useContext(QueryClientContext)
+const WorkspaceOverviewInner: React.FC<WorkspaceOverviewProps> = (props) => {
+  const shellContext = useContext(WorkspaceShellContext)
+  const queryClient = useQueryClient()
 
   const effectiveOrg = props.organization ?? shellContext?.organization ?? {
     id: 1,
@@ -38,132 +38,143 @@ export const WorkspaceOverview: React.FC<WorkspaceOverviewProps> = (props) => {
   }
   const effectiveSubdomain = props.subdomain ?? shellContext?.subdomain ?? effectiveOrg.slug ?? ''
   const effectiveRole = props.role ?? shellContext?.role ?? 'agent'
-  const effectiveToken = props.token ?? shellContext?.token ?? null
+  const effectiveToken = props.token ?? shellContext?.token ?? getAuthToken()
   const effectiveApiUrl = props.apiUrl ?? shellContext?.apiUrl ?? ''
   const isAdmin = effectiveRole === 'admin'
-
-  // Internal data states for live fetching when props are not directly provided
-  const [fetchedTeams, setFetchedTeams] = useState<OverviewTeam[]>([])
-  const [fetchedMembers, setFetchedMembers] = useState<any[]>([])
-  const [fetchedInvitations, setFetchedInvitations] = useState<OverviewInvitation[]>([])
-  const [fetchedTickets, setFetchedTickets] = useState<OverviewTicket[]>([])
 
   // Toast feedback state
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   // Local Modal States
   const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false)
-  const [isCreatingTeam, setIsCreatingTeam] = useState(false)
   const [createTeamError, setCreateTeamError] = useState<string | null>(null)
 
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
-  const [isSubmittingInvite, setIsSubmittingInvite] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
 
-  // Live data fetching when props are omitted and auth token is available
-  useEffect(() => {
-    if (!effectiveToken || !effectiveApiUrl) return
+  const getRequestConfig = () => {
+    return effectiveToken ? { headers: { Authorization: `Bearer ${effectiveToken}` } } : {}
+  }
+  const buildUrl = (path: string) => {
+    return effectiveApiUrl ? `${effectiveApiUrl}${path}` : path
+  }
 
-    let cancelled = false
+  // TanStack Query for Teams
+  const { data: fetchedTeams = [] } = useQuery<OverviewTeam[]>({
+    queryKey: ['teams', effectiveOrg.id],
+    queryFn: async () => {
+      const res = await apiClient.get(buildUrl('/api/teams'), getRequestConfig())
+      const list = res.data?.teams || []
+      return list.map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        members: t.members || [],
+        open_tickets_count: t.open_tickets_count ?? (t.tickets?.length || 0),
+        capacity_percentage:
+          t.capacity_percentage ??
+          Math.min(100, Math.round(((t.tickets?.length || 2) / Math.max(1, (t.members?.length || 1) * 5)) * 100)),
+        sla_target: t.sla_target ?? '99.4% SLA',
+      }))
+    },
+    enabled: props.teams === undefined && Boolean(effectiveToken),
+  })
 
-    // Fetch Teams
-    if (props.teams === undefined) {
-      fetch(`${effectiveApiUrl}/api/teams`, {
-        headers: {
-          Authorization: `Bearer ${effectiveToken}`,
-          Accept: 'application/json',
-        },
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (!cancelled && data?.teams) {
-            setFetchedTeams(
-              data.teams.map((t: any) => ({
-                id: t.id,
-                name: t.name,
-                description: t.description,
-                members: t.members || [],
-                open_tickets_count: t.open_tickets_count ?? (t.tickets?.length || 0),
-                capacity_percentage:
-                  t.capacity_percentage ??
-                  Math.min(100, Math.round(((t.tickets?.length || 2) / Math.max(1, (t.members?.length || 1) * 5)) * 100)),
-                sla_target: t.sla_target ?? '99.4% SLA',
-              }))
-            )
-          }
-        })
-        .catch(() => {})
-    }
+  // TanStack Query for Members
+  const { data: fetchedMembers = [] } = useQuery<any[]>({
+    queryKey: ['members', effectiveOrg.id],
+    queryFn: async () => {
+      const res = await apiClient.get(buildUrl('/api/members'), getRequestConfig())
+      return res.data?.members || []
+    },
+    enabled: props.members === undefined && Boolean(effectiveToken),
+  })
 
-    // Fetch Members
-    if (props.members === undefined) {
-      fetch(`${effectiveApiUrl}/api/members`, {
-        headers: {
-          Authorization: `Bearer ${effectiveToken}`,
-          Accept: 'application/json',
-        },
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (!cancelled && data?.members) {
-            setFetchedMembers(data.members)
-          }
-        })
-        .catch(() => {})
-    }
+  // TanStack Query for Invitations
+  const { data: fetchedInvitations = [] } = useQuery<OverviewInvitation[]>({
+    queryKey: ['invitations', effectiveOrg.id],
+    queryFn: async () => {
+      const res = await apiClient.get(buildUrl('/api/invitations'), getRequestConfig())
+      return res.data?.invitations || []
+    },
+    enabled: props.invitations === undefined && isAdmin && Boolean(effectiveToken),
+  })
 
-    // Fetch Invitations (Admins only)
-    if (props.invitations === undefined && isAdmin) {
-      fetch(`${effectiveApiUrl}/api/invitations`, {
-        headers: {
-          Authorization: `Bearer ${effectiveToken}`,
-          Accept: 'application/json',
-        },
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (!cancelled && data?.invitations) {
-            setFetchedInvitations(data.invitations)
-          }
-        })
-        .catch(() => {})
-    }
+  // TanStack Query for Tickets
+  const { data: fetchedTickets = [] } = useQuery<OverviewTicket[]>({
+    queryKey: ['tickets', effectiveOrg.id],
+    queryFn: async () => {
+      const res = await apiClient.get(buildUrl('/api/tickets'), getRequestConfig())
+      const list = res.data?.data || res.data?.tickets || []
+      return list.map((t: any) => ({
+        id: t.id,
+        ticket_number: t.ticket_number,
+        subject: t.subject,
+        priority: t.priority,
+        status: t.status,
+        customer: t.customer,
+        assigned_team_id: t.assigned_team_id,
+        assigned_member_id: t.assigned_member_id,
+        created_at: t.created_at,
+        wait_time: '14m wait',
+      }))
+    },
+    enabled: props.tickets === undefined && Boolean(effectiveToken),
+  })
 
-    // Fetch Tickets
-    if (props.tickets === undefined) {
-      fetch(`${effectiveApiUrl}/api/tickets`, {
-        headers: {
-          Authorization: `Bearer ${effectiveToken}`,
-          Accept: 'application/json',
-        },
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (!cancelled && (data?.data || data?.tickets)) {
-            const list = data.data || data.tickets
-            setFetchedTickets(
-              list.map((t: any) => ({
-                id: t.id,
-                ticket_number: t.ticket_number,
-                subject: t.subject,
-                priority: t.priority,
-                status: t.status,
-                customer: t.customer,
-                assigned_team_id: t.assigned_team_id,
-                assigned_member_id: t.assigned_member_id,
-                created_at: t.created_at,
-                wait_time: '14m wait',
-              }))
-            )
-          }
-        })
-        .catch(() => {})
-    }
+  // TanStack Query Mutations
+  const createTeamMutation = useMutation({
+    mutationFn: async (data: { name: string; description?: string }) => {
+      const res = await apiClient.post(buildUrl('/api/teams'), data, getRequestConfig())
+      return res.data
+    },
+    onSuccess: (_, variables) => {
+      setIsCreateTeamOpen(false)
+      setToastMessage(`Team "${variables.name}" created successfully.`)
+      queryClient.invalidateQueries({ queryKey: ['teams'] })
+      queryClient.invalidateQueries({ queryKey: ['workspace'] })
+    },
+    onError: (err: any) => {
+      setCreateTeamError(err?.response?.data?.message || 'Failed to create team.')
+    },
+  })
 
-    return () => {
-      cancelled = true
-    }
-  }, [props.teams, props.members, props.invitations, props.tickets, effectiveToken, effectiveApiUrl, isAdmin])
+  const inviteMemberMutation = useMutation({
+    mutationFn: async (data: { email: string; role: 'agent' | 'admin' }) => {
+      const res = await apiClient.post(buildUrl('/api/invitations'), data, getRequestConfig())
+      return res.data
+    },
+    onSuccess: (_, variables) => {
+      setIsInviteModalOpen(false)
+      setToastMessage(`Invitation dispatched to ${variables.email}.`)
+      queryClient.invalidateQueries({ queryKey: ['invitations'] })
+    },
+    onError: (err: any) => {
+      setInviteError(err?.response?.data?.message || 'Failed to send invitation.')
+    },
+  })
+
+  const claimTicketMutation = useMutation({
+    mutationFn: async (ticketId: string | number) => {
+      const res = await apiClient.post(buildUrl(`/api/tickets/${ticketId}/claim`), {}, getRequestConfig())
+      return res.data
+    },
+    onSuccess: (_, ticketId) => {
+      setToastMessage(`Ticket #${ticketId} claimed and routed to your queue.`)
+      queryClient.invalidateQueries({ queryKey: ['tickets'] })
+    },
+  })
+
+  const revokeInvitationMutation = useMutation({
+    mutationFn: async (invitationId: number) => {
+      const res = await apiClient.delete(buildUrl(`/api/invitations/${invitationId}`), getRequestConfig())
+      return res.data
+    },
+    onSuccess: () => {
+      setToastMessage('Invitation revoked.')
+      queryClient.invalidateQueries({ queryKey: ['invitations'] })
+    },
+  })
 
   // Resolve Effective Entities
   const effectiveTeams: readonly OverviewTeam[] = props.teams ?? fetchedTeams
@@ -243,70 +254,21 @@ export const WorkspaceOverview: React.FC<WorkspaceOverviewProps> = (props) => {
 
   // Handle Team Creation Submit
   const handleCreateTeamSubmit = async (data: { name: string; description?: string }) => {
-    if (!effectiveToken || !effectiveApiUrl) return
-    setIsCreatingTeam(true)
     setCreateTeamError(null)
-
     try {
-      const res = await fetch(`${effectiveApiUrl}/api/teams`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${effectiveToken}`,
-          Accept: 'application/json',
-        },
-        body: JSON.stringify(data),
-      })
-      const resData = await res.json()
-      if (!res.ok) {
-        setCreateTeamError(resData?.message || 'Failed to create team.')
-        return
-      }
-      setIsCreateTeamOpen(false)
-      setToastMessage(`Team "${data.name}" created successfully.`)
-      queryClient?.invalidateQueries({ queryKey: ['teams'] })
-      queryClient?.invalidateQueries({ queryKey: ['workspace'] })
-      if (resData.team) {
-        setFetchedTeams((prev) => [...prev, resData.team])
-      }
+      await createTeamMutation.mutateAsync(data)
     } catch {
-      setCreateTeamError('Network error creating team.')
-    } finally {
-      setIsCreatingTeam(false)
+      // Error handled in onError
     }
   }
 
   // Handle Invite Submit
   const handleSendInviteSubmit = async (email: string, role: 'agent' | 'admin') => {
-    if (!effectiveToken || !effectiveApiUrl) return
-    setIsSubmittingInvite(true)
     setInviteError(null)
-
     try {
-      const res = await fetch(`${effectiveApiUrl}/api/invitations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${effectiveToken}`,
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({ email, role }),
-      })
-      const resData = await res.json()
-      if (!res.ok) {
-        setInviteError(resData?.message || 'Failed to send invitation.')
-        return
-      }
-      setIsInviteModalOpen(false)
-      setToastMessage(`Invitation dispatched to ${email}.`)
-      queryClient?.invalidateQueries({ queryKey: ['invitations'] })
-      if (resData.invitation) {
-        setFetchedInvitations((prev) => [resData.invitation, ...prev])
-      }
+      await inviteMemberMutation.mutateAsync({ email, role })
     } catch {
-      setInviteError('Network error sending invitation.')
-    } finally {
-      setIsSubmittingInvite(false)
+      // Error handled in onError
     }
   }
 
@@ -316,27 +278,10 @@ export const WorkspaceOverview: React.FC<WorkspaceOverviewProps> = (props) => {
       await props.onClaimTicket(ticketId)
       return
     }
-
-    if (!effectiveToken || !effectiveApiUrl) return
-
     try {
-      const res = await fetch(`${effectiveApiUrl}/api/tickets/${ticketId}/claim`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${effectiveToken}`,
-          Accept: 'application/json',
-        },
-      })
-      if (res.ok) {
-        setToastMessage(`Ticket #${ticketId} claimed and routed to your queue.`)
-        // Optimistically update tickets
-        setFetchedTickets((prev) =>
-          prev.map((t) => (t.id === ticketId ? { ...t, assigned_member_id: 1 } : t))
-        )
-        queryClient?.invalidateQueries({ queryKey: ['tickets'] })
-      }
+      await claimTicketMutation.mutateAsync(ticketId)
     } catch {
-      // Handled silently
+      // Silently handled
     }
   }
 
@@ -346,24 +291,10 @@ export const WorkspaceOverview: React.FC<WorkspaceOverviewProps> = (props) => {
       await props.onRevokeInvitation(invitationId)
       return
     }
-
-    if (!effectiveToken || !effectiveApiUrl) return
-
     try {
-      const res = await fetch(`${effectiveApiUrl}/api/invitations/${invitationId}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${effectiveToken}`,
-          Accept: 'application/json',
-        },
-      })
-      if (res.ok) {
-        setToastMessage('Invitation revoked.')
-        setFetchedInvitations((prev) => prev.filter((i) => i.id !== invitationId))
-        queryClient?.invalidateQueries({ queryKey: ['invitations'] })
-      }
+      await revokeInvitationMutation.mutateAsync(invitationId)
     } catch {
-      // Handled silently
+      // Silently handled
     }
   }
 
@@ -447,7 +378,7 @@ export const WorkspaceOverview: React.FC<WorkspaceOverviewProps> = (props) => {
         isOpen={isCreateTeamOpen}
         onClose={() => setIsCreateTeamOpen(false)}
         onSubmit={handleCreateTeamSubmit}
-        isSubmitting={isCreatingTeam}
+        isSubmitting={createTeamMutation.isPending}
         error={createTeamError}
       />
 
@@ -456,11 +387,25 @@ export const WorkspaceOverview: React.FC<WorkspaceOverviewProps> = (props) => {
         isOpen={isInviteModalOpen}
         onClose={() => setIsInviteModalOpen(false)}
         onSubmit={handleSendInviteSubmit}
-        isSubmitting={isSubmittingInvite}
+        isSubmitting={inviteMemberMutation.isPending}
         error={inviteError}
       />
     </div>
   )
 }
+
+export const WorkspaceOverview: React.FC<WorkspaceOverviewProps> = (props) => {
+  const existingClient = useContext(QueryClientContext)
+  if (!existingClient) {
+    return (
+      <QueryClientProvider client={defaultQueryClient}>
+        <WorkspaceOverviewInner {...props} />
+      </QueryClientProvider>
+    )
+  }
+  return <WorkspaceOverviewInner {...props} />
+}
+
+WorkspaceOverview.displayName = 'WorkspaceOverview'
 
 export default WorkspaceOverview

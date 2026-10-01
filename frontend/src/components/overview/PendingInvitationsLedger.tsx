@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Mail, Copy, Trash2, Plus, Clock } from 'lucide-react'
+import { Button } from '../ui/Button'
 import type { OverviewInvitation } from './types'
 
 export interface PendingInvitationsLedgerProps {
@@ -17,13 +18,11 @@ export const PendingInvitationsLedger: React.FC<PendingInvitationsLedgerProps> =
   onIssueNewInvitation,
   onCopySuccess,
 }) => {
-  const [invitations, setInvitations] = useState<readonly OverviewInvitation[]>(initialInvitations)
+  const [revokedIds, setRevokedIds] = useState<number[]>([])
   const [copiedId, setCopiedId] = useState<number | null>(null)
   const [revokingId, setRevokingId] = useState<number | null>(null)
 
-  useEffect(() => {
-    setInvitations(initialInvitations)
-  }, [initialInvitations])
+  const invitations = (initialInvitations || []).filter((item) => !revokedIds.includes(item.id))
 
   const handleCopyLink = (inv: OverviewInvitation) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173'
@@ -47,12 +46,12 @@ export const PendingInvitationsLedger: React.FC<PendingInvitationsLedgerProps> =
   const handleRevoke = async (id: number) => {
     setRevokingId(id)
     // Optimistic removal
-    setInvitations((prev) => prev.filter((item) => item.id !== id))
+    setRevokedIds((prev) => [...prev, id])
     try {
       await onRevokeInvitation?.(id)
     } catch {
       // Revert if error
-      setInvitations(initialInvitations)
+      setRevokedIds((prev) => prev.filter((item) => item !== id))
     } finally {
       setRevokingId(null)
     }
@@ -72,22 +71,24 @@ export const PendingInvitationsLedger: React.FC<PendingInvitationsLedgerProps> =
           </h2>
         </div>
 
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="compact"
           data-testid="issue-new-invitation-btn"
           onClick={onIssueNewInvitation}
-          className="text-xs font-label-regular text-accent-glow hover:text-white transition-colors flex items-center gap-1 cursor-pointer"
+          leftIcon={<Plus className="w-3.5 h-3.5" />}
+          className="text-accent-glow hover:text-white"
         >
-          <Plus className="w-3.5 h-3.5" />
-          <span>+ Issue New Invitation</span>
-        </button>
+          + Issue New Invitation
+        </Button>
       </div>
 
       {/* Invitations List */}
       <div className="space-y-3">
         {invitations.length === 0 ? (
           <div className="text-center py-6 text-text-muted text-xs font-mono-data border border-dashed border-border-subtle rounded-lg">
-            No pending staff invitations outstanding.
+            No pending member invitations outstanding.
           </div>
         ) : (
           invitations.map((inv) => {

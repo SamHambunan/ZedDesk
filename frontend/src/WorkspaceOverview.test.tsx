@@ -445,7 +445,7 @@ describe('WorkspaceOverview Console', () => {
 
       // Revoke button with optimistic removal
       const revokeBtn = screen.getByTestId('revoke-invite-402')
-      act(() => {
+      await act(async () => {
         fireEvent.click(revokeBtn)
       })
       expect(handleRevoke).toHaveBeenCalledWith(402)

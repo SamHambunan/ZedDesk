@@ -1,16 +1,16 @@
 import React from 'react'
 import { Users, Radio } from 'lucide-react'
 import type { OverviewAgent } from './types'
+import { getInitials } from './types'
 
 export interface ShiftRosterProps {
   readonly agents: readonly OverviewAgent[]
 }
 
-function getInitials(name?: string): string {
-  if (!name) return '?'
-  const parts = name.trim().split(/\s+/)
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+function getStatusDotClass(status: OverviewAgent['status']): string {
+  if (status === 'triage') return 'bg-sentiment-warning'
+  if (status === 'active') return 'bg-sentiment-positive'
+  return 'bg-sentiment-neutral'
 }
 
 export const ShiftRoster: React.FC<ShiftRosterProps> = ({ agents }) => {
@@ -43,8 +43,7 @@ export const ShiftRoster: React.FC<ShiftRosterProps> = ({ agents }) => {
             const initials = getInitials(agent.name)
             const routingLanes = agent.teams && agent.teams.length > 0 ? agent.teams.join(', ') : 'Unassigned'
             const ticketLoad = agent.ticket_load ?? 0
-            const isTriage = agent.status === 'triage'
-            const statusDotClass = isTriage ? 'bg-sentiment-warning' : 'bg-sentiment-positive'
+            const statusDotClass = getStatusDotClass(agent.status)
 
             return (
               <div

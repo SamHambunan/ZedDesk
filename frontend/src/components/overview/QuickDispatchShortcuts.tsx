@@ -9,7 +9,7 @@ export const QuickDispatchShortcuts: React.FC<QuickDispatchShortcutsProps> = ({ 
   const SHORTCUTS = [
     {
       id: 'members',
-      title: 'Staff Roster',
+      title: 'Member Directory',
       subtitle: '/members',
       description: 'Directory & Admin Roles',
       icon: Users,

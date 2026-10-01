@@ -1,9 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { GitPullRequest, ArrowRight, UserCheck, AlertTriangle, Clock, Inbox } from 'lucide-react'
+import { Button } from '../ui/Button'
 import type { OverviewTicket } from './types'
 
 export interface TriageQueueBridgeProps {
   readonly tickets: readonly OverviewTicket[]
+  readonly avgWaitTime?: string
   readonly onClaimTicket?: (ticketId: string | number) => Promise<void> | void
   readonly onViewAllTickets?: () => void
 }
@@ -27,8 +29,14 @@ const PRIORITY_BADGES: Record<string, { label: string; className: string }> = {
   },
 }
 
+function isP0P1(priority?: string): boolean {
+  const p = priority?.toLowerCase()
+  return p === 'urgent' || p === 'high' || p === 'p0' || p === 'p1'
+}
+
 export const TriageQueueBridge: React.FC<TriageQueueBridgeProps> = ({
   tickets,
+  avgWaitTime,
   onClaimTicket,
   onViewAllTickets,
 }) => {
@@ -36,9 +44,22 @@ export const TriageQueueBridge: React.FC<TriageQueueBridgeProps> = ({
 
   const unassignedTickets = tickets.filter((t) => !t.assigned_member_id)
   const unassignedCount = unassignedTickets.length
-  const p0p1Count = tickets.filter(
-    (t) => t.priority === 'urgent' || t.priority === 'high' || t.priority === 'p0' || t.priority === 'p1'
-  ).length
+  const p0p1Count = tickets.filter((t) => isP0P1(t.priority)).length
+
+  const calculatedAvgWaitTime = useMemo(() => {
+    if (avgWaitTime) return avgWaitTime
+    const ticketsWithTime = tickets.filter((t) => t.created_at)
+    if (ticketsWithTime.length === 0) return '14m avg wait'
+    const now = Date.now()
+    const totalMinutes = ticketsWithTime.reduce((acc, t) => {
+      const created = new Date(t.created_at!).getTime()
+      if (isNaN(created)) return acc + 14
+      const diffMinutes = Math.max(1, Math.round((now - created) / (1000 * 60)))
+      return acc + diffMinutes
+    }, 0)
+    const avg = Math.round(totalMinutes / ticketsWithTime.length)
+    return `${avg}m avg wait`
+  }, [avgWaitTime, tickets])
 
   // Preview unassigned tickets or first 4 tickets
   const previewTickets = unassignedTickets.length > 0 ? unassignedTickets.slice(0, 4) : tickets.slice(0, 4)
@@ -118,7 +139,7 @@ export const TriageQueueBridge: React.FC<TriageQueueBridgeProps> = ({
               data-testid="counter-avg-wait"
               className="text-headline-sm font-semibold text-text-primary tabular-nums font-mono-data"
             >
-              14m avg wait
+              {calculatedAvgWaitTime}
             </div>
             <div className="text-[11px] text-text-muted">Queue Response SLA</div>
           </div>
@@ -166,16 +187,17 @@ export const TriageQueueBridge: React.FC<TriageQueueBridgeProps> = ({
                 </div>
 
                 <div className="flex items-center shrink-0 self-end sm:self-auto">
-                  <button
+                  <Button
                     type="button"
+                    variant="secondary"
+                    size="compact"
                     data-testid={`claim-button-${ticket.id}`}
                     disabled={isClaiming}
                     onClick={() => handleClaim(ticket.id)}
-                    className="h-8 px-3 bg-surface-container hover:bg-surface-container-high border border-border-prominent text-accent-glow hover:text-white rounded text-xs font-label-regular transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    leftIcon={<UserCheck className="w-3.5 h-3.5 text-accent-glow" />}
                   >
-                    <UserCheck className="w-3.5 h-3.5" />
-                    <span>{isClaiming ? 'Routing...' : 'Claim & Route'}</span>
-                  </button>
+                    {isClaiming ? 'Routing...' : 'Claim & Route'}
+                  </Button>
                 </div>
               </div>
             )
