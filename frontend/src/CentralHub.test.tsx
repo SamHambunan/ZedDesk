@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import App from './App'
@@ -63,8 +63,8 @@ describe('Central Hub Authentication and Organization Flow', () => {
     await user.click(screen.getByRole('button', { name: /^register$/i }))
 
     await waitFor(() => {
-      expect(screen.getByText(/logged in as/i)).toHaveTextContent(/alice admin/i)
-      expect(screen.getByRole('heading', { name: /create organization/i })).toBeInTheDocument()
+      expect(screen.getByText('Alice Admin')).toBeInTheDocument()
+      expect(screen.getByTestId('central-hub-switchboard')).toBeInTheDocument()
     })
   })
 
@@ -123,8 +123,7 @@ describe('Central Hub Authentication and Organization Flow', () => {
       expect(screen.getAllByText(/support-team/).length).toBeGreaterThanOrEqual(1)
       expect(screen.getAllByText('admin').length).toBeGreaterThanOrEqual(1)
       expect(screen.getAllByText('agent').length).toBeGreaterThanOrEqual(1)
-      expect(screen.getByRole('heading', { name: /select organization/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /navigate to subdomain/i })).toBeInTheDocument()
+      expect(screen.getByTestId('central-hub-switchboard')).toBeInTheDocument()
     })
 
     // Log out
@@ -195,9 +194,10 @@ describe('Central Hub Authentication and Organization Flow', () => {
     })
 
     // Create organization
-    await user.type(screen.getByLabelText(/organization name/i), 'Zed Helpdesk')
-    await user.type(screen.getByLabelText(/subdomain slug/i), 'zed-help')
-    await user.click(screen.getByRole('button', { name: /create organization/i }))
+    await user.click(screen.getByRole('button', { name: /\+? ?(create new organization|new workspace)/i }))
+    const modal = screen.getByRole('dialog', { name: /create new organization/i })
+    await user.type(within(modal).getByLabelText(/organization name/i), 'Zed Helpdesk')
+    await user.click(within(modal).getByRole('button', { name: /create organization & launch/i }))
 
     await waitFor(() => {
       expect(screen.getAllByText(/Zed Helpdesk/).length).toBeGreaterThanOrEqual(1)

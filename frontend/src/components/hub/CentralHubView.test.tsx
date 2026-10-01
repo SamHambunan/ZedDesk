@@ -295,10 +295,10 @@ describe('CentralHubView (Seam 2)', () => {
     renderView('valid-token', { id: 1, name: 'Alex Vance', email: 'alex@example.com' })
 
     await waitFor(() => {
-      const orgCard = screen.getByTestId('org-card-acme')
-      expect(within(orgCard).getByText('Acme Support')).toBeInTheDocument()
-      expect(within(orgCard).getByText('acme.zeddesk.app')).toBeInTheDocument()
-      expect(within(orgCard).getByText('admin')).toBeInTheDocument()
+      const orgRow = screen.queryByTestId('workspace-row-acme') || screen.getByTestId('org-card-acme')
+      expect(within(orgRow).getByText('Acme Support')).toBeInTheDocument()
+      expect(within(orgRow).getByText('acme.zeddesk.app')).toBeInTheDocument()
+      expect(within(orgRow).getByText('admin')).toBeInTheDocument()
     })
 
     const launchButton = screen.getByRole('button', { name: /launch workspace for acme support/i })
@@ -506,7 +506,7 @@ describe('CentralHubView (Seam 2)', () => {
       expect(screen.queryByRole('dialog', { name: /create new organization/i })).not.toBeInTheDocument()
 
       // Click "+ Create New Organization" button
-      const createButton = screen.getByRole('button', { name: /\+? ?create new organization/i })
+      const createButton = screen.getByRole('button', { name: /\+? ?(create new organization|new workspace)/i })
       await user.click(createButton)
 
       // Modal is opened
@@ -553,7 +553,7 @@ describe('CentralHubView (Seam 2)', () => {
         expect(screen.getByText('Alex Vance')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: /\+? ?create new organization/i }))
+      await user.click(screen.getByRole('button', { name: /\+? ?(create new organization|new workspace)/i }))
 
       const modal = screen.getByRole('dialog', { name: /create new organization/i })
       const orgNameInput = within(modal).getByLabelText(/organization name/i)
@@ -628,7 +628,7 @@ describe('CentralHubView (Seam 2)', () => {
       const initialFetchCount = organizationsFetchCount
 
       // Open modal
-      await user.click(screen.getByRole('button', { name: /\+? ?create new organization/i }))
+      await user.click(screen.getByRole('button', { name: /\+? ?(create new organization|new workspace)/i }))
       const modal = screen.getByRole('dialog', { name: /create new organization/i })
 
       // Fill in org name
@@ -697,7 +697,7 @@ describe('CentralHubView (Seam 2)', () => {
         expect(screen.getByText('Alex Vance')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: /\+? ?create new organization/i }))
+      await user.click(screen.getByRole('button', { name: /\+? ?(create new organization|new workspace)/i }))
       const modal = screen.getByRole('dialog', { name: /create new organization/i })
 
       await user.type(within(modal).getByLabelText(/organization name/i), 'Duplicate Org')

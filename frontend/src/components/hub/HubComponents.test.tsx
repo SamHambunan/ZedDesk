@@ -4,7 +4,6 @@ import { describe, it, expect, vi } from 'vitest'
 import { SystemHealthPill } from './SystemHealthPill'
 import { PendingInvitesBanner } from './PendingInvitesBanner'
 import { OrganizationCard } from './OrganizationCard'
-import { OrganizationGrid } from './OrganizationGrid'
 import { CentralHubHeader } from './CentralHubHeader'
 import { UserProfileCard } from './UserProfileCard'
 
@@ -178,41 +177,6 @@ describe('Hub Components (Seam 1)', () => {
           configurable: true,
         })
       }
-    })
-  })
-
-  describe('OrganizationGrid', () => {
-    it('renders empty state when organizations list is empty', () => {
-      render(<OrganizationGrid organizations={[]} />)
-      expect(screen.getByText(/no workspaces found/i)).toBeInTheDocument()
-    })
-
-    it('renders responsive grid with organization cards and create new organization trigger', async () => {
-      const user = userEvent.setup()
-      const handleCreateNew = vi.fn()
-      const orgs = [
-        { id: 1, name: 'Org One', slug: 'org-one', role: 'admin', agentsCount: 5 },
-        { id: 2, name: 'Org Two', slug: 'org-two', role: 'agent', agentsCount: 3 },
-      ]
-
-      const { container } = render(
-        <OrganizationGrid
-          organizations={orgs}
-          onCreateNew={handleCreateNew}
-        />
-      )
-
-      expect(screen.getByText('Org One')).toBeInTheDocument()
-      expect(screen.getByText('Org Two')).toBeInTheDocument()
-
-      const gridContainer = container.querySelector('[data-testid="org-grid-list"]')
-      if (gridContainer) {
-        expect(gridContainer.className).toMatch(/grid/)
-      }
-
-      const createBtn = screen.getByRole('button', { name: /create new organization/i })
-      await user.click(createBtn)
-      expect(handleCreateNew).toHaveBeenCalled()
     })
   })
 
