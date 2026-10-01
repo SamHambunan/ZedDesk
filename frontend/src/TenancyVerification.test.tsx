@@ -131,8 +131,7 @@ describe('End-to-End Tenancy & Seeded Baseline Verification', () => {
     })
 
     // Admin should see management controls
-    expect(screen.getByTestId('create-team-form')).toBeInTheDocument()
-    expect(screen.getByTestId('team-name-input')).toBeInTheDocument()
+    expect(screen.getByTestId('create-team-btn')).toBeInTheDocument()
   })
 
   it('renders seeded acme workspace for agent@acme.test with read-only controls', async () => {

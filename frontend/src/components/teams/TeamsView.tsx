@@ -4,11 +4,13 @@ import { useQueryClient } from '@tanstack/react-query'
 import apiClient from '../../lib/api-client'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
+import { extractApiErrorMessage } from '../../lib/utils'
 import { WorkspaceShellContext } from '../workspace/WorkspaceShellContext'
-import type { Team, OrganizationMember } from './types'
-import { TeamCard } from './TeamCard'
+import type { Team, OrganizationMember, TeamMember } from './types'
+import { TeamsTabularLedger } from './TeamsTabularLedger'
+import { TeamInspectorModal } from './TeamInspectorModal'
 import { CreateTeamModal } from './CreateTeamModal'
-import { AssignMemberModal } from './AssignMemberModal'
+import { EditTeamModal } from './EditTeamModal'
 import { DeleteTeamModal } from './DeleteTeamModal'
 
 export interface TeamsViewProps {
@@ -21,26 +23,13 @@ export interface TeamsViewProps {
   readonly isCreating?: boolean
   readonly createError?: string | null
   readonly createSuccess?: string | null
-  readonly editingTeamId?: number | null
-  readonly editTeamName?: string
-  readonly editTeamDescription?: string
+  readonly onSaveEdit?: (teamId: number, data?: { name: string; description?: string }) => Promise<void> | void
   readonly isUpdating?: boolean
   readonly updateError?: string | null
-  readonly deletingTeamId?: number | null
-  readonly selectedMemberToAdd?: Record<number, string>
-  readonly addingMemberTeamId?: number | null
-  readonly removingMemberKey?: string | null
-  readonly teamActionError?: Record<number, string | null>
-  readonly onEditNameChange?: (v: string) => void
-  readonly onEditDescChange?: (v: string) => void
-  readonly onStartEdit?: (team: Team) => void
-  readonly onSaveEdit?: (teamId: number) => void
-  readonly onCancelEdit?: () => void
   readonly onDelete?: (teamId: number) => Promise<void> | void
-  readonly onSelectMember?: (teamId: number, value: string) => void
-  readonly onAddMember?: (teamId: number) => Promise<void> | void
   readonly onAssignMember?: (teamId: number, memberId: number) => Promise<void> | void
   readonly onRemoveMember?: (teamId: number, memberId: number) => Promise<void> | void
+  readonly onAddMember?: (teamId: number, memberId?: number) => Promise<void> | void
   readonly className?: string
 }
 
@@ -54,26 +43,13 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
   isCreating = false,
   createError: propCreateError,
   createSuccess: propCreateSuccess,
-  editingTeamId,
-  editTeamName,
-  editTeamDescription,
-  isUpdating = false,
-  updateError,
-  deletingTeamId,
-  selectedMemberToAdd = {},
-  addingMemberTeamId,
-  removingMemberKey,
-  teamActionError = {},
-  onEditNameChange,
-  onEditDescChange,
-  onStartEdit,
   onSaveEdit,
-  onCancelEdit,
+  isUpdating = false,
+  updateError: propUpdateError,
   onDelete,
-  onSelectMember,
-  onAddMember,
   onAssignMember,
   onRemoveMember,
+  onAddMember,
   className = '',
 }) => {
   const shellContext = useContext(WorkspaceShellContext)
@@ -84,34 +60,53 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
       ? isAdmin
       : (shellContext?.role || '').toLowerCase() === 'admin'
 
-  // Optimistic tracking without props-to-state useEffect synchronization
+  // Symmetric optimistic tracking without useEffect (rerender-derived-state-no-effect)
   const [removedMemberKeys, setRemovedMemberKeys] = useState<Set<string>>(new Set())
+  const [addedMembersByTeamId, setAddedMembersByTeamId] = useState<Record<number, TeamMember[]>>({})
   const [deletedTeamIds, setDeletedTeamIds] = useState<Set<number>>(new Set())
 
   const displayTeams = useMemo(() => {
     return teams
       .filter((t) => !deletedTeamIds.has(t.id))
-      .map((t) => ({
-        ...t,
-        members: (t.members || []).filter((m) => !removedMemberKeys.has(`${t.id}-${m.id}`)),
-      }))
-  }, [teams, deletedTeamIds, removedMemberKeys])
+      .map((t) => {
+        const teamAdded = addedMembersByTeamId[t.id] || []
+        const baseMembers = t.members || []
+        const merged = [...baseMembers, ...teamAdded.filter((am) => !baseMembers.some((bm) => bm.id === am.id))]
+        return {
+          ...t,
+          members: merged.filter((m) => !removedMemberKeys.has(`${t.id}-${m.id}`)),
+        }
+      })
+  }, [teams, deletedTeamIds, removedMemberKeys, addedMembersByTeamId])
 
-  // Create Team Modal State
+  // 1. Create Team Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isSubmittingCreate, setIsSubmittingCreate] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
-  // Assign Member Modal State
-  const [assigningTeam, setAssigningTeam] = useState<Team | null>(null)
-  const [isAssigningMember, setIsAssigningMember] = useState(false)
-  const [assignError, setAssignError] = useState<string | null>(null)
+  // 2. Team Inspector Modal State (Subledger + Autocomplete)
+  const [inspectingTeam, setInspectingTeam] = useState<Team | null>(null)
+  const [isAssigningMemberId, setIsAssigningMemberId] = useState<number | null>(null)
+  const [isDetachingMemberId, setIsDetachingMemberId] = useState<number | null>(null)
+  const [inspectorError, setInspectorError] = useState<string | null>(null)
 
-  // Delete Team Modal State
+  // 3. Edit Team Modal State (Modal-driven update)
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null)
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  // 4. Delete Team Modal State
   const [deletingTeam, setDeletingTeam] = useState<Team | null>(null)
   const [isDeletingTeam, setIsDeletingTeam] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
+  // Active inspecting team synced with displayTeams
+  const activeInspectingTeam = useMemo(() => {
+    if (!inspectingTeam) return null
+    return displayTeams.find((t) => t.id === inspectingTeam.id) || inspectingTeam
+  }, [inspectingTeam, displayTeams])
+
+  // Handlers
   const handleCreateTeamSubmit = async (data: { name: string; description?: string }) => {
     setCreateError(null)
     setIsSubmittingCreate(true)
@@ -126,11 +121,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
       queryClient.invalidateQueries({ queryKey: ['workspace'] })
       setIsCreateModalOpen(false)
     } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { message?: string } }; message?: string }
-      const msg =
-        axiosError?.response?.data?.message ||
-        axiosError?.message ||
-        'Failed to create team.'
+      const msg = extractApiErrorMessage(err, 'Failed to create team.')
       setCreateError(msg)
       throw err
     } finally {
@@ -138,56 +129,26 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
     }
   }
 
-  const handleOpenAssignModal = (team: Team) => {
-    const current = displayTeams.find((t) => t.id === team.id) || team
-    setAssigningTeam(current)
-    setAssignError(null)
-  }
-
-  const handleCloseAssignModal = () => {
-    setAssigningTeam(null)
-    setAssignError(null)
-  }
-
-  const handleAssignMemberSubmit = async (teamId: number, memberId: number) => {
-    setIsAssigningMember(true)
-    setAssignError(null)
+  const handleEditTeamSubmit = async (teamId: number, data: { name: string; description?: string }) => {
+    setEditError(null)
+    setIsSubmittingEdit(true)
 
     try {
-      if (onAssignMember) {
-        await onAssignMember(teamId, memberId)
-      } else if (onAddMember) {
-        await (onAddMember as (tId: number, mId?: number) => Promise<void> | void)(teamId, memberId)
+      if (onSaveEdit) {
+        await onSaveEdit(teamId, data)
       } else {
-        await apiClient.post(`/api/teams/${teamId}/members`, {
-          organization_member_id: memberId,
-        })
+        await apiClient.put(`/api/teams/${teamId}`, data)
       }
       queryClient.invalidateQueries({ queryKey: ['teams'] })
       queryClient.invalidateQueries({ queryKey: ['workspace'] })
-      setAssigningTeam(null)
+      setEditingTeam(null)
     } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { message?: string } }; message?: string }
-      const msg =
-        axiosError?.response?.data?.message ||
-        axiosError?.message ||
-        'Failed to assign member to team.'
-      setAssignError(msg)
+      const msg = extractApiErrorMessage(err, 'Failed to update team.')
+      setEditError(msg)
       throw err
     } finally {
-      setIsAssigningMember(false)
+      setIsSubmittingEdit(false)
     }
-  }
-
-  const handleOpenDeleteModal = (team: Team) => {
-    const current = displayTeams.find((t) => t.id === team.id) || team
-    setDeletingTeam(current)
-    setDeleteError(null)
-  }
-
-  const handleCloseDeleteModal = () => {
-    setDeletingTeam(null)
-    setDeleteError(null)
   }
 
   const handleDeleteTeamConfirm = async (teamId: number) => {
@@ -213,19 +174,57 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
         next.delete(teamId)
         return next
       })
-      const axiosError = err as { response?: { data?: { message?: string } }; message?: string }
-      const msg =
-        axiosError?.response?.data?.message ||
-        axiosError?.message ||
-        'Failed to delete team.'
+      const msg = extractApiErrorMessage(err, 'Failed to delete team.')
       setDeleteError(msg)
     } finally {
       setIsDeletingTeam(false)
     }
   }
 
-  const handleRemoveMember = async (teamId: number, memberId: number) => {
+  const handleAssignMemberSubmit = async (teamId: number, memberId: number) => {
+    setIsAssigningMemberId(memberId)
+    setInspectorError(null)
+
+    // Optimistically append candidate to local derived view
+    const candidate = orgMembers.find((m) => m.id === memberId || m.user_id === memberId)
+    if (candidate) {
+      setAddedMembersByTeamId((prev) => ({
+        ...prev,
+        [teamId]: [...(prev[teamId] || []), candidate as TeamMember],
+      }))
+    }
+
+    try {
+      if (onAssignMember) {
+        await onAssignMember(teamId, memberId)
+      } else if (onAddMember) {
+        await onAddMember(teamId, memberId)
+      } else {
+        await apiClient.post(`/api/teams/${teamId}/members`, {
+          organization_member_id: memberId,
+        })
+      }
+      queryClient.invalidateQueries({ queryKey: ['teams'] })
+      queryClient.invalidateQueries({ queryKey: ['workspace'] })
+    } catch (err: unknown) {
+      // Rollback optimistic assignment
+      setAddedMembersByTeamId((prev) => ({
+        ...prev,
+        [teamId]: (prev[teamId] || []).filter((m) => m.id !== memberId && m.user_id !== memberId),
+      }))
+      const msg = extractApiErrorMessage(err, 'Failed to assign member to team.')
+      setInspectorError(msg)
+      throw err
+    } finally {
+      setIsAssigningMemberId(null)
+    }
+  }
+
+  const handleDetachMemberSubmit = async (teamId: number, memberId: number) => {
     const key = `${teamId}-${memberId}`
+    setIsDetachingMemberId(memberId)
+    setInspectorError(null)
+
     // Optimistic detachment in local derived view
     setRemovedMemberKeys((prev) => new Set(prev).add(key))
 
@@ -237,14 +236,18 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
       }
       queryClient.invalidateQueries({ queryKey: ['teams'] })
       queryClient.invalidateQueries({ queryKey: ['workspace'] })
-    } catch (err) {
+    } catch (err: unknown) {
       // Rollback optimistic removal
       setRemovedMemberKeys((prev) => {
         const next = new Set(prev)
         next.delete(key)
         return next
       })
+      const msg = extractApiErrorMessage(err, 'Failed to detach member from team.')
+      setInspectorError(msg)
       throw err
+    } finally {
+      setIsDetachingMemberId(null)
     }
   }
 
@@ -309,16 +312,36 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
         />
       )}
 
-      {/* Strict RBAC: Assign Member Compound Modal completely omitted from DOM for agents */}
-      {effectiveIsAdmin && (
-        <AssignMemberModal
-          isOpen={Boolean(assigningTeam)}
-          onClose={handleCloseAssignModal}
-          team={assigningTeam}
-          orgMembers={orgMembers}
-          onAssignMember={handleAssignMemberSubmit}
-          isSubmitting={isAssigningMember}
-          error={assignError}
+      {/* Team Inspector Modal (Subledger of assigned members + Autocomplete search of unassigned members) */}
+      <TeamInspectorModal
+        isOpen={Boolean(activeInspectingTeam)}
+        onClose={() => {
+          setInspectingTeam(null)
+          setInspectorError(null)
+        }}
+        team={activeInspectingTeam}
+        orgMembers={orgMembers}
+        isAdmin={effectiveIsAdmin}
+        onDetachMember={handleDetachMemberSubmit}
+        onAssignMember={handleAssignMemberSubmit}
+        isDetachingId={isDetachingMemberId}
+        isAssigningId={isAssigningMemberId}
+        error={inspectorError}
+      />
+
+      {/* Strict RBAC: Edit Team Modal keyed to editing team ID (rerender-derived-state-no-effect) */}
+      {effectiveIsAdmin && editingTeam && (
+        <EditTeamModal
+          key={editingTeam.id}
+          isOpen={Boolean(editingTeam)}
+          onClose={() => {
+            setEditingTeam(null)
+            setEditError(null)
+          }}
+          team={editingTeam}
+          onSave={handleEditTeamSubmit}
+          isSaving={isSubmittingEdit || isUpdating}
+          error={editError || propUpdateError}
         />
       )}
 
@@ -326,7 +349,10 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
       {effectiveIsAdmin && (
         <DeleteTeamModal
           isOpen={Boolean(deletingTeam)}
-          onClose={handleCloseDeleteModal}
+          onClose={() => {
+            setDeletingTeam(null)
+            setDeleteError(null)
+          }}
           team={deletingTeam}
           onConfirm={handleDeleteTeamConfirm}
           isDeleting={isDeletingTeam}
@@ -334,7 +360,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
         />
       )}
 
-      {/* Content Area */}
+      {/* Content Area: 40px High-Density Tabular Ledger */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <div className="flex flex-col items-center gap-3">
@@ -354,43 +380,18 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
           <p className="text-body-default">No teams configured in this organization.</p>
         </div>
       ) : (
-        <div
-          data-testid="teams-grid"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-        >
-          {displayTeams.map((team) => (
-            <TeamCard
-              key={team.id}
-              team={team}
-              isAdmin={effectiveIsAdmin}
-              orgMembers={orgMembers}
-              isEditing={editingTeamId === team.id}
-              editName={editTeamName}
-              editDescription={editTeamDescription}
-              onEditNameChange={onEditNameChange}
-              onEditDescChange={onEditDescChange}
-              onStartEdit={onStartEdit}
-              onSaveEdit={onSaveEdit}
-              onCancelEdit={onCancelEdit}
-              onDelete={onDelete}
-              onOpenAssignModal={effectiveIsAdmin ? handleOpenAssignModal : undefined}
-              onOpenDeleteModal={effectiveIsAdmin ? handleOpenDeleteModal : undefined}
-              isUpdating={isUpdating}
-              isDeletingId={deletingTeamId}
-              updateError={updateError}
-              selectedMemberId={selectedMemberToAdd?.[team.id]}
-              onSelectMember={onSelectMember}
-              onAddMember={onAddMember}
-              isAddingMemberId={addingMemberTeamId}
-              removingMemberKey={removingMemberKey}
-              onRemoveMember={handleRemoveMember}
-              teamActionError={teamActionError?.[team.id]}
-            />
-          ))}
-        </div>
+        <TeamsTabularLedger
+          teams={displayTeams}
+          orgMembers={orgMembers}
+          isAdmin={effectiveIsAdmin}
+          onInspectTeam={setInspectingTeam}
+          onEditTeam={setEditingTeam}
+          onDeleteTeam={setDeletingTeam}
+        />
       )}
     </div>
   )
 }
 
+TeamsView.displayName = 'TeamsView'
 export default TeamsView

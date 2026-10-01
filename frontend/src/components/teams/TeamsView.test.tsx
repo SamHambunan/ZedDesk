@@ -88,39 +88,42 @@ describe('TeamsView Component', () => {
     },
   ]
 
-  it('renders title, stats, and a responsive grid of Team cards with JetBrains Mono agent counts', () => {
+  it('renders title, stats, and a 40px flush data table with JetBrains Mono agent counts', () => {
     renderWithClient(<TeamsView teams={mockTeams} isAdmin={true} />)
 
     expect(screen.getByTestId('teams-view-title')).toBeInTheDocument()
     expect(screen.getByTestId('teams-stats')).toHaveTextContent('3')
 
-    // Responsive grid
-    const grid = screen.getByTestId('teams-grid')
-    expect(grid).toBeInTheDocument()
-    expect(grid.className).toContain('grid')
+    // 40px flush tabular ledger
+    const ledger = screen.getByTestId('teams-tabular-ledger')
+    expect(ledger).toBeInTheDocument()
 
     // Team 1
     expect(screen.getByTestId('team-name-1')).toHaveTextContent('Tier 1 Support')
     expect(screen.getByTestId('team-description-1')).toHaveTextContent('First line incident response')
-    const countChip1 = screen.getByTestId('team-agent-count-1')
+    const countChip1 = screen.getByTestId('team-member-count-1')
     expect(countChip1).toHaveTextContent('1')
     expect(countChip1).toHaveClass('tabular-nums')
 
     // Team 2
     expect(screen.getByTestId('team-name-2')).toHaveTextContent('Tier 2 Escalations')
     expect(screen.getByTestId('team-description-2')).toHaveTextContent('Complex technical troubleshooting')
-    const countChip2 = screen.getByTestId('team-agent-count-2')
+    const countChip2 = screen.getByTestId('team-member-count-2')
     expect(countChip2).toHaveTextContent('2')
     expect(countChip2).toHaveClass('tabular-nums')
   })
 
-  it('displays a preview list of assigned Organization Members on each team card', () => {
+  it('displays avatar stacks for assigned members on each team row', () => {
     renderWithClient(<TeamsView teams={mockTeams} isAdmin={true} />)
 
-    expect(screen.getByTestId('team-member-1-20')).toHaveTextContent('Bob Agent')
-    expect(screen.getByTestId('team-member-1-20')).toHaveTextContent('bob@acme.test')
-    expect(screen.getByTestId('team-member-2-21')).toHaveTextContent('Alice Walker')
-    expect(screen.getByTestId('team-member-2-22')).toHaveTextContent('Charlie Lead')
+    const stack1 = screen.getByTestId('team-avatar-stack-1')
+    expect(stack1).toBeInTheDocument()
+    expect(stack1).toHaveTextContent('BA')
+
+    const stack2 = screen.getByTestId('team-avatar-stack-2')
+    expect(stack2).toBeInTheDocument()
+    expect(stack2).toHaveTextContent('AW')
+    expect(stack2).toHaveTextContent('CL')
   })
 
   it('renders "+ Create Team" action button when isAdmin is true', () => {
@@ -178,7 +181,7 @@ describe('TeamsView Component', () => {
     })
   })
 
-  it('opens "Assign Member" compound modal from team card and adds member via API mutation', async () => {
+  it('opens TeamInspectorModal from Manage Members action button and assigns member via autocomplete', async () => {
     const handleAssignMember = vi.fn().mockResolvedValue(undefined)
     const client = new QueryClient()
     const invalidateSpy = vi.spyOn(client, 'invalidateQueries')
@@ -193,58 +196,53 @@ describe('TeamsView Component', () => {
       client
     )
 
-    // Modal is initially not open
-    expect(screen.queryByTestId('assign-member-title')).not.toBeInTheDocument()
+    // Click "Members" action on Team 1 (Tier 1 Support)
+    const manageBtn = screen.getByTestId('manage-members-btn-1')
+    fireEvent.click(manageBtn)
 
-    // Click "+ Assign Member" on Team 1 (Tier 1 Support)
-    const assignBtn = screen.getByTestId('add-member-btn-1')
-    expect(assignBtn).toHaveTextContent(/assign member/i)
-    fireEvent.click(assignBtn)
-
-    // Assign Member modal opens
+    // Team Inspector modal opens
     expect(screen.getByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByTestId('assign-member-title')).toHaveTextContent(/tier 1 support/i)
+    expect(screen.getByTestId('inspector-modal-title')).toHaveTextContent(/tier 1 support/i)
 
-    // Query eligible organization members:
-    // Bob Agent (id: 20) is ALREADY in Team 1, so shouldn't be in select options
-    const select = screen.getByTestId('assign-member-select')
-    const options = Array.from(select.querySelectorAll('option')).map((o) => o.textContent)
-    expect(options.some((t) => t?.includes('Bob Agent'))).toBe(false)
-    expect(options.some((t) => t?.includes('Alice Walker'))).toBe(true)
-    expect(options.some((t) => t?.includes('Diana Prince'))).toBe(true)
+    // Autocomplete search input
+    const searchInput = screen.getByTestId('autocomplete-search-input')
+    expect(searchInput).toBeInTheDocument()
 
-    // Select Diana Prince (id: 23)
-    fireEvent.change(select, { target: { value: '23' } })
+    // Diana Prince (id: 23) is unassigned for Team 1
+    const candidateDiana = screen.getByTestId('candidate-member-23')
+    expect(candidateDiana).toHaveTextContent('Diana Prince')
 
-    // Submit assignment
-    const submitBtn = screen.getByTestId('assign-member-submit')
-    expect(submitBtn).not.toBeDisabled()
-    fireEvent.click(submitBtn)
+    // Click 1-click assign
+    const assignBtn = screen.getByTestId('assign-member-btn-23')
+    fireEvent.click(assignBtn)
 
     await waitFor(() => {
       expect(handleAssignMember).toHaveBeenCalledWith(1, 23)
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['teams'] })
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
   })
 
-  it('triggers "Remove Member" action and detaches member from team', async () => {
+  it('triggers "Remove Member" action and detaches member from team in TeamInspectorModal', async () => {
     const handleRemoveMember = vi.fn().mockResolvedValue(undefined)
 
     renderWithClient(
       <TeamsView
         teams={mockTeams}
+        orgMembers={mockOrgMembers}
         isAdmin={true}
         onRemoveMember={handleRemoveMember}
       />
     )
 
-    // Team 1 has member Bob Agent (id: 20)
-    expect(screen.getByTestId('team-member-1-20')).toBeInTheDocument()
-    const removeBtn = screen.getByTestId('remove-member-btn-1-20')
-    expect(removeBtn).toBeInTheDocument()
+    // Click avatar stack to inspect Team 1
+    fireEvent.click(screen.getByTestId('team-avatar-stack-1'))
 
-    fireEvent.click(removeBtn)
+    // Subledger shows Bob Agent (id: 20) with 1-click Detach button
+    expect(screen.getByTestId('subledger-member-20')).toHaveTextContent('Bob Agent')
+    const detachBtn = screen.getByTestId('detach-member-btn-20')
+    expect(detachBtn).toBeInTheDocument()
+
+    fireEvent.click(detachBtn)
 
     await waitFor(() => {
       expect(handleRemoveMember).toHaveBeenCalledWith(1, 20)
@@ -318,24 +316,22 @@ describe('TeamsView Component', () => {
     expect(handleDelete).not.toHaveBeenCalled()
   })
 
-  it('enforces strict RBAC: "+ Create Team", "+ Assign Member", "Remove", and "Delete" are completely absent from DOM for agent', () => {
+  it('enforces strict RBAC: "+ Create Team", "Members", "Edit", and "Delete" are completely absent from DOM for agent', () => {
     renderWithClient(<TeamsView teams={mockTeams} isAdmin={false} />)
 
     // Strict RBAC: All mutation triggers are completely omitted
     expect(screen.queryByTestId('create-team-btn')).not.toBeInTheDocument()
     expect(screen.queryByTestId('create-team-form')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('manage-members-btn-1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('edit-team-btn-1')).not.toBeInTheDocument()
     expect(screen.queryByTestId('delete-team-btn-1')).not.toBeInTheDocument()
     expect(screen.queryByTestId('delete-team-btn-2')).not.toBeInTheDocument()
     expect(screen.queryByTestId('delete-team-btn-3')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('add-member-btn-1')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('add-member-btn-2')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('remove-member-btn-1-20')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('remove-member-btn-2-21')).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
-    // Cards and rosters are still visible in read-only mode
+    // Table rows are still visible in read-only mode
     expect(screen.getByTestId('team-name-1')).toHaveTextContent('Tier 1 Support')
-    expect(screen.getByTestId('team-member-1-20')).toHaveTextContent('Bob Agent')
+    expect(screen.getByTestId('team-member-count-1')).toHaveTextContent('1')
   })
 
   it('correctly resolves role-based authorization from WorkspaceShellContext when isAdmin is omitted', () => {
@@ -366,7 +362,7 @@ describe('TeamsView Component', () => {
 
     expect(screen.queryByTestId('create-team-btn')).not.toBeInTheDocument()
     expect(screen.queryByTestId('create-team-form')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('add-member-btn-1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('manage-members-btn-1')).not.toBeInTheDocument()
     expect(screen.queryByTestId('delete-team-btn-1')).not.toBeInTheDocument()
 
     // When role is admin
@@ -395,7 +391,7 @@ describe('TeamsView Component', () => {
     )
 
     expect(screen.getByTestId('create-team-btn')).toBeInTheDocument()
-    expect(screen.getByTestId('add-member-btn-1')).toBeInTheDocument()
+    expect(screen.getByTestId('manage-members-btn-1')).toBeInTheDocument()
     expect(screen.getByTestId('delete-team-btn-1')).toBeInTheDocument()
   })
 })

@@ -521,9 +521,16 @@ function AppInner({
     setUpdateTeamError(null)
   }
 
-  const handleSaveEditTeam = async (teamId: number) => {
+  const handleSaveEditTeam = async (
+    teamId: number,
+    dataPayload?: { name: string; description?: string }
+  ) => {
     setIsUpdatingTeam(true)
     setUpdateTeamError(null)
+
+    const payloadName = dataPayload?.name ?? editTeamName
+    const payloadDesc =
+      dataPayload?.description !== undefined ? dataPayload.description : editTeamDesc
 
     try {
       const res = await fetch(`${apiUrl}/api/teams/${teamId}`, {
@@ -534,8 +541,8 @@ function AppInner({
           Accept: 'application/json',
         },
         body: JSON.stringify({
-          name: editTeamName,
-          description: editTeamDesc || undefined,
+          name: payloadName,
+          description: payloadDesc || undefined,
         }),
       })
 
@@ -955,27 +962,12 @@ function AppInner({
                 isCreating={isCreatingTeam}
                 createError={createTeamError}
                 createSuccess={createTeamSuccess}
-                editingTeamId={editingTeamId}
-                editTeamName={editTeamName}
-                editTeamDescription={editTeamDesc}
                 isUpdating={isUpdatingTeam}
                 updateError={updateTeamError}
-                selectedMemberToAdd={selectedMemberToAdd}
-                addingMemberTeamId={addingMemberTeamId}
-                removingMemberKey={removingMemberKey}
-                deletingTeamId={deletingTeamId}
-                teamActionError={teamActionError}
-                onEditNameChange={setEditTeamName}
-                onEditDescChange={setEditTeamDesc}
-                onStartEdit={handleStartEditTeam}
                 onSaveEdit={handleSaveEditTeam}
-                onCancelEdit={() => setEditingTeamId(null)}
                 onDelete={handleDeleteTeam}
-                onSelectMember={(teamId, value) =>
-                  setSelectedMemberToAdd((prev) => ({ ...prev, [teamId]: value }))
-                }
                 onAddMember={handleAddMemberToTeam}
-                onAssignMember={(teamId, memberId) => handleAddMemberToTeam(teamId, memberId)}
+                onAssignMember={(teamId: number, memberId: number) => handleAddMemberToTeam(teamId, memberId)}
                 onRemoveMember={handleRemoveMemberFromTeam}
               />
             )}
