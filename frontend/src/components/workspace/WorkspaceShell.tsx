@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react'
-import { Plus, Users, Network, Inbox, Gauge } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useWorkspace } from '../../hooks/useWorkspace'
 import { WorkspaceHeader, type WorkspaceOrganization } from './WorkspaceHeader'
@@ -7,7 +6,6 @@ import { WorkspaceSidebar } from './WorkspaceSidebar'
 import { WorkspaceOverview } from '../overview/WorkspaceOverview'
 import { PerimeterErrorCard } from './PerimeterErrorCard'
 import { CreateOrganizationModal } from '../hub/CreateOrganizationModal'
-import { workspaceContentData } from '../../data/mockData'
 import { getApiBaseUrl, getOrganizationUrl } from '../../utils/url'
 import {
   WorkspaceShellContext,

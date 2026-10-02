@@ -1,5 +1,5 @@
 import React from 'react'
-import { Users, Radio } from 'lucide-react'
+import { Radio } from 'lucide-react'
 import type { OverviewAgent } from './types'
 import { getInitials } from './types'
 

@@ -25,7 +25,6 @@ export const PendingInvitationsLedger: React.FC<PendingInvitationsLedgerProps> =
   const invitations = (initialInvitations || []).filter((item) => !revokedIds.includes(item.id))
 
   const handleCopyLink = (inv: OverviewInvitation) => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173'
     // Extract base domain
     const host = typeof window !== 'undefined' ? window.location.host : 'localhost:5173'
     const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:'
