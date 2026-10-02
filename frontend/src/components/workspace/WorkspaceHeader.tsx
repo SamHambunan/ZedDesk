@@ -213,7 +213,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
             value={searchQuery}
             onChange={handleSearchChange}
             placeholder={workspaceContentData.brand.searchPlaceholder}
-            className="h-[32px] w-[220px] lg:w-[260px] bg-surface-container-low border border-transparent rounded pl-9 pr-10 text-body-compact text-text-primary focus:border-accent-glow/40 focus:outline-none transition-colors placeholder:text-text-muted"
+            className="h-[32px] w-[220px] lg:w-[260px] bg-surface-container-low border border-transparent rounded pl-9 pr-10 text-body-compact text-text-primary focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] focus:outline-none transition-colors placeholder:text-text-muted"
           />
           <span className="absolute right-2 text-[10px] font-mono-data text-text-muted bg-surface-subpanel px-1.5 py-0.5 rounded border border-border-subtle">
             {workspaceContentData.brand.searchShortcut}
@@ -227,7 +227,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
         <button
           type="button"
           onClick={onCopilotClick}
-          className="h-[32px] px-3 bg-gradient-to-r from-accent-indigo-glow to-primary-container rounded border border-primary-dark text-label-regular font-label-regular text-white flex items-center gap-1.5 hover:opacity-90 transition-opacity shadow-keylight cursor-pointer"
+          className="h-[32px] px-3 bg-gradient-to-r from-accent-indigo-glow to-primary-container rounded border border-primary-dark text-label-regular font-label-regular text-white flex items-center gap-1.5 hover:opacity-90 transition-opacity shadow-keylight cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
         >
           <Sparkles className="w-3.5 h-3.5 animate-pulse" />
           <span>{workspaceContentData.brand.copilotLabel}</span>
@@ -245,7 +245,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
               setShowProfileMenu(false)
             }}
             title={`Switch tenant (${organizationSlug})`}
-            className="h-[32px] px-3 bg-surface-container-low hover:bg-surface-subpanel rounded border border-border-subtle text-label-regular font-label-regular text-text-secondary flex items-center gap-1.5 transition-colors cursor-pointer select-none"
+            className="h-[32px] px-3 bg-surface-container-low hover:bg-surface-subpanel rounded border border-border-subtle text-label-regular font-label-regular text-text-secondary flex items-center gap-1.5 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
           >
             <span
               data-testid="workspace-org-name"

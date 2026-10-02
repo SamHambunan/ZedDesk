@@ -228,7 +228,7 @@ export const ModalCloseButton: React.FC<ModalCloseButtonProps> = ({
       aria-label={ariaLabel}
       onClick={onClose}
       className={cn(
-        'p-1 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-indigo-glow cursor-pointer',
+        'p-1 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B] cursor-pointer',
         className
       )}
       {...props}

@@ -146,7 +146,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
               data-testid="invite-role-select"
               value={role}
               onChange={(e) => setRole(e.target.value as 'agent' | 'admin')}
-              className="w-full h-9 px-3 bg-surface-panel border border-border-subtle rounded text-text-primary text-xs focus:outline-none focus:border-accent-glow cursor-pointer"
+              className="w-full h-9 px-3 bg-surface-panel border border-border-subtle rounded text-text-primary text-xs focus:outline-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] cursor-pointer"
             >
               <option value="agent">Agent (Triage & support queues)</option>
               <option value="admin">Admin (Full administrative privileges)</option>

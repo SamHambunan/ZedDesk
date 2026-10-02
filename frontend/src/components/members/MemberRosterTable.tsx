@@ -97,6 +97,7 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
             return (
               <Table.Row
                 key={member.id}
+                tabIndex={0}
                 data-testid={`member-row-${member.id}`}
                 className="h-10 border-b border-border-subtle hover:bg-surface-container-high/60 transition-colors group cursor-default"
               >
@@ -205,7 +206,7 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
                       aria-label={`Actions for ${userName}`}
                       data-testid={`member-actions-btn-${member.id}`}
                       onClick={() => onActionClick?.(member)}
-                      className="text-text-muted hover:text-text-primary p-1 rounded hover:bg-surface-container-high transition-colors focus:outline-none"
+                      className="text-text-muted hover:text-text-primary p-1 rounded hover:bg-surface-container-high transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B] cursor-pointer"
                     >
                       <MoreVertical className="w-4 h-4" />
                     </button>

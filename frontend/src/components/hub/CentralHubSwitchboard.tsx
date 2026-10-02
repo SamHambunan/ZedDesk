@@ -158,8 +158,15 @@ export const CentralHubSwitchboard: React.FC<CentralHubSwitchboardProps> = ({
                 return (
                   <Table.Row
                     key={org.id}
+                    tabIndex={0}
                     data-testid={`workspace-row-${org.slug}`}
                     onClick={() => onLaunch(org)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        onLaunch(org)
+                      }
+                    }}
                     className="h-10 cursor-pointer transition-colors hover:bg-surface-subpanel/50"
                   >
                     {/* Status Beacon */}
@@ -205,7 +212,7 @@ export const CentralHubSwitchboard: React.FC<CentralHubSwitchboardProps> = ({
                           e.stopPropagation()
                           onLaunch(org)
                         }}
-                        className="px-2.5 py-1 rounded bg-surface-subpanel hover:bg-surface-panel border border-border-subtle text-xs font-semibold text-text-primary hover:text-primary-container transition-all flex items-center gap-1 ml-auto cursor-pointer"
+                        className="px-2.5 py-1 rounded bg-surface-subpanel hover:bg-surface-panel border border-border-subtle text-xs font-semibold text-text-primary hover:text-primary-container transition-all flex items-center gap-1 ml-auto cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
                       >
                         <span>Launch Workspace →</span>
                         <ArrowRight className="w-3.5 h-3.5" />

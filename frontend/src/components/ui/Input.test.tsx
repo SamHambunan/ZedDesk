@@ -58,9 +58,16 @@ describe('Input Primitive', () => {
     expect(input.className).toContain('disabled:opacity-50')
   })
 
-  it('features luminous focus border styling', () => {
+  it('features accessible Cadmium Amber focus border styling by default', () => {
     render(<Input placeholder="Focus test" />)
     const input = screen.getByPlaceholderText('Focus test')
+    expect(input.className).toContain('focus:border-[#F59E0B]')
+    expect(input.className).toContain('focus:ring-[#F59E0B]')
+  })
+
+  it('supports indigo focus styling when explicitly requested', () => {
+    render(<Input placeholder="Indigo focus" focusRing="indigo" />)
+    const input = screen.getByPlaceholderText('Indigo focus')
     expect(input.className).toContain('focus:border-primary-container')
     expect(input.className).toContain('focus:ring-accent-indigo-glow/30')
   })

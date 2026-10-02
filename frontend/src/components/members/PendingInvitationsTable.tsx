@@ -137,6 +137,7 @@ export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = (
                 return (
                   <TableRow
                     key={inv.id}
+                    tabIndex={0}
                     data-testid={`invitation-row-${inv.id}`}
                     className="h-10 border-b border-border-subtle hover:bg-surface-container-high/60 transition-colors group cursor-default"
                   >
@@ -198,7 +199,7 @@ export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = (
                         type="button"
                         data-testid={`copy-invitation-link-${inv.id}`}
                         onClick={() => onCopyLink?.(inv)}
-                        className={`inline-flex items-center gap-1 text-[11px] font-label-caps font-semibold uppercase tracking-wider transition-colors cursor-pointer ${
+                        className={`inline-flex items-center gap-1 text-[11px] font-label-caps font-semibold uppercase tracking-wider transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B] rounded px-1 ${
                           isCopied
                             ? 'text-sentiment-positive'
                             : 'text-accent-glow hover:text-primary-fixed'
@@ -226,7 +227,7 @@ export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = (
                           data-testid={`revoke-invitation-btn-${inv.id}`}
                           disabled={isRevoking}
                           onClick={() => onRevoke?.(inv.id)}
-                          className="inline-flex items-center gap-1 text-sentiment-critical hover:text-red-400 font-label-caps text-[11px] uppercase tracking-wider transition-colors p-1 disabled:opacity-50 cursor-pointer"
+                          className="inline-flex items-center gap-1 text-sentiment-critical hover:text-red-400 font-label-caps text-[11px] uppercase tracking-wider transition-colors p-1 disabled:opacity-50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B] rounded"
                         >
                           <Trash2 className="w-3 h-3 sm:hidden" />
                           <span className="hidden sm:inline">

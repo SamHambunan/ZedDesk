@@ -11,6 +11,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   isLoading?: boolean
   leftIcon?: React.ReactNode
   rightIcon?: React.ReactNode
+  focusRing?: 'amber' | 'indigo' | 'inherit'
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -24,13 +25,21 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       disabled,
       leftIcon,
       rightIcon,
+      focusRing,
       ...props
     },
     ref
   ) => {
+    const isAmberFocus = focusRing === 'amber' || variant === 'amber'
+    const ringClass = isAmberFocus
+      ? 'focus-visible:ring-[#F59E0B]'
+      : 'focus-visible:ring-accent-indigo-glow'
+
     const baseStyles =
       'inline-flex items-center justify-center font-semibold rounded select-none transition-colors duration-150 relative ' +
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-indigo-glow focus-visible:ring-offset-2 focus-visible:ring-offset-surface-canvas ' +
+      'focus-visible:outline-none focus-visible:ring-2 ' +
+      ringClass +
+      ' focus-visible:ring-offset-2 focus-visible:ring-offset-surface-canvas ' +
       'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none'
 
     const variantStyles: Record<ButtonVariant, string> = {
@@ -45,7 +54,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       danger:
         'bg-sentiment-negative hover:bg-rose-600 text-white shadow-keylight-primary border border-transparent',
       amber:
-        'bg-[#F59E0B] hover:bg-[#D97706] active:bg-[#B45309] text-[#0F1012] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] border border-transparent',
+        'bg-[#F59E0B] hover:bg-[#D97706] active:bg-[#B45309] text-[#0F1012] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] border border-transparent focus-visible:ring-[#F59E0B]',
     }
 
     const sizeStyles: Record<ButtonSize, string> = {

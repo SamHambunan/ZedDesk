@@ -77,4 +77,18 @@ describe('Button Primitive', () => {
     button.focus()
     expect(button).toHaveFocus()
   })
+
+  it('features accessible Cadmium Amber focus rings for amber variant and explicit focusRing', () => {
+    const { rerender } = render(<Button variant="amber">Amber Action</Button>)
+    let button = screen.getByRole('button', { name: 'Amber Action' })
+    expect(button.className).toContain('focus-visible:ring-[#F59E0B]')
+    button.focus()
+    expect(button).toHaveFocus()
+
+    rerender(<Button variant="secondary" focusRing="amber">Secondary Amber Focus</Button>)
+    button = screen.getByRole('button', { name: 'Secondary Amber Focus' })
+    expect(button.className).toContain('focus-visible:ring-[#F59E0B]')
+    button.focus()
+    expect(button).toHaveFocus()
+  })
 })
