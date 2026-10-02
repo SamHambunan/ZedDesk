@@ -231,17 +231,6 @@ export interface WorkspaceContentData {
     readonly title: string
     readonly inviteMember: string
   }
-  readonly telemetry: {
-    readonly totalMembers: string
-    readonly totalMembersValue: string | number
-    readonly totalMembersTrend: string
-    readonly activeTeams: string
-    readonly activeTeamsValue: string | number
-    readonly openTickets: string
-    readonly openTicketsValue: string | number
-    readonly slaStatus: string
-    readonly slaValue: string
-  }
   readonly activity: {
     readonly title: string
     readonly items: readonly WorkspaceActivityItem[]
@@ -292,17 +281,6 @@ export const workspaceContentData: WorkspaceContentData = {
   hero: {
     title: 'Operational Overview',
     inviteMember: 'Invite Member',
-  },
-  telemetry: {
-    totalMembers: 'Total Members',
-    totalMembersValue: 14,
-    totalMembersTrend: '+2 this week',
-    activeTeams: 'Active Teams',
-    activeTeamsValue: 3,
-    openTickets: 'Open Tickets',
-    openTicketsValue: 24,
-    slaStatus: 'SLA Status',
-    slaValue: '99.4%',
   },
   activity: {
     title: 'Recent Activity',

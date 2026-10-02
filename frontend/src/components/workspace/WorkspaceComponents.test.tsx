@@ -2,7 +2,6 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { WorkspaceHeader } from './WorkspaceHeader'
 import { WorkspaceSidebar } from './WorkspaceSidebar'
-import { TelemetryMetricCard } from './TelemetryMetricCard'
 import { RecentActivityFeed } from './RecentActivityFeed'
 import { QuickRoutingShortcuts } from './QuickRoutingShortcuts'
 import { PerimeterErrorCard } from './PerimeterErrorCard'
@@ -155,43 +154,6 @@ describe('WorkspaceSidebar Component', () => {
     expect(screen.queryByTestId('nav-org-settings')).not.toBeInTheDocument()
     expect(screen.queryByTestId('nav-invitations')).not.toBeInTheDocument()
     expect(screen.queryByTestId('nav-team-management')).not.toBeInTheDocument()
-  })
-})
-
-describe('TelemetryMetricCard Component', () => {
-  it('renders operational metric values with tabular numbers and status indicators', () => {
-    render(
-      <TelemetryMetricCard
-        title="Open Tickets"
-        value={24}
-        priorityIndicators={[
-          { color: 'critical', label: 'High Priority' },
-          { color: 'warning', label: 'Medium Priority' },
-        ]}
-        testId="card-tickets"
-      />
-    )
-
-    expect(screen.getByTestId('card-tickets')).toBeInTheDocument()
-    expect(screen.getByText('Open Tickets')).toBeInTheDocument()
-    expect(screen.getByText('24')).toHaveClass('tabular-nums')
-    expect(screen.getByTitle('High Priority')).toHaveClass('bg-sentiment-critical')
-    expect(screen.getByTitle('Medium Priority')).toHaveClass('bg-sentiment-warning')
-  })
-
-  it('renders positive SLA status with positive styling', () => {
-    render(
-      <TelemetryMetricCard
-        title="SLA Status"
-        value="99.4%"
-        valueColor="positive"
-        testId="card-sla"
-      />
-    )
-
-    const valueEl = screen.getByText('99.4%')
-    expect(valueEl).toHaveClass('text-sentiment-positive')
-    expect(valueEl).toHaveClass('tabular-nums')
   })
 })
 
