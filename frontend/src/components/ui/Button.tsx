@@ -11,7 +11,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   isLoading?: boolean
   leftIcon?: React.ReactNode
   rightIcon?: React.ReactNode
-  focusRing?: 'amber' | 'indigo' | 'inherit'
+  focusRing?: 'amber' | 'indigo'
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -25,12 +25,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       disabled,
       leftIcon,
       rightIcon,
-      focusRing,
+      focusRing = 'amber',
       ...props
     },
     ref
   ) => {
-    const isAmberFocus = focusRing === 'amber' || variant === 'amber'
+    const isAmberFocus = focusRing !== 'indigo'
     const ringClass = isAmberFocus
       ? 'focus-visible:ring-[#F59E0B]'
       : 'focus-visible:ring-accent-indigo-glow'
@@ -54,7 +54,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       danger:
         'bg-sentiment-negative hover:bg-rose-600 text-white shadow-keylight-primary border border-transparent',
       amber:
-        'bg-[#F59E0B] hover:bg-[#D97706] active:bg-[#B45309] text-[#0F1012] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] border border-transparent focus-visible:ring-[#F59E0B]',
+        'bg-[#F59E0B] hover:bg-[#D97706] active:bg-[#B45309] text-[#0F1012] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] border border-transparent',
     }
 
     const sizeStyles: Record<ButtonSize, string> = {

@@ -70,24 +70,18 @@ describe('Button Primitive', () => {
     expect(button.className).toContain('h-9')
   })
 
-  it('features accessible focus ring classes for keyboard navigation', () => {
+  it('features accessible Cadmium Amber focus ring classes by default', () => {
     render(<Button>Focusable</Button>)
     const button = screen.getByRole('button', { name: 'Focusable' })
-    expect(button.className).toContain('focus-visible:ring-accent-indigo-glow')
+    expect(button.className).toContain('focus-visible:ring-[#F59E0B]')
     button.focus()
     expect(button).toHaveFocus()
   })
 
-  it('features accessible Cadmium Amber focus rings for amber variant and explicit focusRing', () => {
-    const { rerender } = render(<Button variant="amber">Amber Action</Button>)
-    let button = screen.getByRole('button', { name: 'Amber Action' })
-    expect(button.className).toContain('focus-visible:ring-[#F59E0B]')
-    button.focus()
-    expect(button).toHaveFocus()
-
-    rerender(<Button variant="secondary" focusRing="amber">Secondary Amber Focus</Button>)
-    button = screen.getByRole('button', { name: 'Secondary Amber Focus' })
-    expect(button.className).toContain('focus-visible:ring-[#F59E0B]')
+  it('supports explicit indigo focus ring when requested', () => {
+    render(<Button focusRing="indigo">Indigo Action</Button>)
+    const button = screen.getByRole('button', { name: 'Indigo Action' })
+    expect(button.className).toContain('focus-visible:ring-accent-indigo-glow')
     button.focus()
     expect(button).toHaveFocus()
   })
