@@ -146,7 +146,7 @@ export const ModalRoot: React.FC<ModalRootProps> = ({
           aria-describedby={descId}
           tabIndex={-1}
           className={cn(
-            'relative w-full max-w-lg bg-surface-subpanel border border-white/10 rounded-lg shadow-modal text-on-surface overflow-hidden outline-none',
+            'relative w-full max-w-lg bg-surface-subpanel border border-white/10 rounded-lg shadow-modal text-on-surface overflow-hidden outline-none focus-visible:ring-1 focus-visible:ring-[#F59E0B]',
             className
           )}
         >
@@ -228,7 +228,7 @@ export const ModalCloseButton: React.FC<ModalCloseButtonProps> = ({
       aria-label={ariaLabel}
       onClick={onClose}
       className={cn(
-        'p-1 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-indigo-glow cursor-pointer',
+        'p-1 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B] cursor-pointer',
         className
       )}
       {...props}

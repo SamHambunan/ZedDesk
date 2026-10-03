@@ -91,7 +91,7 @@ export const TriageQueueBridge: React.FC<TriageQueueBridgeProps> = ({
           type="button"
           data-testid="view-all-tickets-link"
           onClick={onViewAllTickets}
-          className="text-xs font-label-regular text-accent-glow hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+          className="text-xs font-label-regular text-accent-glow hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B] rounded px-1"
         >
           <span>View Full Triage Queue</span>
           <ArrowRight className="w-3.5 h-3.5" />

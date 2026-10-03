@@ -26,10 +26,14 @@ describe('Modal Primitive', () => {
     expect(screen.getByText('Create Team')).toBeInTheDocument()
     expect(screen.getByText('Team Content')).toBeInTheDocument()
 
-    // Level 3 styling: shadow-modal, 8px radius, border
+    // Level 3 styling: shadow-modal, 8px radius, border, accessible focus ring
     expect(dialog.className).toContain('bg-surface-subpanel')
     expect(dialog.className).toContain('shadow-modal')
     expect(dialog.className).toContain('rounded-lg')
+    expect(dialog.className).toContain('focus-visible:ring-[#F59E0B]')
+
+    const closeBtn = screen.getByRole('button', { name: /close/i })
+    expect(closeBtn.className).toContain('focus-visible:ring-[#F59E0B]')
   })
 
   it('calls onClose when clicking close button', async () => {

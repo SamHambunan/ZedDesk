@@ -129,7 +129,7 @@ export const PendingInvitationsLedger: React.FC<PendingInvitationsLedgerProps> =
                     type="button"
                     data-testid={`copy-invite-${inv.id}`}
                     onClick={() => handleCopyLink(inv)}
-                    className="h-8 px-2.5 bg-surface-container hover:bg-surface-container-high border border-border-prominent text-text-secondary hover:text-text-primary rounded text-xs font-mono-data transition-all flex items-center gap-1 cursor-pointer"
+                    className="h-8 px-2.5 bg-surface-container hover:bg-surface-container-high border border-border-prominent text-text-secondary hover:text-text-primary rounded text-xs font-mono-data transition-all flex items-center gap-1 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
                   >
                     <Copy className="w-3.5 h-3.5 text-accent-glow" />
                     <span>{isCopied ? 'Copied' : 'Copy Link'}</span>
@@ -142,7 +142,7 @@ export const PendingInvitationsLedger: React.FC<PendingInvitationsLedgerProps> =
                     onClick={() => handleRevoke(inv.id)}
                     title="Revoke invitation"
                     aria-label={`Revoke invitation for ${inv.email}`}
-                    className="h-8 w-8 bg-surface-container hover:bg-sentiment-critical/20 border border-border-prominent hover:border-sentiment-critical/30 text-text-muted hover:text-sentiment-critical rounded transition-all flex items-center justify-center cursor-pointer disabled:opacity-50"
+                    className="h-8 w-8 bg-surface-container hover:bg-sentiment-critical/20 border border-border-prominent hover:border-sentiment-critical/30 text-text-muted hover:text-sentiment-critical rounded transition-all flex items-center justify-center cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

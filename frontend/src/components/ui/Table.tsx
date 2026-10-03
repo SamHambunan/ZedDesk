@@ -48,11 +48,13 @@ export const TableFooter = forwardRef<HTMLTableSectionElement, React.HTMLAttribu
 TableFooter.displayName = 'TableFooter'
 
 export const TableRow = forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTMLTableRowElement>>(
-  ({ className, ...props }, ref) => (
+  ({ className, tabIndex, ...props }, ref) => (
     <tr
       ref={ref}
+      tabIndex={tabIndex}
       className={cn(
         'h-10 transition-colors hover:bg-surface-container-high/60 border-b border-border-subtle data-[state=selected]:bg-surface-container-high',
+        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#F59E0B]',
         className
       )}
       {...props}

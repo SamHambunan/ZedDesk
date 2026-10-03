@@ -73,7 +73,7 @@ export const QuickDispatchShortcuts: React.FC<QuickDispatchShortcutsProps> = ({ 
               type="button"
               data-testid={`dispatch-shortcut-${item.id}`}
               onClick={() => onNavigate?.(item.route)}
-              className="bg-surface-panel/60 border border-border-subtle/80 hover:border-accent-glow/50 rounded-lg p-3.5 text-left transition-all group cursor-pointer flex flex-col justify-between gap-2.5 hover:bg-surface-panel"
+              className="bg-surface-panel/60 border border-border-subtle/80 hover:border-accent-glow/50 rounded-lg p-3.5 text-left transition-all group cursor-pointer flex flex-col justify-between gap-2.5 hover:bg-surface-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
             >
               <div className="flex items-center justify-between">
                 <div

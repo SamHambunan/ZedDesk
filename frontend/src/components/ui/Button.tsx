@@ -11,6 +11,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   isLoading?: boolean
   leftIcon?: React.ReactNode
   rightIcon?: React.ReactNode
+  focusRing?: 'amber' | 'indigo'
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -24,13 +25,21 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       disabled,
       leftIcon,
       rightIcon,
+      focusRing = 'amber',
       ...props
     },
     ref
   ) => {
+    const isAmberFocus = focusRing !== 'indigo'
+    const ringClass = isAmberFocus
+      ? 'focus-visible:ring-[#F59E0B]'
+      : 'focus-visible:ring-accent-indigo-glow'
+
     const baseStyles =
       'inline-flex items-center justify-center font-semibold rounded select-none transition-colors duration-150 relative ' +
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-indigo-glow focus-visible:ring-offset-2 focus-visible:ring-offset-surface-canvas ' +
+      'focus-visible:outline-none focus-visible:ring-2 ' +
+      ringClass +
+      ' focus-visible:ring-offset-2 focus-visible:ring-offset-surface-canvas ' +
       'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none'
 
     const variantStyles: Record<ButtonVariant, string> = {
