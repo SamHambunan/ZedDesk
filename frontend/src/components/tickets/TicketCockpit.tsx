@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import type {
   TicketItem,
+  TicketMessage,
   PresetFilter,
   TicketStatus,
   TicketPriority,

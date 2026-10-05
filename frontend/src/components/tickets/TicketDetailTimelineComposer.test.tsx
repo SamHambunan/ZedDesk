@@ -1,7 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import React, { use } from 'react'
+import { describe, it, expect, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   TicketTimeline,
@@ -14,11 +13,10 @@ import {
   PublicReplyComposer,
   InternalNoteComposer,
   useComposer,
-  type ComposerSubmitPayload,
 } from './TicketComposer'
 import { TicketCockpit } from './TicketCockpit'
-import type { TicketMessage, TicketItem } from './types'
-import { INITIAL_MOCK_TICKETS, MOCK_TEAMS, MOCK_MEMBERS, MOCK_TAGS_POOL } from './mockData'
+import type { TicketMessage } from './types'
+import { INITIAL_MOCK_TICKETS } from './mockData'
 
 const MOCK_MESSAGES: TicketMessage[] = [
   {
@@ -213,6 +211,7 @@ describe('Compound Composer Architecture (Issue #104)', () => {
           <span data-testid="current-tab">{state.tab}</span>
           <span data-testid="current-body">{state.body}</span>
           <span data-testid="current-next-status">{state.nextStatus}</span>
+          <span data-testid="has-meta-ref">{meta.textareaRef ? 'true' : 'false'}</span>
           <button
             type="button"
             data-testid="consumer-switch-tab"
@@ -239,6 +238,7 @@ describe('Compound Composer Architecture (Issue #104)', () => {
 
     expect(screen.getByTestId('current-tab')).toHaveTextContent('public_reply')
     expect(screen.getByTestId('current-next-status')).toHaveTextContent('pending')
+    expect(screen.getByTestId('has-meta-ref')).toHaveTextContent('true')
   })
 
   it('PublicReplyComposer includes next-status selector defaulting to pending (overrideable)', async () => {
@@ -438,10 +438,11 @@ describe('Compound Composer Architecture (Issue #104)', () => {
       // Check URL and form data
       expect(submittedUrl).toBe(`http://localhost:8000/api/tickets/${INITIAL_MOCK_TICKETS[0].id}/messages`)
       expect(submittedFormData).not.toBeNull()
-      expect(submittedFormData?.get('body')).toBe('Dispatched multipart response with attachment.')
-      expect(submittedFormData?.get('message_type')).toBe('public_reply')
-      expect(submittedFormData?.get('target_status')).toBe('pending')
-      expect(submittedFormData?.get('attachments[]')).toBeInstanceOf(File)
+      const formData = submittedFormData as unknown as FormData
+      expect(formData.get('body')).toBe('Dispatched multipart response with attachment.')
+      expect(formData.get('message_type')).toBe('public_reply')
+      expect(formData.get('target_status')).toBe('pending')
+      expect(formData.get('attachments[]')).toBeInstanceOf(File)
 
       // Invalidation of queries
       expect(invalidateSpy).toHaveBeenCalledWith(
