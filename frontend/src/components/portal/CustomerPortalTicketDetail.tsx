@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, History, ArrowLeft } from 'lucide-react'
 import { Badge, type BadgeVariant } from '../ui/Badge'
@@ -23,6 +23,7 @@ export interface CustomerPortalTicketDetailProps {
   readonly onOpenHistory: () => void
   readonly onNewInquiry?: () => void
   readonly className?: string
+  readonly ref?: React.Ref<HTMLDivElement>
 }
 
 function getBadgeVariant(status: PortalTicketStatus): BadgeVariant {
@@ -47,28 +48,33 @@ export const CustomerPortalTicketDetail: React.FC<CustomerPortalTicketDetailProp
   onOpenHistory,
   onNewInquiry,
   className = '',
+  ref,
 }) => {
   const queryClient = useQueryClient()
 
-  // 1. Ingest token from URL parameter and strip from address bar
+  // 1. Pure initial token resolution
   const [token] = useState<string | null>(() => {
     if (initialToken) {
-      setCustomerToken(initialToken, ticketUuid)
-      stripTokenFromUrl()
       return initialToken
     }
 
     if (typeof window !== 'undefined') {
       const urlToken = new URLSearchParams(window.location.search).get('token')
       if (urlToken) {
-        setCustomerToken(urlToken, ticketUuid)
-        stripTokenFromUrl()
         return urlToken
       }
     }
 
     return getCustomerToken(ticketUuid)
   })
+
+  // Synchronize token into sessionStorage and strip from address bar
+  useEffect(() => {
+    if (token) {
+      setCustomerToken(token, ticketUuid)
+    }
+    stripTokenFromUrl()
+  }, [token, ticketUuid])
 
   // 2. Query ticket data with X-Customer-Token header
   const { data, isLoading, error, refetch } = useCustomerTicketQuery(apiUrl, ticketUuid, token)
@@ -157,7 +163,7 @@ export const CustomerPortalTicketDetail: React.FC<CustomerPortalTicketDetailProp
   const isClosed = currentStatus === 'closed'
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div ref={ref} className={`space-y-6 ${className}`}>
       {/* Top Breadcrumb & Action bar */}
       {onNewInquiry && (
         <div className="flex items-center gap-2 border-b border-border-subtle pb-3">

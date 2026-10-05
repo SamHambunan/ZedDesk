@@ -12,6 +12,7 @@ export interface CustomerPortalReplyComposerProps {
   readonly onSubmitReply: (payload: { body: string; files?: readonly File[] }) => Promise<void> | void
   readonly isSubmitting?: boolean
   readonly className?: string
+  readonly ref?: React.Ref<HTMLDivElement>
 }
 
 /**
@@ -23,6 +24,7 @@ export const CustomerPortalReplyComposer: React.FC<CustomerPortalReplyComposerPr
   onSubmitReply,
   isSubmitting = false,
   className = '',
+  ref,
 }) => {
   const handleSubmit = async (payload: ComposerSubmitPayload) => {
     await onSubmitReply({
@@ -32,7 +34,7 @@ export const CustomerPortalReplyComposer: React.FC<CustomerPortalReplyComposerPr
   }
 
   return (
-    <div data-testid="customer-portal-reply-composer" className={className}>
+    <div ref={ref} data-testid="customer-portal-reply-composer" className={className}>
       <Composer.Provider
         currentStatus={currentStatus}
         onSubmit={handleSubmit}

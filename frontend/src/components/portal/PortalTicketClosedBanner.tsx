@@ -7,6 +7,7 @@ export interface PortalTicketClosedBannerProps {
   readonly onNewInquiry?: () => void
   readonly onFindTickets?: () => void
   readonly className?: string
+  readonly ref?: React.Ref<HTMLDivElement>
 }
 
 /**
@@ -18,9 +19,11 @@ export const PortalTicketClosedBanner: React.FC<PortalTicketClosedBannerProps> =
   onNewInquiry,
   onFindTickets,
   className = '',
+  ref,
 }) => {
   return (
     <div
+      ref={ref}
       data-testid="portal-ticket-closed-banner"
       className={`rounded-xl border border-border-subtle bg-surface-subpanel/50 p-5 shadow-card ${className}`}
     >

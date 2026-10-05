@@ -7,7 +7,7 @@ import {
   User,
   Paperclip,
 } from 'lucide-react'
-import { formatFileSize } from '../tickets/constants'
+import { formatFileSize, formatRelativeTime } from '../tickets/constants'
 import type { PortalMessage, PortalAttachment } from './types'
 
 export interface PortalTicketActiveThreadProps {
@@ -16,20 +16,7 @@ export interface PortalTicketActiveThreadProps {
   readonly ticketUuid?: string
   readonly apiUrl?: string
   readonly className?: string
-}
-
-function formatRelativeTime(isoString: string): string {
-  try {
-    const diffMs = Date.now() - new Date(isoString).getTime()
-    const diffMins = Math.max(1, Math.round(diffMs / (60 * 1000)))
-    if (diffMins < 60) return `${diffMins}m ago`
-    const diffHours = Math.round(diffMins / 60)
-    if (diffHours < 24) return `${diffHours}h ago`
-    const diffDays = Math.round(diffHours / 24)
-    return `${diffDays}d ago`
-  } catch {
-    return 'recently'
-  }
+  readonly ref?: React.Ref<HTMLDivElement>
 }
 
 /**
@@ -92,6 +79,7 @@ export const PortalTicketActiveThread: React.FC<PortalTicketActiveThreadProps> =
   ticketUuid,
   apiUrl,
   className = '',
+  ref,
 }) => {
   // Defense-in-depth: strictly filter out staff internal notes from DOM
   const publicMessages = useMemo(() => {
@@ -107,7 +95,7 @@ export const PortalTicketActiveThread: React.FC<PortalTicketActiveThreadProps> =
   }
 
   return (
-    <div data-testid="portal-ticket-active-thread" className={`space-y-4 ${className}`}>
+    <div ref={ref} data-testid="portal-ticket-active-thread" className={`space-y-4 ${className}`}>
       {publicMessages.map((msg) => {
         const isCustomer =
           msg.author_type === 'Customer' ||

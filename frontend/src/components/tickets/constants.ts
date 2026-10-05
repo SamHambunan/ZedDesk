@@ -96,6 +96,20 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+export function formatRelativeTime(isoString: string): string {
+  try {
+    const diffMs = Date.now() - new Date(isoString).getTime()
+    const diffMins = Math.max(1, Math.round(diffMs / (60 * 1000)))
+    if (diffMins < 60) return `${diffMins}m ago`
+    const diffHours = Math.round(diffMins / 60)
+    if (diffHours < 24) return `${diffHours}h ago`
+    const diffDays = Math.round(diffHours / 24)
+    return `${diffDays}d ago`
+  } catch {
+    return 'recently'
+  }
+}
+
 export function normalizeTicketMessage(m: any, defaultTicketId: string): TicketMessage {
   return {
     id: String(m.id),
