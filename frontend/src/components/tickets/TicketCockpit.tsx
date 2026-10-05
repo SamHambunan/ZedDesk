@@ -126,6 +126,8 @@ function TicketCockpitInternalProvider({
   currentUserId: number
   userRole: 'admin' | 'agent'
 }) {
+  const [internalTickets, setInternalTickets] = useState<readonly TicketItem[]>(() => tickets)
+  const [internalTags, setInternalTags] = useState<readonly TicketTag[]>(() => allTags)
   const [internalSelectedTicketId, setInternalSelectedTicketId] = useState<string | null>(
     () => tickets[0]?.id ?? null
   )
@@ -134,6 +136,22 @@ function TicketCockpitInternalProvider({
   const [mobilePane, setMobilePane] = useState<'queue' | 'detail'>('queue')
   const searchInputRef = useRef<HTMLInputElement | null>(null)
 
+  // Adjust internal state during render when external data props change
+  const [prevTickets, setPrevTickets] = useState(tickets)
+  if (tickets !== prevTickets) {
+    setPrevTickets(tickets)
+    setInternalTickets(tickets)
+  }
+
+  const [prevTags, setPrevTags] = useState(allTags)
+  if (allTags !== prevTags) {
+    setPrevTags(allTags)
+    setInternalTags(allTags)
+  }
+
+  const effectiveTickets = internalTickets
+  const effectiveTags = internalTags
+
   const selectedTicketId = controlledSelectedTicketId !== undefined
     ? controlledSelectedTicketId
     : internalSelectedTicketId
@@ -141,17 +159,17 @@ function TicketCockpitInternalProvider({
   // Calculate counts for each preset
   const presetCounts = useMemo(() => {
     return {
-      all_open: tickets.filter((t) => ['new', 'open', 'pending'].includes(t.status)).length,
-      my_tickets: tickets.filter((t) => t.assigned_member_id === currentUserId).length,
-      unassigned: tickets.filter((t) => !t.assigned_member_id).length,
-      team_queue: tickets.filter((t) => Boolean(t.assigned_team_id)).length,
-      resolved_closed: tickets.filter((t) => ['resolved', 'closed'].includes(t.status)).length,
+      all_open: effectiveTickets.filter((t) => ['new', 'open', 'pending'].includes(t.status)).length,
+      my_tickets: effectiveTickets.filter((t) => t.assigned_member_id === currentUserId).length,
+      unassigned: effectiveTickets.filter((t) => !t.assigned_member_id).length,
+      team_queue: effectiveTickets.filter((t) => Boolean(t.assigned_team_id)).length,
+      resolved_closed: effectiveTickets.filter((t) => ['resolved', 'closed'].includes(t.status)).length,
     }
-  }, [tickets, currentUserId])
+  }, [effectiveTickets, currentUserId])
 
   // Filter tickets by preset and search
   const filteredTickets = useMemo(() => {
-    return tickets.filter((ticket) => {
+    return effectiveTickets.filter((ticket) => {
       // Preset filtering
       if (activePreset === 'all_open' && !['new', 'open', 'pending'].includes(ticket.status)) {
         return false
@@ -183,27 +201,196 @@ function TicketCockpitInternalProvider({
 
       return true
     })
-  }, [tickets, activePreset, currentUserId, searchQuery])
+  }, [effectiveTickets, activePreset, currentUserId, searchQuery])
 
   // Active Ticket
   const activeTicket = useMemo(() => {
     if (selectedTicketId) {
-      const found = tickets.find((t) => t.id === selectedTicketId)
+      const found = effectiveTickets.find((t) => t.id === selectedTicketId)
       if (found) return found
     }
-    return filteredTickets[0] ?? tickets[0] ?? null
-  }, [tickets, selectedTicketId, filteredTickets])
+    return filteredTickets[0] ?? effectiveTickets[0] ?? null
+  }, [effectiveTickets, selectedTicketId, filteredTickets])
 
-  const selectTicket = (ticketId: string) => {
-    if (controlledSelectedTicketId === undefined) {
-      setInternalSelectedTicketId(ticketId)
+  // Stable Actions with functional state updates
+  const actions: TicketCockpitActions = useMemo(() => {
+    return {
+      selectTicket: (ticketId: string) => {
+        if (controlledSelectedTicketId === undefined) {
+          setInternalSelectedTicketId(ticketId)
+        }
+        onSelectTicket?.(ticketId)
+        setMobilePane('detail')
+      },
+      setActivePreset: (preset: PresetFilter) => {
+        setActivePreset(preset)
+      },
+      setSearchQuery: (query: string) => {
+        setSearchQuery(query)
+      },
+      setMobilePane: (pane: 'queue' | 'detail') => {
+        setMobilePane(pane)
+      },
+      claimTicket: (ticketId: string) => {
+        onClaimTicket?.(ticketId)
+        const currentMember = members.find((m) => m.id === currentUserId)
+        const memberName = currentMember ? currentMember.name : 'Current Agent'
+        setInternalTickets((prev) =>
+          prev.map((t) => {
+            if (t.id !== ticketId) return t
+            return {
+              ...t,
+              assigned_member_id: currentUserId,
+              assigned_member_name: memberName,
+              status: t.status === 'new' ? 'open' : t.status,
+              assignments: [
+                ...(t.assignments || []),
+                {
+                  id: `assign-${Date.now()}`,
+                  ticket_id: t.id,
+                  team_id: t.assigned_team_id ?? null,
+                  team_name: t.assigned_team_name ?? null,
+                  member_id: currentUserId,
+                  member_name: memberName,
+                  assigned_by_name: memberName,
+                  created_at: 'Just now',
+                  note: 'Claimed ticket from queue',
+                },
+              ],
+            }
+          })
+        )
+      },
+      updateStatus: (ticketId: string, status: TicketStatus) => {
+        onUpdateStatus?.(ticketId, status)
+        setInternalTickets((prev) =>
+          prev.map((t) => (t.id === ticketId ? { ...t, status } : t))
+        )
+      },
+      updatePriority: (ticketId: string, priority: TicketPriority) => {
+        onUpdatePriority?.(ticketId, priority)
+        setInternalTickets((prev) =>
+          prev.map((t) => (t.id === ticketId ? { ...t, priority } : t))
+        )
+      },
+      assign: (ticketId: string, teamId: number | null, memberId: number | null) => {
+        onAssign?.(ticketId, teamId, memberId)
+        const team = teams.find((tm) => tm.id === teamId)
+        const member = members.find((m) => m.id === memberId)
+        setInternalTickets((prev) =>
+          prev.map((t) => {
+            if (t.id !== ticketId) return t
+            return {
+              ...t,
+              assigned_team_id: teamId,
+              assigned_team_name: team ? team.name : null,
+              assigned_member_id: memberId,
+              assigned_member_name: member ? member.name : null,
+              assignments: [
+                ...(t.assignments || []),
+                {
+                  id: `assign-${Date.now()}`,
+                  ticket_id: t.id,
+                  team_id: teamId,
+                  team_name: team ? team.name : null,
+                  member_id: memberId,
+                  member_name: member ? member.name : null,
+                  assigned_by_name: userRole === 'admin' ? 'Super Admin' : 'Agent Support',
+                  created_at: 'Just now',
+                },
+              ],
+            }
+          })
+        )
+      },
+      addTag: (ticketId: string, tag: TicketTag) => {
+        onAddTag?.(ticketId, tag)
+        setInternalTags((prev) =>
+          prev.some((t) => t.id === tag.id) ? prev : [...prev, tag]
+        )
+        setInternalTickets((prev) =>
+          prev.map((t) => {
+            if (t.id !== ticketId) return t
+            const existingTags = t.tags || []
+            if (existingTags.some((eg) => eg.id === tag.id)) return t
+            return {
+              ...t,
+              tags: [...existingTags, tag],
+            }
+          })
+        )
+      },
+      removeTag: (ticketId: string, tagId: number) => {
+        onRemoveTag?.(ticketId, tagId)
+        setInternalTickets((prev) =>
+          prev.map((t) => {
+            if (t.id !== ticketId) return t
+            return {
+              ...t,
+              tags: (t.tags || []).filter((tag) => tag.id !== tagId),
+            }
+          })
+        )
+      },
+      deleteTicket: (ticketId: string) => {
+        onDeleteTicket?.(ticketId)
+        setInternalTickets((prev) => prev.filter((t) => t.id !== ticketId))
+        setInternalSelectedTicketId((curr) => {
+          if (curr === ticketId) {
+            const next = effectiveTickets.filter((t) => t.id !== ticketId)
+            return next[0]?.id ?? null
+          }
+          return curr
+        })
+      },
+      submitComposer: (ticketId: string, payload: ComposerSubmitPayload) => {
+        onComposerSubmit?.(ticketId, payload)
+        const isInternal = payload.messageType === 'internal_note'
+        const newMsg = {
+          id: `msg-${Date.now()}`,
+          ticket_id: ticketId,
+          message_type: payload.messageType,
+          author_type: 'OrganizationMember' as const,
+          author_name: userRole === 'admin' ? 'Super Admin' : 'Agent Support',
+          author_role: userRole === 'admin' ? 'Lead Administrator' : 'Support Specialist',
+          body: payload.body,
+          attachments: payload.attachments,
+          created_at: 'Just now',
+        }
+        setInternalTickets((prev) =>
+          prev.map((t) => {
+            if (t.id !== ticketId) return t
+            const updatedStatus =
+              !isInternal && payload.nextStatus ? payload.nextStatus : t.status
+            return {
+              ...t,
+              status: updatedStatus,
+              messages: [...(t.messages || []), newMsg],
+            }
+          })
+        )
+      },
     }
-    onSelectTicket?.(ticketId)
-    setMobilePane('detail')
-  }
+  }, [
+    controlledSelectedTicketId,
+    currentUserId,
+    effectiveTickets,
+    members,
+    onAddTag,
+    onAssign,
+    onClaimTicket,
+    onComposerSubmit,
+    onDeleteTicket,
+    onRemoveTag,
+    onSelectTicket,
+    onUpdatePriority,
+    onUpdateStatus,
+    teams,
+    userRole,
+  ])
 
-  const state: TicketCockpitState = {
-    tickets,
+  const state: TicketCockpitState = useMemo(() => ({
+    tickets: effectiveTickets,
     filteredTickets,
     selectedTicketId,
     activeTicket,
@@ -213,37 +400,34 @@ function TicketCockpitInternalProvider({
     mobilePane,
     teams,
     members,
-    allTags,
+    allTags: effectiveTags,
     currentUserId,
     userRole,
-  }
+  }), [
+    effectiveTickets,
+    filteredTickets,
+    selectedTicketId,
+    activeTicket,
+    activePreset,
+    searchQuery,
+    presetCounts,
+    mobilePane,
+    teams,
+    members,
+    effectiveTags,
+    currentUserId,
+    userRole,
+  ])
 
-  const actions: TicketCockpitActions = {
-    selectTicket,
-    setActivePreset,
-    setSearchQuery,
-    setMobilePane,
-    claimTicket: (ticketId: string) => onClaimTicket?.(ticketId),
-    updateStatus: (ticketId: string, status: TicketStatus) => onUpdateStatus?.(ticketId, status),
-    updatePriority: (ticketId: string, priority: TicketPriority) => onUpdatePriority?.(ticketId, priority),
-    assign: (ticketId: string, teamId: number | null, memberId: number | null) =>
-      onAssign?.(ticketId, teamId, memberId),
-    addTag: (ticketId: string, tag: TicketTag) => onAddTag?.(ticketId, tag),
-    removeTag: (ticketId: string, tagId: number) => onRemoveTag?.(ticketId, tagId),
-    deleteTicket: (ticketId: string) => onDeleteTicket?.(ticketId),
-    submitComposer: (ticketId: string, payload: ComposerSubmitPayload) =>
-      onComposerSubmit?.(ticketId, payload),
-  }
-
-  const meta: TicketCockpitMeta = {
+  const meta: TicketCockpitMeta = useMemo(() => ({
     searchInputRef,
-  }
+  }), [])
 
-  const contextValue: TicketCockpitContextValue = {
+  const contextValue: TicketCockpitContextValue = useMemo(() => ({
     state,
     actions,
     meta,
-  }
+  }), [state, actions, meta])
 
   return (
     <TicketCockpitContext value={contextValue}>
@@ -333,7 +517,7 @@ export const TicketCockpitSubRail: React.FC<TicketCockpitSubRailProps> = ({
       {/* Active Preset Summary */}
       <div className="mt-auto pt-3 border-t border-[#282A33] px-2 text-[11px] font-mono text-text-muted">
         <div className="text-white/80 font-medium">Split-Cockpit</div>
-        <div className="text-[10px] text-text-muted">Linear & Zendesk layout</div>
+        <div className="text-[10px] text-text-muted">Active queue: {state.presetCounts[state.activePreset]}</div>
       </div>
     </nav>
   )
@@ -621,32 +805,17 @@ export interface TicketCockpitInspectorProps {
 export const TicketCockpitInspector: React.FC<TicketCockpitInspectorProps> = ({
   className = '',
 }) => {
-  const { state, actions } = useTicketCockpit()
+  const { state } = useTicketCockpit()
   const { activeTicket } = state
 
   return (
     <aside
       aria-label="Ticket Metadata Inspector"
       data-testid="ticket-cockpit-inspector"
-      className={`w-full lg:w-[300px] shrink-0 bg-[#0F1012] p-4 overflow-y-auto space-y-5 border-l border-[#282A33] ${
-        state.mobilePane === 'queue' ? 'hidden lg:block' : 'block'
-      } ${className}`}
+      className={`w-full lg:w-[300px] shrink-0 bg-[#0F1012] p-4 overflow-y-auto space-y-5 border-l border-[#282A33] hidden lg:block ${className}`}
     >
       {activeTicket ? (
-        <TicketMetadataInspector
-          ticket={activeTicket}
-          teams={state.teams}
-          members={state.members}
-          allTags={state.allTags}
-          userRole={state.userRole}
-          onClaimTicket={actions.claimTicket}
-          onUpdateStatus={actions.updateStatus}
-          onUpdatePriority={actions.updatePriority}
-          onAssign={actions.assign}
-          onAddTag={actions.addTag}
-          onRemoveTag={actions.removeTag}
-          onDeleteTicket={actions.deleteTicket}
-        />
+        <TicketMetadataInspector />
       ) : (
         <div className="text-text-muted text-xs text-center py-8">
           No ticket selected.

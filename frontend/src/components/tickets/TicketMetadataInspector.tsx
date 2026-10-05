@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, use } from 'react'
 import {
   User,
   Users2,
@@ -20,42 +20,46 @@ import type {
   OrgMemberOption,
   TicketTag,
 } from './types'
+import { TicketCockpitContext } from './TicketCockpitContext'
 
 export interface TicketMetadataInspectorProps {
-  readonly ticket: TicketItem
-  readonly teams: readonly OrgTeamOption[]
-  readonly members: readonly OrgMemberOption[]
-  readonly allTags: readonly TicketTag[]
+  readonly ticket?: TicketItem
+  readonly teams?: readonly OrgTeamOption[]
+  readonly members?: readonly OrgMemberOption[]
+  readonly allTags?: readonly TicketTag[]
   readonly userRole?: 'admin' | 'agent'
-  readonly onClaimTicket: (ticketId: string) => void
-  readonly onUpdateStatus: (ticketId: string, status: TicketStatus) => void
-  readonly onUpdatePriority: (ticketId: string, priority: TicketPriority) => void
-  readonly onAssign: (ticketId: string, teamId: number | null, memberId: number | null) => void
-  readonly onAddTag: (ticketId: string, tag: TicketTag) => void
-  readonly onRemoveTag: (ticketId: string, tagId: number) => void
-  readonly onDeleteTicket: (ticketId: string) => void
+  readonly onClaimTicket?: (ticketId: string) => void
+  readonly onUpdateStatus?: (ticketId: string, status: TicketStatus) => void
+  readonly onUpdatePriority?: (ticketId: string, priority: TicketPriority) => void
+  readonly onAssign?: (ticketId: string, teamId: number | null, memberId: number | null) => void
+  readonly onAddTag?: (ticketId: string, tag: TicketTag) => void
+  readonly onRemoveTag?: (ticketId: string, tagId: number) => void
+  readonly onDeleteTicket?: (ticketId: string) => void
   readonly className?: string
 }
 
-export const TicketMetadataInspector: React.FC<TicketMetadataInspectorProps> = ({
-  ticket,
-  teams,
-  members,
-  allTags,
-  userRole = 'agent',
-  onClaimTicket,
-  onUpdateStatus,
-  onUpdatePriority,
-  onAssign,
-  onAddTag,
-  onRemoveTag,
-  onDeleteTicket,
-  className = '',
-}) => {
+export const TicketMetadataInspector: React.FC<TicketMetadataInspectorProps> = (props) => {
+  const context = use(TicketCockpitContext)
+
+  const ticket = props.ticket ?? context?.state.activeTicket
+  const teams = props.teams ?? context?.state.teams ?? []
+  const members = props.members ?? context?.state.members ?? []
+  const allTags = props.allTags ?? context?.state.allTags ?? []
+  const userRole = props.userRole ?? context?.state.userRole ?? 'agent'
+  const onClaimTicket = props.onClaimTicket ?? context?.actions.claimTicket
+  const onUpdateStatus = props.onUpdateStatus ?? context?.actions.updateStatus
+  const onUpdatePriority = props.onUpdatePriority ?? context?.actions.updatePriority
+  const onAssign = props.onAssign ?? context?.actions.assign
+  const onAddTag = props.onAddTag ?? context?.actions.addTag
+  const onRemoveTag = props.onRemoveTag ?? context?.actions.removeTag
+  const onDeleteTicket = props.onDeleteTicket ?? context?.actions.deleteTicket
+  const className = props.className ?? ''
+
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false)
   const [newTagInput, setNewTagInput] = useState('')
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
-  const [activeRole, setActiveRole] = useState<'admin' | 'agent'>(userRole)
+
+  if (!ticket) return null
 
   const isUnassigned = !ticket.assigned_member_id && !ticket.assigned_team_id
   const assignedTeam = teams.find((t) => t.id === ticket.assigned_team_id)
@@ -130,38 +134,15 @@ export const TicketMetadataInspector: React.FC<TicketMetadataInspectorProps> = (
       data-testid="ticket-metadata-inspector"
       className={`space-y-5 text-text-primary text-xs ${className}`}
     >
-      {/* Role Preview Switcher Header */}
+      {/* Ticket Attributes Header */}
       <div className="flex items-center justify-between pb-3 border-b border-[#282A33]">
         <span className="text-[11px] font-mono uppercase tracking-wider text-text-muted flex items-center gap-1.5">
           <Shield className="w-3.5 h-3.5 text-[#F59E0B]" />
-          <span>RBAC Simulator:</span>
+          <span>Ticket Attributes</span>
         </span>
-        <div className="flex items-center gap-1 bg-[#121316] p-0.5 rounded border border-[#282A33]">
-          <button
-            type="button"
-            data-testid="role-switch-agent"
-            onClick={() => setActiveRole('agent')}
-            className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
-              activeRole === 'agent'
-                ? 'bg-[#F59E0B] text-[#0F1012] font-semibold'
-                : 'text-text-muted hover:text-text-primary'
-            }`}
-          >
-            Agent
-          </button>
-          <button
-            type="button"
-            data-testid="role-switch-admin"
-            onClick={() => setActiveRole('admin')}
-            className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
-              activeRole === 'admin'
-                ? 'bg-[#F59E0B] text-[#0F1012] font-semibold'
-                : 'text-text-muted hover:text-text-primary'
-            }`}
-          >
-            Admin
-          </button>
-        </div>
+        <span className="font-mono text-[10px] text-text-muted uppercase px-1.5 py-0.5 rounded bg-white/5 border border-white/10">
+          {userRole}
+        </span>
       </div>
 
       {/* 1-Click "Claim Ticket" CTA (for Unassigned Tickets) */}
@@ -434,7 +415,7 @@ export const TicketMetadataInspector: React.FC<TicketMetadataInspectorProps> = (
       )}
 
       {/* Strict DOM RBAC: Delete Ticket action */}
-      {activeRole === 'admin' ? (
+      {userRole === 'admin' ? (
         <div className="pt-2 border-t border-[#282A33]">
           <button
             type="button"

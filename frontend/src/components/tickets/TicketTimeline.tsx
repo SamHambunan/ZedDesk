@@ -8,18 +8,13 @@ import {
   User,
   Paperclip,
 } from 'lucide-react'
+import { formatFileSize } from './constants'
 import type { TicketMessage } from './types'
 
 export interface TicketTimelineProps {
   readonly messages: readonly TicketMessage[]
   readonly customerName?: string
   readonly className?: string
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function formatRelativeTime(isoString: string): string {
@@ -38,6 +33,7 @@ function formatRelativeTime(isoString: string): string {
 
 export const TicketTimeline: React.FC<TicketTimelineProps> = ({
   messages,
+  customerName,
   className = '',
 }) => {
   if (!messages || messages.length === 0) {
@@ -82,7 +78,7 @@ export const TicketTimeline: React.FC<TicketTimelineProps> = ({
 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                   <span className="text-body-default font-medium text-text-primary">
-                    {msg.author_name}
+                    {isCustomer ? (msg.author_name || customerName || 'Customer') : msg.author_name}
                   </span>
 
                   <div className="flex items-center gap-1.5">

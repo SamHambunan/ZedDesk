@@ -8,6 +8,7 @@ import {
   FileCheck,
   CornerDownLeft,
 } from 'lucide-react'
+import { formatFileSize } from './constants'
 import type { MessageType, TicketStatus, TicketAttachment } from './types'
 
 export interface ComposerSubmitPayload {
@@ -36,21 +37,17 @@ const ALLOWED_MIME_PREFIXES = [
   'application/vnd.openxmlformats-officedocument',
 ]
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
 export const TicketComposer: React.FC<TicketComposerProps> = ({
-  currentStatus: _currentStatus,
+  currentStatus,
   onSubmit,
   isSubmitting = false,
   className = '',
 }) => {
   const [tab, setTab] = useState<MessageType>('public_reply')
   const [body, setBody] = useState('')
-  const [nextStatus, setNextStatus] = useState<TicketStatus>('pending')
+  const [nextStatus, setNextStatus] = useState<TicketStatus>(() =>
+    currentStatus === 'resolved' ? 'open' : 'pending'
+  )
   const [stagedFiles, setStagedFiles] = useState<TicketAttachment[]>([])
   const [fileError, setFileError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -195,7 +192,7 @@ export const TicketComposer: React.FC<TicketComposerProps> = ({
                 <FileCheck className="w-3.5 h-3.5 text-sentiment-positive" />
                 <span className="font-mono text-[11px] max-w-[160px] truncate">{file.file_name}</span>
                 <span className="font-mono tabular-nums text-[10px] text-text-muted">
-                  ({formatBytes(file.file_size_bytes)})
+                  ({formatFileSize(file.file_size_bytes)})
                 </span>
                 <button
                   type="button"

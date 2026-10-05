@@ -49,3 +49,9 @@ export function getStatusBadge(status: string): { label: string; class: string }
       return { label: status, class: 'bg-[#16181D] text-[#8C90A0] border-[#282A33]' }
   }
 }
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
