@@ -1027,7 +1027,12 @@ function AppInner({
             )}
 
             {!loadingWorkspace && workspaceData && workspaceView === 'tickets' && (
-              <TicketQueueView apiUrl={apiUrl} token={token} />
+              <TicketQueueView
+                apiUrl={apiUrl}
+                token={token}
+                userRole={workspaceData.role as 'admin' | 'agent'}
+                currentUserId={user?.id}
+              />
             )}
 
       </WorkspaceShell>
