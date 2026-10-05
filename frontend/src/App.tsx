@@ -8,6 +8,7 @@ import { MembersView } from './components/members'
 import { PublicInvitationView } from './components/invitations'
 import { CustomerPortalView } from './components/portal'
 import { TicketQueueView } from './components/tickets/TicketQueueView'
+import { parseTicketNumberFromPath } from './components/tickets/constants'
 import { useWorkspace } from './hooks/useWorkspace'
 import { getApiBaseUrl, getCentralHubUrl, getOrganizationUrl, getSubdomain } from './utils/url'
 
@@ -109,10 +110,7 @@ function AppInner({
 
   // Tickets Route Check: /tickets or /tickets/:ticketNumber
   const isTicketsRoute = activePath === '/tickets' || activePath.startsWith('/tickets/')
-  const initialTicketNumber = useMemo(() => {
-    const match = activePath.match(/^\/tickets\/(\d+)/)
-    return match ? Number(match[1]) : undefined
-  }, [activePath])
+  const initialTicketNumber = parseTicketNumberFromPath(activePath) ?? undefined
 
   // Public Invitation State
   const [publicInvitation, setPublicInvitation] = useState<PublicInvitation | null>(null)

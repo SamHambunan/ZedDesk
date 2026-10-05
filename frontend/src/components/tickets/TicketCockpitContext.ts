@@ -31,7 +31,7 @@ export interface TicketCockpitState {
   readonly activeTicket: TicketItem | null
   readonly activePreset: PresetFilter
   readonly searchQuery: string
-  readonly filters?: CompoundFilters
+  readonly filters: CompoundFilters
   readonly presetCounts: Record<PresetFilter, number>
   readonly mobilePane: 'queue' | 'detail'
   readonly teams: readonly OrgTeamOption[]
@@ -48,8 +48,8 @@ export interface TicketCockpitActions {
   readonly selectTicket: (ticketId: string) => void
   readonly setActivePreset: (preset: PresetFilter) => void
   readonly setSearchQuery: (query: string) => void
-  readonly setFilters?: (filters: Partial<CompoundFilters>) => void
-  readonly resetFilters?: () => void
+  readonly setFilters: (filters: Partial<CompoundFilters>) => void
+  readonly resetFilters: () => void
   readonly setMobilePane: (pane: 'queue' | 'detail') => void
   readonly claimTicket: (ticketId: string) => void
   readonly updateStatus: (ticketId: string, status: TicketStatus) => void

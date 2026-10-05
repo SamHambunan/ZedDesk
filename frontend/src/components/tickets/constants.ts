@@ -20,6 +20,31 @@ export const PRESET_DEFINITIONS: readonly {
   { id: 'resolved_closed', label: 'Resolved & Closed', icon: FolderArchive },
 ]
 
+export function parseTicketNumberFromPath(path?: string): number | null {
+  if (!path) return null
+  const match = path.match(/\/tickets\/(\d+)/)
+  return match ? Number(match[1]) : null
+}
+
+export function matchesPreset(
+  ticket: { status: string; assigned_member_id?: number | null; assigned_team_id?: number | null },
+  preset: PresetFilter,
+  currentUserId?: number
+): boolean {
+  switch (preset) {
+    case 'all_open':
+      return ['new', 'open', 'pending'].includes(ticket.status)
+    case 'my_tickets':
+      return Boolean(currentUserId && ticket.assigned_member_id === currentUserId)
+    case 'unassigned':
+      return !ticket.assigned_member_id
+    case 'team_queue':
+      return Boolean(ticket.assigned_team_id)
+    case 'resolved_closed':
+      return ['resolved', 'closed'].includes(ticket.status)
+  }
+}
+
 export function getPresetQueryParams(preset: PresetFilter): Record<string, string> {
   switch (preset) {
     case 'all_open':

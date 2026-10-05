@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 import { TicketCockpit } from './TicketCockpit'
-import { useTicketCockpit } from './TicketCockpitContext'
+import { useTicketCockpit, DEFAULT_COMPOUND_FILTERS } from './TicketCockpitContext'
 import { TicketQueueView } from './TicketQueueView'
 import { INITIAL_MOCK_TICKETS, MOCK_TEAMS, MOCK_MEMBERS, MOCK_TAGS_POOL } from './mockData'
 
@@ -149,6 +149,7 @@ describe('TicketCockpit Compound Component Baseline', () => {
         activeTicket: INITIAL_MOCK_TICKETS[0],
         activePreset: 'all_open' as const,
         searchQuery: '',
+        filters: DEFAULT_COMPOUND_FILTERS,
         presetCounts: {
           all_open: 1,
           my_tickets: 0,
@@ -162,11 +163,16 @@ describe('TicketCockpit Compound Component Baseline', () => {
         allTags: MOCK_TAGS_POOL,
         currentUserId: 2,
         userRole: 'admin' as const,
+        isLoading: false,
+        isError: false,
+        isFetching: false,
       },
       actions: {
         selectTicket: vi.fn(),
         setActivePreset: vi.fn(),
         setSearchQuery: vi.fn(),
+        setFilters: vi.fn(),
+        resetFilters: vi.fn(),
         setMobilePane: vi.fn(),
         claimTicket: vi.fn(),
         updateStatus: vi.fn(),
