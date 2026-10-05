@@ -81,7 +81,7 @@ export const TicketMetadataInspector: React.FC<TicketMetadataInspectorProps> = (
       }
     }
 
-    onAssign(ticket.id, nextTeamId, nextMemberId ?? null)
+    onAssign?.(ticket.id, nextTeamId, nextMemberId ?? null)
   }
 
   const handleMemberChange = (memberIdStr: string) => {
@@ -98,11 +98,11 @@ export const TicketMetadataInspector: React.FC<TicketMetadataInspectorProps> = (
       }
     }
 
-    onAssign(ticket.id, nextTeamId ?? null, nextMemberId)
+    onAssign?.(ticket.id, nextTeamId ?? null, nextMemberId)
   }
 
   const handleAddTagFromPool = (tag: TicketTag) => {
-    onAddTag(ticket.id, tag)
+    onAddTag?.(ticket.id, tag)
     setIsTagPopoverOpen(false)
     setNewTagInput('')
   }
@@ -124,7 +124,7 @@ export const TicketMetadataInspector: React.FC<TicketMetadataInspectorProps> = (
       slug: trimmed,
       color: '#64748B',
     }
-    onAddTag(ticket.id, newTag)
+    onAddTag?.(ticket.id, newTag)
     setIsTagPopoverOpen(false)
     setNewTagInput('')
   }
@@ -158,7 +158,7 @@ export const TicketMetadataInspector: React.FC<TicketMetadataInspectorProps> = (
           <button
             type="button"
             data-testid="claim-ticket-btn"
-            onClick={() => onClaimTicket(ticket.id)}
+            onClick={() => onClaimTicket?.(ticket.id)}
             className="w-full h-8 bg-[#F59E0B] hover:bg-[#D97706] text-[#0F1012] font-semibold rounded text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-keylight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -182,7 +182,7 @@ export const TicketMetadataInspector: React.FC<TicketMetadataInspectorProps> = (
               id="inspector-status"
               data-testid="inspector-status-select"
               value={ticket.status}
-              onChange={(e) => onUpdateStatus(ticket.id, e.target.value as TicketStatus)}
+              onChange={(e) => onUpdateStatus?.(ticket.id, e.target.value as TicketStatus)}
               className="w-full h-8 px-2.5 bg-[#141518] border border-[#282A33] rounded text-xs font-mono text-text-primary focus:outline-none focus:border-[#F59E0B]"
             >
               <option value="new">new (Awaiting triage)</option>
@@ -201,7 +201,7 @@ export const TicketMetadataInspector: React.FC<TicketMetadataInspectorProps> = (
               id="inspector-priority"
               data-testid="inspector-priority-select"
               value={ticket.priority}
-              onChange={(e) => onUpdatePriority(ticket.id, e.target.value as TicketPriority)}
+              onChange={(e) => onUpdatePriority?.(ticket.id, e.target.value as TicketPriority)}
               className="w-full h-8 px-2.5 bg-[#141518] border border-[#282A33] rounded text-xs font-mono text-text-primary focus:outline-none focus:border-[#F59E0B]"
             >
               <option value="urgent">P0 Urgent</option>
@@ -333,7 +333,7 @@ export const TicketMetadataInspector: React.FC<TicketMetadataInspectorProps> = (
                 <button
                   type="button"
                   data-testid={`remove-tag-${tag.slug}`}
-                  onClick={() => onRemoveTag(ticket.id, tag.id)}
+                  onClick={() => onRemoveTag?.(ticket.id, tag.id)}
                   className="hover:text-sentiment-negative text-text-muted transition-colors rounded p-0.5"
                   title={`Remove tag ${tag.name}`}
                 >
@@ -455,7 +455,7 @@ export const TicketMetadataInspector: React.FC<TicketMetadataInspectorProps> = (
                 type="button"
                 data-testid="confirm-delete-btn"
                 onClick={() => {
-                  onDeleteTicket(ticket.id)
+                  onDeleteTicket?.(ticket.id)
                   setIsDeleteModalOpen(false)
                 }}
                 className="h-8 px-3 text-xs bg-sentiment-negative hover:bg-rose-700 text-white font-semibold rounded transition-colors"
