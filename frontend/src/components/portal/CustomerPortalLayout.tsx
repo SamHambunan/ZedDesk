@@ -8,6 +8,7 @@ export interface CustomerPortalLayoutProps {
   organizationName?: string | null
   onOpenHistory?: () => void
   children: React.ReactNode
+  contentClassName?: string
 }
 
 export const CustomerPortalLayout: React.FC<CustomerPortalLayoutProps> = ({
@@ -15,6 +16,7 @@ export const CustomerPortalLayout: React.FC<CustomerPortalLayoutProps> = ({
   organizationName,
   onOpenHistory,
   children,
+  contentClassName,
 }) => {
   const orgDisplayName =
     organizationName ||
@@ -52,14 +54,14 @@ export const CustomerPortalLayout: React.FC<CustomerPortalLayoutProps> = ({
             onClick={onOpenHistory}
             leftIcon={<History className="w-3.5 h-3.5 text-accent-indigo-glow" />}
           >
-            Find My Tickets
+            View all my tickets
           </Button>
         </div>
       </header>
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8">
-        <div className="w-full max-w-2xl bg-surface-panel border border-border-subtle rounded-2xl p-6 sm:p-10 shadow-modal">
+        <div className={`w-full ${contentClassName || 'max-w-2xl'} bg-surface-panel border border-border-subtle rounded-2xl p-6 sm:p-10 shadow-modal`}>
           {children}
         </div>
       </main>

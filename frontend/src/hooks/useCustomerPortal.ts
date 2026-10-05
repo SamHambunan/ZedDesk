@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 
 export type TicketPriorityType = 'low' | 'medium' | 'high' | 'urgent'
 
@@ -117,6 +117,138 @@ export function useMagicLinkMutation(apiUrl: string) {
       }
 
       return data as MagicLinkResponse
+    },
+  })
+}
+
+export const CUSTOMER_TOKEN_STORAGE_KEY = 'zeddesk_customer_token'
+
+export function getCustomerToken(ticketUuid?: string): string | null {
+  if (typeof window === 'undefined') return null
+  if (ticketUuid) {
+    const scopedToken = sessionStorage.getItem(`portal_token_${ticketUuid}`)
+    if (scopedToken) return scopedToken
+  }
+  return (
+    sessionStorage.getItem(CUSTOMER_TOKEN_STORAGE_KEY) ||
+    sessionStorage.getItem('portal_token')
+  )
+}
+
+export function setCustomerToken(token: string, ticketUuid?: string): void {
+  if (typeof window === 'undefined') return
+  sessionStorage.setItem(CUSTOMER_TOKEN_STORAGE_KEY, token)
+  if (ticketUuid) {
+    sessionStorage.setItem(`portal_token_${ticketUuid}`, token)
+  }
+}
+
+export function clearCustomerToken(ticketUuid?: string): void {
+  if (typeof window === 'undefined') return
+  sessionStorage.removeItem(CUSTOMER_TOKEN_STORAGE_KEY)
+  sessionStorage.removeItem('portal_token')
+  if (ticketUuid) {
+    sessionStorage.removeItem(`portal_token_${ticketUuid}`)
+  }
+}
+
+export function stripTokenFromUrl(): void {
+  if (typeof window === 'undefined') return
+  const params = new URLSearchParams(window.location.search)
+  if (params.has('token')) {
+    params.delete('token')
+    const newSearch = params.toString() ? `?${params.toString()}` : ''
+    window.history.replaceState({}, '', `${window.location.pathname}${newSearch}${window.location.hash}`)
+  }
+}
+
+export function parsePortalTicketUuidFromPath(path?: string): string | null {
+  if (!path) return null
+  const match = path.match(/^\/portal\/tickets\/([^/?#]+)/)
+  return match ? match[1] : null
+}
+
+export interface CustomerReplyPayload {
+  body: string
+  files?: readonly File[]
+}
+
+export function useCustomerTicketQuery(
+  apiUrl: string,
+  ticketUuid: string | null,
+  token: string | null
+) {
+  return useQuery({
+    queryKey: ['portal-ticket', ticketUuid, token],
+    queryFn: async () => {
+      if (!ticketUuid) {
+        throw new Error('Ticket identifier is required.')
+      }
+
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+      }
+      if (token) {
+        headers['X-Customer-Token'] = token
+      }
+
+      const res = await fetch(`${apiUrl}/api/portal/tickets/${ticketUuid}`, {
+        method: 'GET',
+        headers,
+      })
+
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        throw new Error(extractPortalErrorMessage(data, `Failed to load ticket (${res.status}).`))
+      }
+
+      return data
+    },
+    enabled: Boolean(ticketUuid),
+  })
+}
+
+export function useCustomerReplyMutation(
+  apiUrl: string,
+  ticketUuid: string | null,
+  token: string | null
+) {
+  return useMutation({
+    mutationFn: async (payload: CustomerReplyPayload) => {
+      if (!ticketUuid) {
+        throw new Error('Ticket identifier is required.')
+      }
+
+      const formData = new FormData()
+      formData.append('message', payload.body.trim())
+
+      if (payload.files && payload.files.length > 0) {
+        payload.files.forEach((file) => {
+          formData.append('attachments[]', file)
+        })
+      }
+
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+      }
+      if (token) {
+        headers['X-Customer-Token'] = token
+      }
+
+      const res = await fetch(`${apiUrl}/api/portal/tickets/${ticketUuid}/reply`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      })
+
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        throw new Error(extractPortalErrorMessage(data, 'Failed to submit reply.'))
+      }
+
+      return data
     },
   })
 }
