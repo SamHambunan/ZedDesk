@@ -10,6 +10,20 @@ import type {
 } from './types'
 import type { ComposerSubmitPayload } from './TicketComposer'
 
+export interface CompoundFilters {
+  readonly status: TicketStatus | 'all'
+  readonly priority: TicketPriority | 'all'
+  readonly teamId: number | 'all'
+  readonly tagId: number | 'all'
+}
+
+export const DEFAULT_COMPOUND_FILTERS: CompoundFilters = {
+  status: 'all',
+  priority: 'all',
+  teamId: 'all',
+  tagId: 'all',
+}
+
 export interface TicketCockpitState {
   readonly tickets: readonly TicketItem[]
   readonly filteredTickets: readonly TicketItem[]
@@ -17,6 +31,7 @@ export interface TicketCockpitState {
   readonly activeTicket: TicketItem | null
   readonly activePreset: PresetFilter
   readonly searchQuery: string
+  readonly filters: CompoundFilters
   readonly presetCounts: Record<PresetFilter, number>
   readonly mobilePane: 'queue' | 'detail'
   readonly teams: readonly OrgTeamOption[]
@@ -24,12 +39,17 @@ export interface TicketCockpitState {
   readonly allTags: readonly TicketTag[]
   readonly currentUserId?: number
   readonly userRole?: 'admin' | 'agent'
+  readonly isLoading?: boolean
+  readonly isError?: boolean
+  readonly isFetching?: boolean
 }
 
 export interface TicketCockpitActions {
   readonly selectTicket: (ticketId: string) => void
   readonly setActivePreset: (preset: PresetFilter) => void
   readonly setSearchQuery: (query: string) => void
+  readonly setFilters: (filters: Partial<CompoundFilters>) => void
+  readonly resetFilters: () => void
   readonly setMobilePane: (pane: 'queue' | 'detail') => void
   readonly claimTicket: (ticketId: string) => void
   readonly updateStatus: (ticketId: string, status: TicketStatus) => void

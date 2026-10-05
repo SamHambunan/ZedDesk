@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 import { TicketCockpit } from './TicketCockpit'
-import { useTicketCockpit } from './TicketCockpitContext'
+import { useTicketCockpit, DEFAULT_COMPOUND_FILTERS } from './TicketCockpitContext'
 import { TicketQueueView } from './TicketQueueView'
 import { INITIAL_MOCK_TICKETS, MOCK_TEAMS, MOCK_MEMBERS, MOCK_TAGS_POOL } from './mockData'
 
@@ -149,6 +149,7 @@ describe('TicketCockpit Compound Component Baseline', () => {
         activeTicket: INITIAL_MOCK_TICKETS[0],
         activePreset: 'all_open' as const,
         searchQuery: '',
+        filters: DEFAULT_COMPOUND_FILTERS,
         presetCounts: {
           all_open: 1,
           my_tickets: 0,
@@ -162,11 +163,16 @@ describe('TicketCockpit Compound Component Baseline', () => {
         allTags: MOCK_TAGS_POOL,
         currentUserId: 2,
         userRole: 'admin' as const,
+        isLoading: false,
+        isError: false,
+        isFetching: false,
       },
       actions: {
         selectTicket: vi.fn(),
         setActivePreset: vi.fn(),
         setSearchQuery: vi.fn(),
+        setFilters: vi.fn(),
+        resetFilters: vi.fn(),
         setMobilePane: vi.fn(),
         claimTicket: vi.fn(),
         updateStatus: vi.fn(),
@@ -305,6 +311,263 @@ describe('TicketCockpit Compound Component Baseline', () => {
 
     // Verify new message appears in timeline
     expect(screen.getByText('Patch deployed to production verified.')).toBeInTheDocument()
+  })
+
+  it('queries GET /api/tickets with scoped preset parameters via TanStack Query when switching presets', async () => {
+    const user = userEvent.setup()
+    const fetchCalls: string[] = []
+
+    const mockFetch = vi.fn().mockImplementation(async (url: string) => {
+      fetchCalls.push(url)
+      return {
+        ok: true,
+        json: async () => ({
+          data: [
+            {
+              id: 'server-ticket-1',
+              ticket_number: 9999,
+              subject: 'Server Ticket from Query',
+              status: 'open',
+              priority: 'high',
+              assigned_team_id: 1,
+              assigned_member_id: 2,
+              customer: { id: 'c1', name: 'Server Customer', email: 'srv@test.com' },
+              tags: [],
+              messages: [],
+              assignments: [],
+            },
+          ],
+        }),
+      }
+    })
+
+    vi.stubGlobal('fetch', mockFetch)
+
+    try {
+      render(
+        <TicketCockpit.Provider
+          apiUrl="http://acme.localhost"
+          token="secret-token"
+          teams={MOCK_TEAMS}
+          members={MOCK_MEMBERS}
+          allTags={MOCK_TAGS_POOL}
+          currentUserId={2}
+        >
+          <TicketCockpit.Frame>
+            <TicketCockpit.SubRail />
+            <TicketCockpit.Queue />
+          </TicketCockpit.Frame>
+        </TicketCockpit.Provider>
+      )
+
+      // Initial fetch should query all_open preset
+      expect(fetchCalls.some((call) => call.includes('status=new%2Copen%2Cpending') || call.includes('status=new,open,pending'))).toBe(true)
+
+      // 1. Switch to My Tickets
+      await user.click(screen.getByTestId('preset-btn-my_tickets'))
+      expect(fetchCalls.some((call) => call.includes('assigned_to=me'))).toBe(true)
+
+      // 2. Switch to Unassigned
+      await user.click(screen.getByTestId('preset-btn-unassigned'))
+      expect(fetchCalls.some((call) => call.includes('unassigned=true'))).toBe(true)
+
+      // 3. Switch to Team Queue
+      await user.click(screen.getByTestId('preset-btn-team_queue'))
+      expect(fetchCalls.some((call) => call.includes('team_queue=true'))).toBe(true)
+
+      // 4. Switch to Resolved & Closed
+      await user.click(screen.getByTestId('preset-btn-resolved_closed'))
+      expect(fetchCalls.some((call) => call.includes('status=resolved%2Cclosed') || call.includes('status=resolved,closed'))).toBe(true)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('displays accurate preset count badges formatted with font-mono and tabular-nums', () => {
+    render(
+      <TicketCockpit.Provider
+        tickets={INITIAL_MOCK_TICKETS}
+        teams={MOCK_TEAMS}
+        members={MOCK_MEMBERS}
+        allTags={MOCK_TAGS_POOL}
+        currentUserId={2}
+      >
+        <TicketCockpit.Frame>
+          <TicketCockpit.SubRail />
+        </TicketCockpit.Frame>
+      </TicketCockpit.Provider>
+    )
+
+    const expectedAllOpen = INITIAL_MOCK_TICKETS.filter((t) => ['new', 'open', 'pending'].includes(t.status)).length
+    const expectedMyTickets = INITIAL_MOCK_TICKETS.filter((t) => t.assigned_member_id === 2).length
+    const expectedUnassigned = INITIAL_MOCK_TICKETS.filter((t) => !t.assigned_member_id).length
+    const expectedTeamQueue = INITIAL_MOCK_TICKETS.filter((t) => Boolean(t.assigned_team_id)).length
+    const expectedResolvedClosed = INITIAL_MOCK_TICKETS.filter((t) => ['resolved', 'closed'].includes(t.status)).length
+
+    // Check count badge presence and typography classes
+    const allOpenBadge = screen.getByTestId('preset-count-all_open')
+    expect(allOpenBadge).toHaveTextContent(String(expectedAllOpen))
+    expect(allOpenBadge.className).toContain('font-mono')
+    expect(allOpenBadge.className).toContain('tabular-nums')
+
+    const myTicketsBadge = screen.getByTestId('preset-count-my_tickets')
+    expect(myTicketsBadge).toHaveTextContent(String(expectedMyTickets))
+    expect(myTicketsBadge.className).toContain('font-mono')
+    expect(myTicketsBadge.className).toContain('tabular-nums')
+
+    const unassignedBadge = screen.getByTestId('preset-count-unassigned')
+    expect(unassignedBadge).toHaveTextContent(String(expectedUnassigned))
+    expect(unassignedBadge.className).toContain('tabular-nums')
+
+    const teamQueueBadge = screen.getByTestId('preset-count-team_queue')
+    expect(teamQueueBadge).toHaveTextContent(String(expectedTeamQueue))
+    expect(teamQueueBadge.className).toContain('tabular-nums')
+
+    const resolvedClosedBadge = screen.getByTestId('preset-count-resolved_closed')
+    expect(resolvedClosedBadge).toHaveTextContent(String(expectedResolvedClosed))
+    expect(resolvedClosedBadge.className).toContain('tabular-nums')
+  })
+
+  it('derives filtered queues during render with compound filter dropdowns (status, priority, team, tag)', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <TicketCockpit.Provider
+        tickets={INITIAL_MOCK_TICKETS}
+        teams={MOCK_TEAMS}
+        members={MOCK_MEMBERS}
+        allTags={MOCK_TAGS_POOL}
+        currentUserId={2}
+      >
+        <TicketCockpit.Frame>
+          <TicketCockpit.Queue />
+        </TicketCockpit.Frame>
+      </TicketCockpit.Provider>
+    )
+
+    // Initially under all_open: ticket-1, ticket-2, ticket-3
+    expect(screen.getByTestId('ticket-row-ticket-1')).toBeInTheDocument()
+    expect(screen.getByTestId('ticket-row-ticket-2')).toBeInTheDocument()
+    expect(screen.getByTestId('ticket-row-ticket-3')).toBeInTheDocument()
+
+    // 1. Filter by Priority: urgent (P0) -> only ticket-1
+    const prioritySelect = screen.getByTestId('filter-priority-select')
+    await user.selectOptions(prioritySelect, 'urgent')
+    expect(screen.getByTestId('ticket-row-ticket-1')).toBeInTheDocument()
+    expect(screen.queryByTestId('ticket-row-ticket-2')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('ticket-row-ticket-3')).not.toBeInTheDocument()
+
+    // Reset priority back to all
+    await user.selectOptions(prioritySelect, 'all')
+    expect(screen.getByTestId('ticket-row-ticket-1')).toBeInTheDocument()
+    expect(screen.getByTestId('ticket-row-ticket-2')).toBeInTheDocument()
+
+    // 2. Filter by Status: open -> only ticket-2
+    const statusSelect = screen.getByTestId('filter-status-select')
+    await user.selectOptions(statusSelect, 'open')
+    expect(screen.getByTestId('ticket-row-ticket-2')).toBeInTheDocument()
+    expect(screen.queryByTestId('ticket-row-ticket-1')).not.toBeInTheDocument()
+
+    // Reset status back to all
+    await user.selectOptions(statusSelect, 'all')
+
+    // 3. Filter by Team: Team 1 (Support Tier 1)
+    const teamSelect = screen.getByTestId('filter-team-select')
+    await user.selectOptions(teamSelect, '1')
+    // Ticket 1 is unassigned to team, so it should not appear
+    expect(screen.queryByTestId('ticket-row-ticket-1')).not.toBeInTheDocument()
+    // Ticket 2 and Ticket 3 are assigned to team 1
+    expect(screen.getByTestId('ticket-row-ticket-2')).toBeInTheDocument()
+    expect(screen.getByTestId('ticket-row-ticket-3')).toBeInTheDocument()
+
+    // 4. Filter by Tag: tag 4 (database) -> only ticket-2
+    const tagSelect = screen.getByTestId('filter-tag-select')
+    await user.selectOptions(tagSelect, '4')
+    expect(screen.getByTestId('ticket-row-ticket-2')).toBeInTheDocument()
+    expect(screen.queryByTestId('ticket-row-ticket-3')).not.toBeInTheDocument()
+
+    // 5. Click Clear Filters button
+    const clearBtn = screen.getByTestId('clear-filters-btn')
+    expect(clearBtn).toBeInTheDocument()
+    await user.click(clearBtn)
+
+    // After reset, all open tickets return
+    expect(screen.getByTestId('ticket-row-ticket-1')).toBeInTheDocument()
+    expect(screen.getByTestId('ticket-row-ticket-2')).toBeInTheDocument()
+    expect(screen.getByTestId('ticket-row-ticket-3')).toBeInTheDocument()
+  })
+
+  it('updates URL to /tickets/:ticketNumber via HTML5 History without full page reload when selecting a ticket', async () => {
+    const user = userEvent.setup()
+    const pushStateSpy = vi.spyOn(window.history, 'pushState')
+
+    render(
+      <TicketCockpit.Provider
+        tickets={INITIAL_MOCK_TICKETS}
+        teams={MOCK_TEAMS}
+        members={MOCK_MEMBERS}
+        allTags={MOCK_TAGS_POOL}
+      >
+        <TicketCockpit.Frame>
+          <TicketCockpit.Queue />
+          <TicketCockpit.Detail />
+        </TicketCockpit.Frame>
+      </TicketCockpit.Provider>
+    )
+
+    // Select ticket-2 (ticket_number 1002)
+    await user.click(screen.getByTestId('ticket-row-ticket-2'))
+
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ ticketId: 'ticket-2', ticketNumber: 1002 }),
+      '',
+      '/tickets/1002'
+    )
+
+    pushStateSpy.mockRestore()
+  })
+
+  it('hydrates targeted ticket directly when booting with /tickets/:ticketNumber', () => {
+    render(
+      <TicketCockpit.Provider
+        tickets={INITIAL_MOCK_TICKETS}
+        teams={MOCK_TEAMS}
+        members={MOCK_MEMBERS}
+        allTags={MOCK_TAGS_POOL}
+        initialTicketNumber={1002}
+      >
+        <TicketCockpit.Frame>
+          <TicketCockpit.Queue />
+          <TicketCockpit.Detail />
+        </TicketCockpit.Frame>
+      </TicketCockpit.Provider>
+    )
+
+    // Ticket 1002 should be the active detail
+    expect(screen.getByTestId('detail-subject')).toHaveTextContent(INITIAL_MOCK_TICKETS[1].subject)
+  })
+
+  it('hydrates resolved ticket and automatically switches active preset to resolved_closed on boot', () => {
+    render(
+      <TicketCockpit.Provider
+        tickets={INITIAL_MOCK_TICKETS}
+        teams={MOCK_TEAMS}
+        members={MOCK_MEMBERS}
+        allTags={MOCK_TAGS_POOL}
+        initialTicketNumber={1006}
+      >
+        <TicketCockpit.Frame>
+          <TicketCockpit.SubRail />
+          <TicketCockpit.Queue />
+          <TicketCockpit.Detail />
+        </TicketCockpit.Frame>
+      </TicketCockpit.Provider>
+    )
+
+    // Ticket 1006 is resolved, so detail should show it
+    expect(screen.getByTestId('detail-subject')).toHaveTextContent(INITIAL_MOCK_TICKETS[5].subject)
+    // Queue should show ticket-1006
+    expect(screen.getByTestId('ticket-row-ticket-1006')).toBeInTheDocument()
   })
 
   it('throws an informative error if useTicketCockpit is consumed outside Provider', () => {
