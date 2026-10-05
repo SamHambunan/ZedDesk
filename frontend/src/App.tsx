@@ -903,17 +903,13 @@ function AppInner({
     const cleanPath = pathPart.startsWith('/') ? pathPart.slice(1) : pathPart
     const segments = cleanPath.split('/')
     const baseSection = segments[0]
+    let targetPath = `/${cleanPath}`
 
     if (baseSection === 'overview' || baseSection === '') {
       setWorkspaceView('overview')
       setActiveTicketNumber(undefined)
       setActivePreset(undefined)
-      if (typeof window !== 'undefined') {
-        const targetUrl = `/overview${queryPart ? `?${queryPart}` : ''}`
-        if (window.location.pathname + window.location.search !== targetUrl) {
-          window.history.pushState({}, '', targetUrl)
-        }
-      }
+      targetPath = '/overview'
     } else if (baseSection === 'tickets') {
       setWorkspaceView('tickets')
       const ticketNum = segments[1] ? Number(segments[1]) : undefined
@@ -921,13 +917,6 @@ function AppInner({
 
       const urlPreset = queryPart ? (new URLSearchParams(queryPart).get('preset') as PresetFilter | null) : null
       setActivePreset(urlPreset ?? undefined)
-
-      if (typeof window !== 'undefined') {
-        const targetUrl = `/${cleanPath}${queryPart ? `?${queryPart}` : ''}`
-        if (window.location.pathname + window.location.search !== targetUrl) {
-          window.history.pushState({}, '', targetUrl)
-        }
-      }
     } else if (
       baseSection === 'invitations' ||
       baseSection === 'members' ||
@@ -937,11 +926,12 @@ function AppInner({
       setWorkspaceView(baseSection as any)
       setActiveTicketNumber(undefined)
       setActivePreset(undefined)
-      if (typeof window !== 'undefined') {
-        const targetUrl = `/${cleanPath}${queryPart ? `?${queryPart}` : ''}`
-        if (window.location.pathname + window.location.search !== targetUrl) {
-          window.history.pushState({}, '', targetUrl)
-        }
+    }
+
+    if (typeof window !== 'undefined') {
+      const targetUrl = `${targetPath}${queryPart ? `?${queryPart}` : ''}`
+      if (window.location.pathname + window.location.search !== targetUrl) {
+        window.history.pushState({}, '', targetUrl)
       }
     }
   }
@@ -1020,7 +1010,7 @@ function AppInner({
         onLogout={handleLogout}
         onAuthSuccess={persistSession}
       >
-        {!loadingWorkspace && workspaceData && workspaceView === 'overview' && (
+        {!loadingWorkspace && workspaceData && workspaceView === 'overview' ? (
           <WorkspaceOverview
             organization={workspaceData.organization}
             subdomain={subdomain!}
@@ -1029,7 +1019,7 @@ function AppInner({
             apiUrl={apiUrl}
             onNavigate={handleWorkspaceNavigate}
           />
-        )}
+        ) : null}
 
         {(workspaceView === 'invitations' || workspaceView === 'members') && (
           <MembersView

@@ -168,17 +168,6 @@ function TicketCockpitInternalProvider({
   )
   const [activePreset, setActivePreset] = useState<PresetFilter>(() => {
     if (initialPreset) return initialPreset
-    if (typeof window !== 'undefined') {
-      const searchPreset = new URLSearchParams(window.location?.search).get('preset') as PresetFilter | null
-      if (
-        searchPreset &&
-        ['my_tickets', 'all_open', 'unassigned', 'urgent_p0_p1', 'pending', 'resolved_closed'].includes(
-          searchPreset
-        )
-      ) {
-        return searchPreset
-      }
-    }
     if (initialTicket && ['resolved', 'closed'].includes(initialTicket.status)) {
       return 'resolved_closed'
     }
@@ -324,12 +313,12 @@ function TicketCockpitInternalProvider({
     ? controlledSelectedTicketId
     : internalSelectedTicketId
 
-  // Boot hydration: If booting with initialTicketNum, select targeted ticket when available
-  const [hydratedNum, setHydratedNum] = useState<number | null>(null)
-  if (initialTicketNum !== null && hydratedNum !== initialTicketNum && effectiveTickets.length > 0) {
+  // Target ticket synchronization: When initialTicketNum updates or tickets hydrate, select targeted ticket
+  const [syncedTicketNum, setSyncedTicketNum] = useState<number | null>(null)
+  if (initialTicketNum !== null && syncedTicketNum !== initialTicketNum && effectiveTickets.length > 0) {
     const match = effectiveTickets.find((t) => t.ticket_number === initialTicketNum)
     if (match) {
-      setHydratedNum(initialTicketNum)
+      setSyncedTicketNum(initialTicketNum)
       if (internalSelectedTicketId !== match.id) {
         setInternalSelectedTicketId(match.id)
       }
@@ -338,30 +327,6 @@ function TicketCockpitInternalProvider({
       }
       if (mobilePane !== 'detail') {
         setMobilePane('detail')
-      }
-    }
-  }
-
-  // Adjust selected ticket during render when initialTicketNumber prop updates
-  const [prevInitialTicketNumber, setPrevInitialTicketNumber] = useState(initialTicketNumber)
-  if (initialTicketNumber !== prevInitialTicketNumber) {
-    setPrevInitialTicketNumber(initialTicketNumber)
-    const newNum =
-      typeof initialTicketNumber === 'number'
-        ? initialTicketNumber
-        : typeof initialTicketNumber === 'string'
-          ? Number(initialTicketNumber) || null
-          : null
-    if (newNum !== null && effectiveTickets.length > 0) {
-      const match = effectiveTickets.find((t) => t.ticket_number === newNum)
-      if (match && internalSelectedTicketId !== match.id) {
-        setInternalSelectedTicketId(match.id)
-        if (['resolved', 'closed'].includes(match.status) && activePreset !== 'resolved_closed') {
-          setActivePreset('resolved_closed')
-        }
-        if (mobilePane !== 'detail') {
-          setMobilePane('detail')
-        }
       }
     }
   }
