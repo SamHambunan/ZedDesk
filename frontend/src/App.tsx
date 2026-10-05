@@ -7,7 +7,7 @@ import { TeamsView, TeamManagementView } from './components/teams'
 import { MembersView } from './components/members'
 import { PublicInvitationView } from './components/invitations'
 import { CustomerPortalView } from './components/portal'
-import { TicketQueueView } from './components/tickets'
+import { TicketQueueView } from './components/tickets/TicketQueueView'
 import { useWorkspace } from './hooks/useWorkspace'
 import { getApiBaseUrl, getCentralHubUrl, getOrganizationUrl, getSubdomain } from './utils/url'
 
@@ -1027,7 +1027,12 @@ function AppInner({
             )}
 
             {!loadingWorkspace && workspaceData && workspaceView === 'tickets' && (
-              <TicketQueueView apiUrl={apiUrl} token={token} />
+              <TicketQueueView
+                apiUrl={apiUrl}
+                token={token}
+                userRole={workspaceData.role as 'admin' | 'agent'}
+                currentUserId={user?.id}
+              />
             )}
 
       </WorkspaceShell>
