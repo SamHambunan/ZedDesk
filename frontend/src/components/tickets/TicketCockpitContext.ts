@@ -58,7 +58,8 @@ export interface TicketCockpitActions {
   readonly addTag: (ticketId: string, tag: TicketTag) => Promise<void> | void
   readonly removeTag: (ticketId: string, tagId: number | string) => Promise<void> | void
   readonly deleteTicket: (ticketId: string) => Promise<void> | void
-  readonly submitComposer: (ticketId: string, payload: ComposerSubmitPayload) => Promise<void> | void
+  readonly restoreTicket?: (ticketId: string) => Promise<void> | void
+  readonly submitComposer: (ticketId: string, payload: ComposerSubmitPayload) => void
 }
 
 export interface TicketCockpitMeta {

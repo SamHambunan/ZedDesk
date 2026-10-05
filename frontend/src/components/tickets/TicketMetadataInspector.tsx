@@ -5,6 +5,7 @@ import {
   Tag as TagIcon,
   Shield,
   Trash2,
+  RotateCcw,
   CheckCircle2,
   AlertTriangle,
   History,
@@ -24,6 +25,9 @@ import type {
 } from './types'
 import { TicketCockpitContext } from './TicketCockpitContext'
 import { Toast } from '../ui/Toast'
+import { Modal } from '../ui/Modal'
+import { Button } from '../ui/Button'
+import { Badge } from '../ui/Badge'
 
 // --- Compound Subcomponent 1: CustomerCard ---
 export interface InspectorCustomerCardProps {
@@ -52,9 +56,9 @@ export const InspectorCustomerCard: React.FC<InspectorCustomerCardProps> = ({
           <span>Customer Profile</span>
         </span>
         {customer.tier ? (
-          <span className="px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-mono uppercase">
+          <Badge variant="primary" className="text-[10px] font-mono uppercase">
             {customer.tier}
-          </span>
+          </Badge>
         ) : null}
       </div>
 
@@ -122,7 +126,7 @@ export const InspectorClaimCta: React.FC<InspectorClaimCtaProps> = ({
         <span>Unassigned Ticket</span>
       </div>
       <p className="text-[11px] text-text-secondary leading-normal">
-        Take ownership of this ticket. Claiming will assign it to you and transition status to{' '}
+        Assign this ticket to yourself. Claiming will assign it to you and transition status to{' '}
         <span className="font-mono text-emerald-400">open</span>.
       </p>
       <button
@@ -231,8 +235,8 @@ export const InspectorLifecycle: React.FC<InspectorLifecycleProps> = ({
 }
 InspectorLifecycle.displayName = 'TicketCockpit.Inspector.Lifecycle'
 
-// --- Compound Subcomponent 4: Routing ---
-export interface InspectorRoutingProps {
+// --- Compound Subcomponent 4: Assignment (formerly Routing) ---
+export interface InspectorAssignmentProps {
   readonly ticket?: TicketItem
   readonly teams?: readonly OrgTeamOption[]
   readonly members?: readonly OrgMemberOption[]
@@ -242,7 +246,7 @@ export interface InspectorRoutingProps {
   readonly className?: string
 }
 
-export const InspectorRouting: React.FC<InspectorRoutingProps> = ({
+export const InspectorAssignment: React.FC<InspectorAssignmentProps> = ({
   ticket: propTicket,
   teams: propTeams,
   members: propMembers,
@@ -315,7 +319,7 @@ export const InspectorRouting: React.FC<InspectorRoutingProps> = ({
     <div className={`space-y-3 bg-[#121316] p-3 rounded-lg border border-[#282A33] ${className}`}>
       <div className="text-[11px] font-mono text-text-muted uppercase tracking-wider flex items-center gap-1.5">
         <Users2 className="w-3.5 h-3.5 text-[#F59E0B]" />
-        <span>Routing & Assignment</span>
+        <span>Assignment</span>
       </div>
 
       <div className="space-y-2">
@@ -362,7 +366,8 @@ export const InspectorRouting: React.FC<InspectorRoutingProps> = ({
     </div>
   )
 }
-InspectorRouting.displayName = 'TicketCockpit.Inspector.Routing'
+InspectorAssignment.displayName = 'TicketCockpit.Inspector.Assignment'
+export const InspectorRouting = InspectorAssignment
 
 // --- Compound Subcomponent 5: Tags ---
 export interface InspectorTagsProps {
@@ -670,6 +675,7 @@ export interface InspectorDestructiveProps {
   readonly ticket?: TicketItem
   readonly userRole?: 'admin' | 'agent'
   readonly onDeleteTicket?: (ticketId: string) => Promise<void> | void
+  readonly onRestoreTicket?: (ticketId: string) => Promise<void> | void
   readonly onError?: (error: Error) => void
   readonly className?: string
 }
@@ -678,6 +684,7 @@ export const InspectorDestructive: React.FC<InspectorDestructiveProps> = ({
   ticket: propTicket,
   userRole: propRole,
   onDeleteTicket: propOnDelete,
+  onRestoreTicket: propOnRestore,
   onError,
   className = '',
 }) => {
@@ -685,6 +692,7 @@ export const InspectorDestructive: React.FC<InspectorDestructiveProps> = ({
   const ticket = propTicket ?? context?.state.activeTicket
   const userRole = propRole ?? context?.state.userRole ?? 'agent'
   const onDeleteTicket = propOnDelete ?? context?.actions.deleteTicket
+  const onRestoreTicket = propOnRestore ?? context?.actions.restoreTicket
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
 
@@ -700,9 +708,17 @@ export const InspectorDestructive: React.FC<InspectorDestructiveProps> = ({
     }
   }
 
+  const handleRestore = async () => {
+    try {
+      await onRestoreTicket?.(ticket.id)
+    } catch (err) {
+      if (err instanceof Error) onError?.(err)
+    }
+  }
+
   return (
     <>
-      <div className={`pt-2 border-t border-[#282A33] ${className}`}>
+      <div className={`pt-2 border-t border-[#282A33] space-y-2 ${className}`}>
         <button
           type="button"
           data-testid="admin-delete-ticket-btn"
@@ -712,42 +728,56 @@ export const InspectorDestructive: React.FC<InspectorDestructiveProps> = ({
           <Trash2 className="w-3.5 h-3.5" />
           <span>Delete Ticket</span>
         </button>
+
+        {ticket.status === 'closed' ? (
+          <button
+            type="button"
+            data-testid="admin-restore-ticket-btn"
+            onClick={handleRestore}
+            className="w-full h-8 px-3 rounded border border-sentiment-positive/30 hover:bg-sentiment-positive/10 text-sentiment-positive text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sentiment-positive"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Restore Ticket</span>
+          </button>
+        ) : null}
       </div>
 
-      {isDeleteModalOpen ? (
-        <div
-          data-testid="delete-confirmation-modal"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150"
-        >
-          <div className="bg-[#141518] border border-sentiment-negative/40 rounded-xl p-5 max-w-sm w-full space-y-4 shadow-modal">
-            <div className="flex items-center gap-2 text-sentiment-negative font-semibold text-body-default">
-              <AlertTriangle className="w-5 h-5 shrink-0" />
-              <span>Confirm Ticket Deletion</span>
-            </div>
-            <p className="text-xs text-text-secondary leading-normal">
-              Are you sure you want to soft-delete Ticket <span className="font-mono text-white">#{ticket.ticket_number}</span>? This action can be reversed by an administrator, but the ticket will be removed from all active triage queues.
-            </p>
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                data-testid="cancel-delete-btn"
-                onClick={() => setIsDeleteModalOpen(false)}
-                className="h-8 px-3 text-xs bg-[#16181D] hover:bg-[#282A33] text-text-secondary rounded transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                data-testid="confirm-delete-btn"
-                onClick={handleConfirmDelete}
-                className="h-8 px-3 text-xs bg-sentiment-negative hover:bg-rose-700 text-white font-semibold rounded transition-colors cursor-pointer"
-              >
-                Confirm Delete
-              </button>
-            </div>
+      <Modal
+        open={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        title={
+          <div className="flex items-center gap-2 text-sentiment-negative font-semibold text-body-default">
+            <AlertTriangle className="w-5 h-5 shrink-0" />
+            <span>Confirm Ticket Deletion</span>
+          </div>
+        }
+        description={
+          <>
+            Are you sure you want to soft-delete Ticket <span className="font-mono text-white">#{ticket.ticket_number}</span>? This action can be reversed by an administrator, but the ticket will be removed from all active triage queues.
+          </>
+        }
+      >
+        <div data-testid="delete-confirmation-modal" className="space-y-4">
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button
+              variant="secondary"
+              size="compact"
+              data-testid="cancel-delete-btn"
+              onClick={() => setIsDeleteModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="compact"
+              data-testid="confirm-delete-btn"
+              onClick={handleConfirmDelete}
+            >
+              Confirm Delete
+            </Button>
           </div>
         </div>
-      ) : null}
+      </Modal>
     </>
   )
 }
@@ -767,6 +797,7 @@ export interface TicketMetadataInspectorProps {
   readonly onAddTag?: (ticketId: string, tag: TicketTag) => Promise<void> | void
   readonly onRemoveTag?: (ticketId: string, tagId: number | string) => Promise<void> | void
   readonly onDeleteTicket?: (ticketId: string) => Promise<void> | void
+  readonly onRestoreTicket?: (ticketId: string) => Promise<void> | void
   readonly className?: string
   readonly children?: React.ReactNode
 }
@@ -806,9 +837,9 @@ export const TicketMetadataInspector: React.FC<TicketMetadataInspectorProps> = (
           <Shield className="w-3.5 h-3.5 text-[#F59E0B]" />
           <span>Ticket Attributes</span>
         </span>
-        <span className="font-mono text-[10px] text-text-muted uppercase px-1.5 py-0.5 rounded bg-white/5 border border-white/10">
+        <Badge variant={userRole === 'admin' ? 'admin' : 'agent'} className="font-mono text-[10px] uppercase">
           {userRole}
-        </span>
+        </Badge>
       </div>
 
       {props.children ?? (
@@ -825,7 +856,7 @@ export const TicketMetadataInspector: React.FC<TicketMetadataInspectorProps> = (
             onUpdatePriority={props.onUpdatePriority}
             onError={handleError}
           />
-          <InspectorRouting
+          <InspectorAssignment
             ticket={ticket}
             teams={props.teams}
             members={props.members}
@@ -845,6 +876,7 @@ export const TicketMetadataInspector: React.FC<TicketMetadataInspectorProps> = (
             ticket={ticket}
             userRole={userRole}
             onDeleteTicket={props.onDeleteTicket}
+            onRestoreTicket={props.onRestoreTicket}
             onError={handleError}
           />
         </>

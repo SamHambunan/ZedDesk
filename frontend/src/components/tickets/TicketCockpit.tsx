@@ -43,6 +43,7 @@ import {
   InspectorCustomerCard,
   InspectorClaimCta,
   InspectorLifecycle,
+  InspectorAssignment,
   InspectorRouting,
   InspectorTags,
   InspectorAuditLog,
@@ -264,11 +265,40 @@ function TicketCockpitInternalProvider({
     return internalTickets
   }, [serverTickets, internalTickets])
 
+  // TanStack Query: live query to GET /api/tags
+  const { data: serverTags } = useQuery<readonly TicketTag[]>({
+    queryKey: ['tags', apiUrl],
+    queryFn: async () => {
+      const url = resolveApiEndpoint(apiUrl ?? '', 'tags')
+      const headers: Record<string, string> = { Accept: 'application/json' }
+      if (token) headers.Authorization = `Bearer ${token}`
+      const res = await fetch(url, { headers })
+      if (!res.ok) throw new Error('Failed to fetch tags')
+      const json = await res.json()
+      const list = json.data || json.tags || []
+      return list.map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        slug: t.slug,
+        color: t.color || '#64748B',
+      }))
+    },
+    enabled: Boolean(apiUrl),
+    staleTime: 60_000,
+  })
+
   // Ref mirror of effectiveTickets to keep action callbacks stable without invalidation cascades
   const effectiveTicketsRef = useRef(effectiveTickets)
   effectiveTicketsRef.current = effectiveTickets
 
-  const effectiveTags = internalTags
+  const effectiveTags = useMemo(() => {
+    if (serverTags && serverTags.length > 0) {
+      const serverIds = new Set(serverTags.map((t) => t.id))
+      const preserved = internalTags.filter((t) => !serverIds.has(t.id))
+      return [...serverTags, ...preserved]
+    }
+    return internalTags
+  }, [serverTags, internalTags])
 
   const selectedTicketId = controlledSelectedTicketId !== undefined
     ? controlledSelectedTicketId
@@ -431,6 +461,41 @@ function TicketCockpitInternalProvider({
 
     return baseTicket
   }, [effectiveTickets, selectedTicketId, filteredTickets, serverTicketDetail, targetTicketId])
+  const executeApiMutation = async (
+    endpoint: string,
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    body?: unknown,
+    ticketIdToInvalidate?: string
+  ) => {
+    const { apiUrl: cfgApiUrl, token: cfgToken, queryClient: cfgQueryClient } = configRef.current
+    if (!cfgApiUrl) return null
+
+    const url = resolveApiEndpoint(cfgApiUrl, endpoint)
+    const headers: Record<string, string> = { Accept: 'application/json' }
+    if (body !== undefined) {
+      headers['Content-Type'] = 'application/json'
+    }
+    if (cfgToken) {
+      headers.Authorization = `Bearer ${cfgToken}`
+    }
+
+    const res = await fetch(url, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.message || `Request to ${endpoint} failed (${res.status})`)
+    }
+
+    cfgQueryClient.invalidateQueries({ queryKey: ['tickets'] })
+    if (ticketIdToInvalidate) {
+      cfgQueryClient.invalidateQueries({ queryKey: ['ticket', ticketIdToInvalidate] })
+    }
+    return res.json().catch(() => null)
+  }
 
   // Stable Actions with functional state updates & ref lookups
   const actions: TicketCockpitActions = useMemo(() => {
@@ -478,7 +543,6 @@ function TicketCockpitInternalProvider({
         const currentMember = members.find((m) => m.id === currentUserId)
         const memberName = currentMember ? currentMember.name : 'Current Agent'
 
-        // Optimistic update
         setInternalTickets((prev) =>
           prev.map((t) => {
             if (t.id !== ticketId) return t
@@ -506,25 +570,9 @@ function TicketCockpitInternalProvider({
         )
 
         try {
-          if (onClaimTicket) {
-            await onClaimTicket(ticketId)
-          }
-
-          const { apiUrl: cfgApiUrl, token: cfgToken, queryClient: cfgQueryClient } = configRef.current
-          if (cfgApiUrl) {
-            const url = resolveApiEndpoint(cfgApiUrl, `tickets/${ticketId}/claim`)
-            const headers: Record<string, string> = { Accept: 'application/json' }
-            if (cfgToken) headers.Authorization = `Bearer ${cfgToken}`
-            const res = await fetch(url, { method: 'POST', headers })
-            if (!res.ok) {
-              const err = await res.json().catch(() => ({}))
-              throw new Error(err.message || `Failed to claim ticket (${res.status})`)
-            }
-            cfgQueryClient.invalidateQueries({ queryKey: ['ticket', ticketId] })
-            cfgQueryClient.invalidateQueries({ queryKey: ['tickets'] })
-          }
+          if (onClaimTicket) await onClaimTicket(ticketId)
+          await executeApiMutation(`tickets/${ticketId}/claim`, 'POST', undefined, ticketId)
         } catch (err) {
-          // Instant rollback on error
           setInternalTickets((prev) =>
             prev.map((t) => (t.id === ticketId ? previousTicket : t))
           )
@@ -536,36 +584,13 @@ function TicketCockpitInternalProvider({
         if (!targetTicket || targetTicket.status === status) return
         const previousStatus = targetTicket.status
 
-        // Optimistic update
         setInternalTickets((prev) =>
           prev.map((t) => (t.id === ticketId ? { ...t, status } : t))
         )
 
         try {
-          if (onUpdateStatus) {
-            await onUpdateStatus(ticketId, status)
-          }
-
-          const { apiUrl: cfgApiUrl, token: cfgToken, queryClient: cfgQueryClient } = configRef.current
-          if (cfgApiUrl) {
-            const url = resolveApiEndpoint(cfgApiUrl, `tickets/${ticketId}/status`)
-            const headers: Record<string, string> = {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-            }
-            if (cfgToken) headers.Authorization = `Bearer ${cfgToken}`
-            const res = await fetch(url, {
-              method: 'PATCH',
-              headers,
-              body: JSON.stringify({ status }),
-            })
-            if (!res.ok) {
-              const err = await res.json().catch(() => ({}))
-              throw new Error(err.message || `Failed to update status (${res.status})`)
-            }
-            cfgQueryClient.invalidateQueries({ queryKey: ['ticket', ticketId] })
-            cfgQueryClient.invalidateQueries({ queryKey: ['tickets'] })
-          }
+          if (onUpdateStatus) await onUpdateStatus(ticketId, status)
+          await executeApiMutation(`tickets/${ticketId}/status`, 'PATCH', { status }, ticketId)
         } catch (err) {
           setInternalTickets((prev) =>
             prev.map((t) => (t.id === ticketId ? { ...t, status: previousStatus } : t))
@@ -578,36 +603,13 @@ function TicketCockpitInternalProvider({
         if (!targetTicket || targetTicket.priority === priority) return
         const previousPriority = targetTicket.priority
 
-        // Optimistic update
         setInternalTickets((prev) =>
           prev.map((t) => (t.id === ticketId ? { ...t, priority } : t))
         )
 
         try {
-          if (onUpdatePriority) {
-            await onUpdatePriority(ticketId, priority)
-          }
-
-          const { apiUrl: cfgApiUrl, token: cfgToken, queryClient: cfgQueryClient } = configRef.current
-          if (cfgApiUrl) {
-            const url = resolveApiEndpoint(cfgApiUrl, `tickets/${ticketId}/priority`)
-            const headers: Record<string, string> = {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-            }
-            if (cfgToken) headers.Authorization = `Bearer ${cfgToken}`
-            const res = await fetch(url, {
-              method: 'PATCH',
-              headers,
-              body: JSON.stringify({ priority }),
-            })
-            if (!res.ok) {
-              const err = await res.json().catch(() => ({}))
-              throw new Error(err.message || `Failed to update priority (${res.status})`)
-            }
-            cfgQueryClient.invalidateQueries({ queryKey: ['ticket', ticketId] })
-            cfgQueryClient.invalidateQueries({ queryKey: ['tickets'] })
-          }
+          if (onUpdatePriority) await onUpdatePriority(ticketId, priority)
+          await executeApiMutation(`tickets/${ticketId}/priority`, 'PATCH', { priority }, ticketId)
         } catch (err) {
           setInternalTickets((prev) =>
             prev.map((t) => (t.id === ticketId ? { ...t, priority: previousPriority } : t))
@@ -622,7 +624,6 @@ function TicketCockpitInternalProvider({
         const team = teams.find((tm) => tm.id === teamId)
         const member = members.find((m) => m.id === memberId)
 
-        // Optimistic update
         setInternalTickets((prev) =>
           prev.map((t) => {
             if (t.id !== ticketId) return t
@@ -650,30 +651,8 @@ function TicketCockpitInternalProvider({
         )
 
         try {
-          if (onAssign) {
-            await onAssign(ticketId, teamId, memberId)
-          }
-
-          const { apiUrl: cfgApiUrl, token: cfgToken, queryClient: cfgQueryClient } = configRef.current
-          if (cfgApiUrl) {
-            const url = resolveApiEndpoint(cfgApiUrl, `tickets/${ticketId}/assign`)
-            const headers: Record<string, string> = {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-            }
-            if (cfgToken) headers.Authorization = `Bearer ${cfgToken}`
-            const res = await fetch(url, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({ team_id: teamId, member_id: memberId }),
-            })
-            if (!res.ok) {
-              const err = await res.json().catch(() => ({}))
-              throw new Error(err.message || `Failed to assign ticket (${res.status})`)
-            }
-            cfgQueryClient.invalidateQueries({ queryKey: ['ticket', ticketId] })
-            cfgQueryClient.invalidateQueries({ queryKey: ['tickets'] })
-          }
+          if (onAssign) await onAssign(ticketId, teamId, memberId)
+          await executeApiMutation(`tickets/${ticketId}/assign`, 'POST', { team_id: teamId, member_id: memberId }, ticketId)
         } catch (err) {
           if (previousTicket) {
             setInternalTickets((prev) =>
@@ -703,29 +682,17 @@ function TicketCockpitInternalProvider({
         )
 
         try {
-          if (onAddTag) {
-            await onAddTag(ticketId, tag)
-          }
-
-          const { apiUrl: cfgApiUrl, token: cfgToken, queryClient: cfgQueryClient } = configRef.current
+          if (onAddTag) await onAddTag(ticketId, tag)
+          const { apiUrl: cfgApiUrl } = configRef.current
           if (cfgApiUrl) {
-            const url = resolveApiEndpoint(cfgApiUrl, `tickets/${ticketId}/tags`)
-            const headers: Record<string, string> = {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
+            let persistTagId = tag.id
+            if (typeof tag.id === 'number' && tag.id > 1_000_000_000) {
+              const created = await executeApiMutation('tags', 'POST', { name: tag.name, slug: tag.slug })
+              if (created?.data?.id) {
+                persistTagId = created.data.id
+              }
             }
-            if (cfgToken) headers.Authorization = `Bearer ${cfgToken}`
-            const res = await fetch(url, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({ tag_id: tag.id }),
-            })
-            if (!res.ok) {
-              const err = await res.json().catch(() => ({}))
-              throw new Error(err.message || `Failed to attach tag (${res.status})`)
-            }
-            cfgQueryClient.invalidateQueries({ queryKey: ['ticket', ticketId] })
-            cfgQueryClient.invalidateQueries({ queryKey: ['tickets'] })
+            await executeApiMutation(`tickets/${ticketId}/tags`, 'POST', { tag_id: persistTagId }, ticketId)
           }
         } catch (err) {
           setInternalTickets((prev) =>
@@ -749,23 +716,8 @@ function TicketCockpitInternalProvider({
         )
 
         try {
-          if (onRemoveTag) {
-            await onRemoveTag(ticketId, tagId)
-          }
-
-          const { apiUrl: cfgApiUrl, token: cfgToken, queryClient: cfgQueryClient } = configRef.current
-          if (cfgApiUrl) {
-            const url = resolveApiEndpoint(cfgApiUrl, `tickets/${ticketId}/tags/${tagId}`)
-            const headers: Record<string, string> = { Accept: 'application/json' }
-            if (cfgToken) headers.Authorization = `Bearer ${cfgToken}`
-            const res = await fetch(url, { method: 'DELETE', headers })
-            if (!res.ok) {
-              const err = await res.json().catch(() => ({}))
-              throw new Error(err.message || `Failed to detach tag (${res.status})`)
-            }
-            cfgQueryClient.invalidateQueries({ queryKey: ['ticket', ticketId] })
-            cfgQueryClient.invalidateQueries({ queryKey: ['tickets'] })
-          }
+          if (onRemoveTag) await onRemoveTag(ticketId, tagId)
+          await executeApiMutation(`tickets/${ticketId}/tags/${tagId}`, 'DELETE', undefined, ticketId)
         } catch (err) {
           setInternalTickets((prev) =>
             prev.map((t) => (t.id === ticketId ? { ...t, tags: previousTags } : t))
@@ -775,6 +727,8 @@ function TicketCockpitInternalProvider({
       },
       deleteTicket: async (ticketId: string) => {
         const previousTickets = effectiveTicketsRef.current
+        const previousSelectedId = internalSelectedTicketId
+
         setInternalTickets((prev) => prev.filter((t) => t.id !== ticketId))
         setInternalSelectedTicketId((curr) => {
           if (curr === ticketId) {
@@ -785,28 +739,27 @@ function TicketCockpitInternalProvider({
         })
 
         try {
-          if (onDeleteTicket) {
-            await onDeleteTicket(ticketId)
-          }
-
-          const { apiUrl: cfgApiUrl, token: cfgToken, queryClient: cfgQueryClient } = configRef.current
-          if (cfgApiUrl) {
-            const url = resolveApiEndpoint(cfgApiUrl, `tickets/${ticketId}`)
-            const headers: Record<string, string> = { Accept: 'application/json' }
-            if (cfgToken) headers.Authorization = `Bearer ${cfgToken}`
-            const res = await fetch(url, { method: 'DELETE', headers })
-            if (!res.ok) {
-              const err = await res.json().catch(() => ({}))
-              throw new Error(err.message || `Failed to delete ticket (${res.status})`)
-            }
-            cfgQueryClient.invalidateQueries({ queryKey: ['tickets'] })
-          }
+          if (onDeleteTicket) await onDeleteTicket(ticketId)
+          await executeApiMutation(`tickets/${ticketId}`, 'DELETE')
+        } catch (err) {
+          setInternalTickets(previousTickets)
+          setInternalSelectedTicketId(previousSelectedId)
+          throw err
+        }
+      },
+      restoreTicket: async (ticketId: string) => {
+        const previousTickets = effectiveTicketsRef.current
+        setInternalTickets((prev) =>
+          prev.map((t) => (t.id === ticketId ? { ...t, status: 'open' } : t))
+        )
+        try {
+          await executeApiMutation(`tickets/${ticketId}/restore`, 'POST', undefined, ticketId)
         } catch (err) {
           setInternalTickets(previousTickets)
           throw err
         }
       },
-      submitComposer: async (ticketId: string, payload: ComposerSubmitPayload) => {
+      submitComposer: (ticketId: string, payload: ComposerSubmitPayload) => {
         const { apiUrl: cfgApiUrl, token: cfgToken, userRole: cfgUserRole, onComposerSubmit: cfgOnComposerSubmit, queryClient: cfgQueryClient } = configRef.current
         cfgOnComposerSubmit?.(ticketId, payload)
         const isInternal = payload.messageType === 'internal_note'
@@ -836,48 +789,46 @@ function TicketCockpitInternalProvider({
 
         // Dispatch atomic multipart POST /api/tickets/{uuid}/messages if apiUrl configured
         if (cfgApiUrl) {
-          try {
-            const formData = new FormData()
-            formData.append('message_type', payload.messageType)
-            formData.append('body', payload.body)
-            if (!isInternal && payload.nextStatus) {
-              formData.append('target_status', payload.nextStatus)
-              formData.append('status', payload.nextStatus)
-            }
-            if (payload.files && payload.files.length > 0) {
-              for (const file of payload.files) {
-                formData.append('attachments[]', file)
-              }
-            }
-
-            const headers: Record<string, string> = { Accept: 'application/json' }
-            if (cfgToken) {
-              headers.Authorization = `Bearer ${cfgToken}`
-            }
-
-            const url = resolveApiEndpoint(cfgApiUrl, `tickets/${ticketId}/messages`)
-            const res = await fetch(url, {
-              method: 'POST',
-              headers,
-              body: formData,
-            })
-
-            if (!res.ok) {
-              const err = await res.json().catch(() => null)
-              console.error('Failed to post message to backend:', err)
-            } else {
-              cfgQueryClient.invalidateQueries({ queryKey: ['ticket', ticketId] })
-              cfgQueryClient.invalidateQueries({ queryKey: ['tickets'] })
-            }
-          } catch (err) {
-            console.error('Error submitting ticket message:', err)
+          const formData = new FormData()
+          formData.append('message_type', payload.messageType)
+          formData.append('body', payload.body)
+          if (!isInternal && payload.nextStatus) {
+            formData.append('target_status', payload.nextStatus)
+            formData.append('status', payload.nextStatus)
           }
+          if (payload.files && payload.files.length > 0) {
+            for (const file of payload.files) {
+              formData.append('attachments[]', file)
+            }
+          }
+
+          const headers: Record<string, string> = { Accept: 'application/json' }
+          if (cfgToken) {
+            headers.Authorization = `Bearer ${cfgToken}`
+          }
+
+          const url = resolveApiEndpoint(cfgApiUrl, `tickets/${ticketId}/messages`)
+          fetch(url, {
+            method: 'POST',
+            headers,
+            body: formData,
+          })
+            .then(async (res) => {
+              if (res.ok) {
+                cfgQueryClient.invalidateQueries({ queryKey: ['ticket', ticketId] })
+                cfgQueryClient.invalidateQueries({ queryKey: ['tickets'] })
+              }
+            })
+            .catch((err) => {
+              console.error('Error submitting ticket message:', err)
+            })
         }
       },
     }
   }, [
     controlledSelectedTicketId,
     currentUserId,
+    internalSelectedTicketId,
     members,
     onAddTag,
     onAssign,
@@ -1437,6 +1388,7 @@ export const TicketCockpitInspector = Object.assign(TicketCockpitInspectorCompon
   CustomerCard: InspectorCustomerCard,
   ClaimCta: InspectorClaimCta,
   Lifecycle: InspectorLifecycle,
+  Assignment: InspectorAssignment,
   Routing: InspectorRouting,
   Tags: InspectorTags,
   AuditLog: InspectorAuditLog,
