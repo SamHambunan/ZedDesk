@@ -38,6 +38,16 @@ function formatRelativeTime(isoString: string): string {
 }
 
 /**
+ * Hoisted static empty timeline view (rendering-hoist-jsx)
+ */
+const EMPTY_TIMELINE_VIEW = (
+  <div className="py-12 text-center text-text-muted text-body-sm">
+    <MessageSquare className="w-8 h-8 mx-auto mb-2 text-text-muted/40" />
+    <p>No messages recorded on this ticket yet.</p>
+  </div>
+)
+
+/**
  * Renders an attachment chip with secure download link.
  */
 function AttachmentChip({ attachment }: { readonly attachment: TicketAttachment }) {
@@ -67,6 +77,40 @@ function AttachmentChip({ attachment }: { readonly attachment: TicketAttachment 
         <Download className="w-3 h-3" />
       </a>
     </div>
+  )
+}
+
+/**
+ * Shared message body and attachment tray rendering to avoid duplication across variants.
+ */
+function MessageBodyAndAttachments({
+  body,
+  attachments,
+}: {
+  readonly body: string
+  readonly attachments?: readonly TicketAttachment[]
+}) {
+  return (
+    <>
+      <div className="text-body-default text-text-primary/95 leading-relaxed whitespace-pre-wrap break-words">
+        {body}
+      </div>
+
+      {attachments && attachments.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-white/5 space-y-2">
+          <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono">
+            <Paperclip className="w-3.5 h-3.5 text-[#F59E0B]" />
+            <span>Attachments ({attachments.length})</span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {attachments.map((att) => (
+              <AttachmentChip key={att.id} attachment={att} />
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -127,26 +171,11 @@ export const PublicReplyItem: React.FC<TicketTimelineItemProps> = React.memo(({
         </time>
       </div>
 
-      {/* Body */}
-      <div className="text-body-default text-text-primary/95 leading-relaxed whitespace-pre-wrap break-words">
-        {message.body}
-      </div>
-
-      {/* Attachments */}
-      {message.attachments && message.attachments.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-white/5 space-y-2">
-          <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono">
-            <Paperclip className="w-3.5 h-3.5 text-[#F59E0B]" />
-            <span>Attachments ({message.attachments.length})</span>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {message.attachments.map((att) => (
-              <AttachmentChip key={att.id} attachment={att} />
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Body & Attachments */}
+      <MessageBodyAndAttachments
+        body={message.body}
+        attachments={message.attachments}
+      />
     </article>
   )
 })
@@ -201,26 +230,11 @@ export const InternalNoteItem: React.FC<TicketTimelineItemProps> = React.memo(({
         </time>
       </div>
 
-      {/* Body */}
-      <div className="text-body-default text-text-primary/95 leading-relaxed whitespace-pre-wrap break-words">
-        {message.body}
-      </div>
-
-      {/* Attachments */}
-      {message.attachments && message.attachments.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-white/5 space-y-2">
-          <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono">
-            <Paperclip className="w-3.5 h-3.5 text-[#F59E0B]" />
-            <span>Attachments ({message.attachments.length})</span>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {message.attachments.map((att) => (
-              <AttachmentChip key={att.id} attachment={att} />
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Body & Attachments */}
+      <MessageBodyAndAttachments
+        body={message.body}
+        attachments={message.attachments}
+      />
     </article>
   )
 })
@@ -235,12 +249,7 @@ export const TicketTimelineComponent: React.FC<TicketTimelineProps> = ({
   className = '',
 }) => {
   if (!messages || messages.length === 0) {
-    return (
-      <div className="py-12 text-center text-text-muted text-body-sm">
-        <MessageSquare className="w-8 h-8 mx-auto mb-2 text-text-muted/40" />
-        <p>No messages recorded on this ticket yet.</p>
-      </div>
-    )
+    return EMPTY_TIMELINE_VIEW
   }
 
   return (

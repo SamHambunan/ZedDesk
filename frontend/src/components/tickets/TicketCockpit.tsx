@@ -32,6 +32,7 @@ import {
   getPresetQueryParams,
   parseTicketNumberFromPath,
   matchesPreset,
+  normalizeTicketMessage,
 } from './constants'
 import { INITIAL_MOCK_TICKETS } from './mockData'
 import { TicketTimeline } from './TicketTimeline'
@@ -370,23 +371,9 @@ function TicketCockpitInternalProvider({
       const json = await res.json()
       const raw = json.data || json.ticket || json
 
-      const normalizedMessages: TicketMessage[] = (raw.messages || json.messages || []).map((m: any) => ({
-        id: String(m.id),
-        ticket_id: String(m.ticket_id || targetTicketId),
-        message_type: m.message_type,
-        author_type: (m.author_type && m.author_type.includes('Customer')) ? 'Customer' : 'OrganizationMember',
-        author_name: m.author_name || m.author?.user?.name || m.author?.name || ((m.author_type && m.author_type.includes('Customer')) ? 'Customer' : 'Staff'),
-        author_role: m.author_role || m.author?.role || ((m.author_type && m.author_type.includes('Customer')) ? undefined : 'Staff'),
-        body: m.body || '',
-        attachments: (m.attachments || []).map((att: any) => ({
-          id: String(att.id),
-          file_name: att.file_name || att.name || 'attachment',
-          file_size_bytes: att.file_size_bytes ?? att.size ?? 0,
-          mime_type: att.mime_type || 'application/octet-stream',
-          url: att.url || `/api/attachments/${att.id}/download`,
-        })),
-        created_at: m.created_at || new Date().toISOString(),
-      }))
+      const normalizedMessages: TicketMessage[] = (raw.messages || json.messages || []).map((m: any) =>
+        normalizeTicketMessage(m, targetTicketId)
+      )
 
       return {
         id: String(raw.id),

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useEffect, use } from 'react'
+import React, { useState, useRef, useMemo, use } from 'react'
 import {
   Send,
   Lock,
@@ -44,7 +44,7 @@ export interface ComposerActions {
   readonly addFiles: (files: FileList | readonly File[]) => void
   readonly removeFile: (id: string) => void
   readonly clearFiles: () => void
-  readonly submit: () => void | Promise<void>
+  readonly submit: (overrideType?: MessageType) => void | Promise<void>
 }
 
 export interface ComposerMeta {
@@ -95,6 +95,17 @@ function isAllowedMimeType(mime: string): boolean {
   if (mime.startsWith('text/')) return true
   return false
 }
+
+/**
+ * Hoisted static keyboard shortcut badge (rendering-hoist-jsx)
+ */
+const KEYBOARD_SHORTCUT_BADGE = (
+  <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono text-text-muted">
+    <kbd className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-text-secondary">Ctrl</kbd>
+    <span>+</span>
+    <kbd className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-text-secondary">Enter</kbd>
+  </span>
+)
 
 export interface ComposerProviderProps {
   readonly children: React.ReactNode
@@ -196,14 +207,15 @@ function ComposerInternalProvider({
       setFileError(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
     },
-    submit: () => {
+    submit: (overrideType?: MessageType) => {
       const current = stateRef.current
       if (!current.body.trim() || current.isSubmitting) return
 
+      const effectiveType = overrideType ?? current.tab
       const payload: ComposerSubmitPayload = {
-        messageType: current.tab,
+        messageType: effectiveType,
         body: current.body.trim(),
-        nextStatus: current.tab === 'internal_note' ? undefined : current.nextStatus,
+        nextStatus: effectiveType === 'internal_note' ? undefined : current.nextStatus,
         attachments: current.stagedFiles.map((s) => ({
           id: s.id,
           file_name: s.file_name,
@@ -447,7 +459,7 @@ export const ComposerFooter: React.FC<ComposerFooterProps> = ({
   children,
   className = '',
 }) => {
-  const { meta, actions } = useComposer()
+  const { meta } = useComposer()
 
   return (
     <div className={`flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 bg-[#0F1012]/60 border-t border-[#282A33] ${className}`}>
@@ -466,18 +478,7 @@ export const ComposerFooter: React.FC<ComposerFooterProps> = ({
       </div>
 
       <div className="flex items-center gap-3">
-        <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono text-text-muted">
-          <kbd className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-text-secondary">Ctrl</kbd>
-          <span>+</span>
-          <kbd className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-text-secondary">Enter</kbd>
-        </span>
-
-        {/* If no custom submit button is passed as child, render ComposerSubmit */}
-        {React.Children.toArray(children).some(
-          (child) => React.isValidElement(child) && child.type === ComposerSubmit
-        ) ? null : (
-          <ComposerSubmit />
-        )}
+        {KEYBOARD_SHORTCUT_BADGE}
       </div>
     </div>
   )
@@ -511,13 +512,15 @@ export const ComposerStatusSelector: React.FC<ComposerStatusSelectorProps> = ({
 
 export interface ComposerSubmitProps {
   readonly className?: string
+  readonly isInternalNote?: boolean
 }
 
 export const ComposerSubmit: React.FC<ComposerSubmitProps> = ({
   className = '',
+  isInternalNote: explicitInternalNote,
 }) => {
   const { state, actions } = useComposer()
-  const isInternalNote = state.tab === 'internal_note'
+  const isInternal = explicitInternalNote ?? (state.tab === 'internal_note')
   const isDisabled = !state.body.trim() || state.isSubmitting
 
   return (
@@ -525,14 +528,14 @@ export const ComposerSubmit: React.FC<ComposerSubmitProps> = ({
       type="button"
       data-testid="composer-submit-btn"
       disabled={isDisabled}
-      onClick={() => actions.submit()}
+      onClick={() => actions.submit(isInternal ? 'internal_note' : 'public_reply')}
       className={`h-8 px-4 text-xs font-semibold rounded shadow-keylight transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B] ${
-        isInternalNote
+        isInternal
           ? 'bg-[#F59E0B]/20 hover:bg-[#F59E0B]/30 text-[#F59E0B] border border-[#F59E0B]/40'
           : 'bg-[#F59E0B] hover:bg-[#D97706] text-[#0F1012] font-semibold'
       } ${className}`}
     >
-      {isInternalNote ? (
+      {isInternal ? (
         <>
           <Lock className="w-3.5 h-3.5" />
           <span>Save Note</span>
@@ -556,19 +559,11 @@ export const ComposerSubmit: React.FC<ComposerSubmitProps> = ({
 // Explicit Composer Variants
 
 /**
- * PublicReplyComposer: Composes public reply controls including next-status selector.
+ * PublicReplyComposer: Composes public reply controls including next-status selector without effect cascades.
  */
 export const PublicReplyComposer: React.FC<{ readonly className?: string }> = ({
   className = '',
 }) => {
-  const { state, actions } = useComposer()
-
-  useEffect(() => {
-    if (state.tab !== 'public_reply') {
-      actions.setTab('public_reply')
-    }
-  }, [state.tab, actions])
-
   return (
     <ComposerFrame className={className}>
       <div className="flex items-center justify-between border-b border-[#282A33] px-3 pt-2 bg-[#0F1012]/60">
@@ -587,19 +582,11 @@ export const PublicReplyComposer: React.FC<{ readonly className?: string }> = ({
 }
 
 /**
- * InternalNoteComposer: Composes caution-amber internal note controls strictly omitting status selector.
+ * InternalNoteComposer: Composes caution-amber internal note controls strictly omitting status selector without effect cascades.
  */
 export const InternalNoteComposer: React.FC<{ readonly className?: string }> = ({
   className = '',
 }) => {
-  const { state, actions } = useComposer()
-
-  useEffect(() => {
-    if (state.tab !== 'internal_note') {
-      actions.setTab('internal_note')
-    }
-  }, [state.tab, actions])
-
   return (
     <ComposerFrame className={`ring-1 ring-[#F59E0B]/30 ${className}`}>
       <div className="flex items-center justify-between border-b border-[#282A33] px-3 pt-2 bg-[#0F1012]/60">
@@ -614,7 +601,7 @@ export const InternalNoteComposer: React.FC<{ readonly className?: string }> = (
       </div>
       <ComposerInput placeholder="Type an internal note visible only to organization staff members..." />
       <ComposerFooter>
-        <ComposerSubmit />
+        <ComposerSubmit isInternalNote />
       </ComposerFooter>
     </ComposerFrame>
   )
