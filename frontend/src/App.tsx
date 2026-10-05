@@ -107,6 +107,13 @@ function AppInner({
   // Customer Portal Route Check: /portal or /portal/*
   const isPortalRoute = activePath === '/portal' || activePath.startsWith('/portal/')
 
+  // Tickets Route Check: /tickets or /tickets/:ticketNumber
+  const isTicketsRoute = activePath === '/tickets' || activePath.startsWith('/tickets/')
+  const initialTicketNumber = useMemo(() => {
+    const match = activePath.match(/^\/tickets\/(\d+)/)
+    return match ? Number(match[1]) : undefined
+  }, [activePath])
+
   // Public Invitation State
   const [publicInvitation, setPublicInvitation] = useState<PublicInvitation | null>(null)
   const [loadingInvitation, setLoadingInvitation] = useState<boolean>(Boolean(invitationToken))
@@ -121,7 +128,10 @@ function AppInner({
 
   // Workspace Shell Invitations State
   const [workspaceView, setWorkspaceView] = useState<'overview' | 'invitations' | 'members' | 'teams' | 'team-management' | 'tickets'>(
-    () => ROUTE_VIEW_MAP[activePath] ?? 'overview'
+    () => {
+      if (isTicketsRoute) return 'tickets'
+      return ROUTE_VIEW_MAP[activePath] ?? 'overview'
+    }
   )
   const [workspaceInvitations, setWorkspaceInvitations] = useState<InvitationItem[]>([])
   const [loadingWorkspaceInvitations, setLoadingWorkspaceInvitations] = useState(false)
@@ -926,6 +936,9 @@ function AppInner({
             view === 'tickets'
           ) {
             setWorkspaceView(view)
+            if (view === 'tickets' && typeof window !== 'undefined' && !window.location.pathname.startsWith('/tickets')) {
+              window.history.pushState({}, '', '/tickets')
+            }
           }
         }}
         onLogout={handleLogout}
@@ -1032,6 +1045,7 @@ function AppInner({
                 token={token}
                 userRole={workspaceData.role as 'admin' | 'agent'}
                 currentUserId={user?.id}
+                initialTicketNumber={initialTicketNumber}
               />
             )}
 

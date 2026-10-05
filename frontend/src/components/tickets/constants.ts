@@ -20,6 +20,21 @@ export const PRESET_DEFINITIONS: readonly {
   { id: 'resolved_closed', label: 'Resolved & Closed', icon: FolderArchive },
 ]
 
+export function getPresetQueryParams(preset: PresetFilter): Record<string, string> {
+  switch (preset) {
+    case 'all_open':
+      return { status: 'new,open,pending' }
+    case 'my_tickets':
+      return { assigned_to: 'me' }
+    case 'unassigned':
+      return { unassigned: 'true' }
+    case 'team_queue':
+      return { team_queue: 'true' }
+    case 'resolved_closed':
+      return { status: 'resolved,closed' }
+  }
+}
+
 export function getPriorityBadge(priority: string): { label: string; class: string } {
   switch (priority.toLowerCase()) {
     case 'urgent':

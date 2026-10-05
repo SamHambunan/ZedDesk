@@ -93,6 +93,8 @@ class TicketController extends Controller
             } else {
                 $query->whereRaw('1 = 0');
             }
+        } elseif ($request->boolean('team_queue')) {
+            $query->whereNotNull('assigned_team_id');
         }
 
         // 6. Customer filter

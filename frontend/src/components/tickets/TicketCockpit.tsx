@@ -1,4 +1,6 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useMemo, useRef, useEffect, useCallback, useContext } from 'react'
+import { useQuery, QueryClientContext, QueryClientProvider } from '@tanstack/react-query'
+import { queryClient as defaultQueryClient } from '../../lib/query-client'
 import {
   Search,
   ArrowLeft,
@@ -16,6 +18,8 @@ import type {
 import {
   TicketCockpitContext,
   useTicketCockpit,
+  DEFAULT_COMPOUND_FILTERS,
+  type CompoundFilters,
   type TicketCockpitContextValue,
   type TicketCockpitState,
   type TicketCockpitActions,
@@ -25,14 +29,26 @@ import {
   PRESET_DEFINITIONS,
   getPriorityBadge,
   getStatusBadge,
+  getPresetQueryParams,
 } from './constants'
+import { INITIAL_MOCK_TICKETS } from './mockData'
 import { TicketTimeline } from './TicketTimeline'
 import { TicketComposer, type ComposerSubmitPayload } from './TicketComposer'
 import { TicketMetadataInspector } from './TicketMetadataInspector'
 
+export function SafeQueryProvider({ children }: { readonly children: React.ReactNode }) {
+  const client = useContext(QueryClientContext)
+  if (client) {
+    return <>{children}</>
+  }
+  return <QueryClientProvider client={defaultQueryClient}>{children}</QueryClientProvider>
+}
+
 export interface TicketCockpitProviderProps {
   readonly children: React.ReactNode
   readonly value?: TicketCockpitContextValue
+  readonly apiUrl?: string
+  readonly token?: string | null
   readonly tickets?: readonly TicketItem[]
   readonly selectedTicketId?: string | null
   readonly onSelectTicket?: (ticketId: string) => void
@@ -41,6 +57,8 @@ export interface TicketCockpitProviderProps {
   readonly allTags?: readonly TicketTag[]
   readonly currentUserId?: number
   readonly userRole?: 'admin' | 'agent'
+  readonly initialTicketNumber?: number | string
+  readonly initialPreset?: PresetFilter
   readonly onClaimTicket?: (ticketId: string) => void
   readonly onUpdateStatus?: (ticketId: string, status: TicketStatus) => void
   readonly onUpdatePriority?: (ticketId: string, priority: TicketPriority) => void
@@ -51,10 +69,24 @@ export interface TicketCockpitProviderProps {
   readonly onComposerSubmit?: (ticketId: string, payload: ComposerSubmitPayload) => void
 }
 
-export const TicketCockpitProvider: React.FC<TicketCockpitProviderProps> = ({
+export const TicketCockpitProvider: React.FC<TicketCockpitProviderProps> = (props) => {
+  // If a generic context value is directly provided (dependency injection), use it
+  if (props.value) {
+    return <TicketCockpitContext value={props.value}>{props.children}</TicketCockpitContext>
+  }
+
+  return (
+    <SafeQueryProvider>
+      <TicketCockpitInternalProvider {...props} />
+    </SafeQueryProvider>
+  )
+}
+
+function TicketCockpitInternalProvider({
   children,
-  value,
-  tickets = [],
+  apiUrl,
+  token,
+  tickets: propTickets,
   selectedTicketId: controlledSelectedTicketId,
   onSelectTicket,
   teams = [],
@@ -62,6 +94,8 @@ export const TicketCockpitProvider: React.FC<TicketCockpitProviderProps> = ({
   allTags = [],
   currentUserId = 2,
   userRole = 'agent',
+  initialTicketNumber,
+  initialPreset,
   onClaimTicket,
   onUpdateStatus,
   onUpdatePriority,
@@ -70,77 +104,118 @@ export const TicketCockpitProvider: React.FC<TicketCockpitProviderProps> = ({
   onRemoveTag,
   onDeleteTicket,
   onComposerSubmit,
-}) => {
-  // If a generic context value is directly provided (dependency injection), use it
-  if (value) {
-    return <TicketCockpitContext value={value}>{children}</TicketCockpitContext>
-  }
+}: Omit<TicketCockpitProviderProps, 'value'>) {
+  // Initial fallback data if no tickets are passed and no API URL is configured
+  const effectivePropTickets = propTickets ?? (apiUrl ? [] : INITIAL_MOCK_TICKETS)
 
-  return (
-    <TicketCockpitInternalProvider
-      tickets={tickets}
-      selectedTicketId={controlledSelectedTicketId}
-      onSelectTicket={onSelectTicket}
-      teams={teams}
-      members={members}
-      allTags={allTags}
-      currentUserId={currentUserId}
-      userRole={userRole}
-      onClaimTicket={onClaimTicket}
-      onUpdateStatus={onUpdateStatus}
-      onUpdatePriority={onUpdatePriority}
-      onAssign={onAssign}
-      onAddTag={onAddTag}
-      onRemoveTag={onRemoveTag}
-      onDeleteTicket={onDeleteTicket}
-      onComposerSubmit={onComposerSubmit}
-    >
-      {children}
-    </TicketCockpitInternalProvider>
-  )
-}
+  // Resolve initial ticket number from prop or window location
+  const initialTicketNum = useMemo(() => {
+    if (initialTicketNumber !== undefined && initialTicketNumber !== null) {
+      const parsed = Number(initialTicketNumber)
+      return !isNaN(parsed) ? parsed : null
+    }
+    if (typeof window !== 'undefined' && window.location?.pathname) {
+      const match = window.location.pathname.match(/\/tickets\/(\d+)/)
+      if (match) {
+        const parsed = Number(match[1])
+        return !isNaN(parsed) ? parsed : null
+      }
+    }
+    return null
+  }, [initialTicketNumber])
 
-function TicketCockpitInternalProvider({
-  children,
-  tickets,
-  selectedTicketId: controlledSelectedTicketId,
-  onSelectTicket,
-  teams,
-  members,
-  allTags,
-  currentUserId,
-  userRole,
-  onClaimTicket,
-  onUpdateStatus,
-  onUpdatePriority,
-  onAssign,
-  onAddTag,
-  onRemoveTag,
-  onDeleteTicket,
-  onComposerSubmit,
-}: Omit<TicketCockpitProviderProps, 'value'> & {
-  tickets: readonly TicketItem[]
-  teams: readonly OrgTeamOption[]
-  members: readonly OrgMemberOption[]
-  allTags: readonly TicketTag[]
-  currentUserId: number
-  userRole: 'admin' | 'agent'
-}) {
-  const [internalTickets, setInternalTickets] = useState<readonly TicketItem[]>(() => tickets)
+  // Resolve initial ticket candidate from provided prop tickets
+  const initialTicket = useMemo(() => {
+    if (initialTicketNum !== null && effectivePropTickets.length > 0) {
+      const match = effectivePropTickets.find((t) => t.ticket_number === initialTicketNum)
+      if (match) return match
+    }
+    return effectivePropTickets[0] ?? null
+  }, [initialTicketNum, effectivePropTickets])
+
+  const [internalTickets, setInternalTickets] = useState<readonly TicketItem[]>(() => effectivePropTickets)
   const [internalTags, setInternalTags] = useState<readonly TicketTag[]>(() => allTags)
   const [internalSelectedTicketId, setInternalSelectedTicketId] = useState<string | null>(
-    () => tickets[0]?.id ?? null
+    () => initialTicket?.id ?? null
   )
-  const [activePreset, setActivePreset] = useState<PresetFilter>('all_open')
+  const [activePreset, setActivePreset] = useState<PresetFilter>(() => {
+    if (initialPreset) return initialPreset
+    if (initialTicket && ['resolved', 'closed'].includes(initialTicket.status)) {
+      return 'resolved_closed'
+    }
+    return 'all_open'
+  })
+  const [filters, setFiltersState] = useState<CompoundFilters>(DEFAULT_COMPOUND_FILTERS)
   const [searchQuery, setSearchQuery] = useState('')
-  const [mobilePane, setMobilePane] = useState<'queue' | 'detail'>('queue')
+  const [mobilePane, setMobilePane] = useState<'queue' | 'detail'>(() => {
+    return initialTicketNum !== null ? 'detail' : 'queue'
+  })
   const searchInputRef = useRef<HTMLInputElement | null>(null)
 
+  // Scoped parameters for live TanStack Query fetching
+  const presetParams = useMemo(() => {
+    const params = new URLSearchParams()
+    const queryMap = getPresetQueryParams(activePreset)
+    for (const [k, v] of Object.entries(queryMap)) {
+      params.set(k, v)
+    }
+    return params.toString()
+  }, [activePreset])
+
+  // TanStack Query: live query to GET /api/tickets with scoped preset parameters
+  const {
+    data: serverTickets,
+    isLoading,
+    isError,
+    isFetching,
+  } = useQuery<readonly TicketItem[]>({
+    queryKey: ['tickets', apiUrl, activePreset, presetParams],
+    queryFn: async () => {
+      const url = `${apiUrl}/api/tickets?${presetParams}`
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+      }
+      if (token) {
+        headers.Authorization = `Bearer ${token}`
+      }
+      const res = await fetch(url, { headers })
+      if (!res.ok) throw new Error('Failed to fetch tickets')
+      const data = await res.json()
+      const backendList: any[] = data.data || data.tickets || []
+      return backendList.map((bt) => ({
+        id: String(bt.id),
+        organization_id: bt.organization_id ?? 1,
+        ticket_number: bt.ticket_number ?? 1001,
+        subject: bt.subject || 'Support Inquiry',
+        status: (bt.status as TicketStatus) || 'new',
+        priority: (bt.priority as TicketPriority) || 'medium',
+        customer: bt.customer || {
+          id: 'cust-unknown',
+          name: 'External Requester',
+          email: 'requester@example.com',
+        },
+        assigned_team_id: bt.assigned_team_id ?? null,
+        assigned_team_name: bt.assigned_team?.name ?? null,
+        assigned_member_id: bt.assigned_member_id ?? null,
+        assigned_member_name: bt.assigned_member?.user?.name ?? null,
+        tags: bt.tags || [],
+        messages: bt.messages || [],
+        assignments: bt.assignments || [],
+        created_at: bt.created_at,
+        updated_at: bt.updated_at,
+      }))
+    },
+    enabled: Boolean(apiUrl),
+    staleTime: 30_000,
+  })
+
   // Adjust internal state during render when external data props change
-  const [prevTickets, setPrevTickets] = useState(tickets)
-  if (tickets !== prevTickets) {
-    setPrevTickets(tickets)
-    setInternalTickets(tickets)
+  const [prevPropTickets, setPrevPropTickets] = useState(propTickets)
+  if (propTickets !== prevPropTickets) {
+    setPrevPropTickets(propTickets)
+    if (propTickets) {
+      setInternalTickets(propTickets)
+    }
   }
 
   const [prevTags, setPrevTags] = useState(allTags)
@@ -149,12 +224,67 @@ function TicketCockpitInternalProvider({
     setInternalTags(allTags)
   }
 
-  const effectiveTickets = internalTickets
+  // Merge server tickets with internal tickets (preserving local modifications by ID)
+  const effectiveTickets = useMemo(() => {
+    if (serverTickets && serverTickets.length > 0) {
+      if (internalTickets.length > 0) {
+        const serverIds = new Set(serverTickets.map((t) => t.id))
+        const preserved = internalTickets.filter((t) => !serverIds.has(t.id))
+        return [...serverTickets, ...preserved]
+      }
+      return serverTickets
+    }
+    return internalTickets
+  }, [serverTickets, internalTickets])
+
   const effectiveTags = internalTags
 
   const selectedTicketId = controlledSelectedTicketId !== undefined
     ? controlledSelectedTicketId
     : internalSelectedTicketId
+
+  // Boot hydration: If booting with initialTicketNum, select targeted ticket when available
+  const [hydratedNum, setHydratedNum] = useState<number | null>(null)
+  if (initialTicketNum !== null && hydratedNum !== initialTicketNum && effectiveTickets.length > 0) {
+    const match = effectiveTickets.find((t) => t.ticket_number === initialTicketNum)
+    if (match) {
+      setHydratedNum(initialTicketNum)
+      if (internalSelectedTicketId !== match.id) {
+        setInternalSelectedTicketId(match.id)
+      }
+      if (['resolved', 'closed'].includes(match.status) && activePreset !== 'resolved_closed') {
+        setActivePreset('resolved_closed')
+      }
+      if (mobilePane !== 'detail') {
+        setMobilePane('detail')
+      }
+    }
+  }
+
+  // HTML5 History popstate synchronization for browser back/forward
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handlePopState = () => {
+      const match = window.location.pathname.match(/\/tickets\/(\d+)/)
+      if (match) {
+        const num = Number(match[1])
+        const target = effectiveTickets.find((t) => t.ticket_number === num)
+        if (target) {
+          setInternalSelectedTicketId(target.id)
+          setMobilePane('detail')
+          if (['resolved', 'closed'].includes(target.status)) {
+            setActivePreset('resolved_closed')
+          }
+        }
+      } else if (window.location.pathname === '/tickets') {
+        setMobilePane('queue')
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [effectiveTickets])
 
   // Calculate counts for each preset
   const presetCounts = useMemo(() => {
@@ -167,10 +297,10 @@ function TicketCockpitInternalProvider({
     }
   }, [effectiveTickets, currentUserId])
 
-  // Filter tickets by preset and search
+  // Filter tickets by preset, compound filter dropdowns, and search query (derived in render)
   const filteredTickets = useMemo(() => {
     return effectiveTickets.filter((ticket) => {
-      // Preset filtering
+      // 1. Preset filtering
       if (activePreset === 'all_open' && !['new', 'open', 'pending'].includes(ticket.status)) {
         return false
       }
@@ -187,7 +317,22 @@ function TicketCockpitInternalProvider({
         return false
       }
 
-      // Search query filter
+      // 2. Compound dropdown filters
+      if (filters.status !== 'all' && ticket.status !== filters.status) {
+        return false
+      }
+      if (filters.priority !== 'all' && ticket.priority !== filters.priority) {
+        return false
+      }
+      if (filters.teamId !== 'all' && ticket.assigned_team_id !== Number(filters.teamId)) {
+        return false
+      }
+      if (filters.tagId !== 'all') {
+        const hasTag = ticket.tags?.some((t) => t.id === Number(filters.tagId))
+        if (!hasTag) return false
+      }
+
+      // 3. Search query filter
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase()
         const matchNumber = ticket.ticket_number.toString().includes(query)
@@ -201,7 +346,7 @@ function TicketCockpitInternalProvider({
 
       return true
     })
-  }, [effectiveTickets, activePreset, currentUserId, searchQuery])
+  }, [effectiveTickets, activePreset, currentUserId, filters, searchQuery])
 
   // Active Ticket
   const activeTicket = useMemo(() => {
@@ -221,12 +366,31 @@ function TicketCockpitInternalProvider({
         }
         onSelectTicket?.(ticketId)
         setMobilePane('detail')
+
+        // Update URL to /tickets/:ticketNumber via HTML5 History without full page reload
+        const targetTicket = effectiveTickets.find((t) => t.id === ticketId)
+        if (targetTicket && typeof window !== 'undefined' && window.history?.pushState) {
+          const targetUrl = `/tickets/${targetTicket.ticket_number}`
+          if (window.location.pathname !== targetUrl) {
+            window.history.pushState(
+              { ticketId, ticketNumber: targetTicket.ticket_number },
+              '',
+              targetUrl
+            )
+          }
+        }
       },
       setActivePreset: (preset: PresetFilter) => {
         setActivePreset(preset)
       },
       setSearchQuery: (query: string) => {
         setSearchQuery(query)
+      },
+      setFilters: (newFilters: Partial<CompoundFilters>) => {
+        setFiltersState((prev) => ({ ...prev, ...newFilters }))
+      },
+      resetFilters: () => {
+        setFiltersState(DEFAULT_COMPOUND_FILTERS)
       },
       setMobilePane: (pane: 'queue' | 'detail') => {
         setMobilePane(pane)
@@ -396,6 +560,7 @@ function TicketCockpitInternalProvider({
     activeTicket,
     activePreset,
     searchQuery,
+    filters,
     presetCounts,
     mobilePane,
     teams,
@@ -403,6 +568,9 @@ function TicketCockpitInternalProvider({
     allTags: effectiveTags,
     currentUserId,
     userRole,
+    isLoading,
+    isError: Boolean(isError),
+    isFetching,
   }), [
     effectiveTickets,
     filteredTickets,
@@ -410,6 +578,7 @@ function TicketCockpitInternalProvider({
     activeTicket,
     activePreset,
     searchQuery,
+    filters,
     presetCounts,
     mobilePane,
     teams,
@@ -417,6 +586,9 @@ function TicketCockpitInternalProvider({
     effectiveTags,
     currentUserId,
     userRole,
+    isLoading,
+    isError,
+    isFetching,
   ])
 
   const meta: TicketCockpitMeta = useMemo(() => ({
@@ -502,6 +674,7 @@ export const TicketCockpitSubRail: React.FC<TicketCockpitSubRailProps> = ({
                   <span className="truncate">{def.label}</span>
                 </div>
                 <span
+                  data-testid={`preset-count-${def.id}`}
                   className={`font-mono tabular-nums text-[11px] px-1.5 py-0.2 rounded ${
                     isActive ? 'bg-[#F59E0B]/20 text-[#F59E0B]' : 'text-text-muted'
                   }`}
@@ -540,7 +713,11 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
         e.key === '/' &&
-        !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        !['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName) &&
+        !(e.target as HTMLElement)?.isContentEditable
       ) {
         e.preventDefault()
         searchInputRef.current?.focus()
@@ -550,6 +727,13 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [searchInputRef])
 
+  const filters = state.filters ?? DEFAULT_COMPOUND_FILTERS
+  const hasActiveFilters =
+    filters.status !== 'all' ||
+    filters.priority !== 'all' ||
+    filters.teamId !== 'all' ||
+    filters.tagId !== 'all'
+
   return (
     <section
       aria-label="Ticket Queue List"
@@ -558,8 +742,8 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
         state.mobilePane === 'detail' ? 'hidden lg:flex' : 'flex'
       } ${className}`}
     >
-      {/* Search Header */}
-      <div className="p-3 border-b border-[#282A33] bg-[#141518]/80 backdrop-blur-sm">
+      {/* Search Header & Compound Filter Bar */}
+      <div className="p-3 border-b border-[#282A33] bg-[#141518]/80 backdrop-blur-sm space-y-2">
         <div className="relative">
           <Search className="w-3.5 h-3.5 text-text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
           <input
@@ -572,13 +756,94 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
             className="w-full h-8 pl-8 pr-3 bg-[#121316] border border-[#282A33] rounded-lg text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B]"
           />
         </div>
+
+        {/* Compound Filter Dropdowns */}
+        <div data-testid="compound-filter-bar" className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 text-[11px]">
+          {/* Status Filter */}
+          <select
+            data-testid="filter-status-select"
+            aria-label="Filter by Status"
+            value={filters.status}
+            onChange={(e) => actions.setFilters?.({ status: e.target.value as TicketStatus | 'all' })}
+            className="h-7 px-1.5 bg-[#121316] border border-[#282A33] rounded text-text-secondary focus:text-text-primary focus:border-[#F59E0B] focus:outline-none text-[11px] font-mono cursor-pointer truncate"
+          >
+            <option value="all">Status: All</option>
+            <option value="new">New</option>
+            <option value="open">Open</option>
+            <option value="pending">Pending</option>
+            <option value="resolved">Resolved</option>
+            <option value="closed">Closed</option>
+          </select>
+
+          {/* Priority Filter */}
+          <select
+            data-testid="filter-priority-select"
+            aria-label="Filter by Priority"
+            value={filters.priority}
+            onChange={(e) => actions.setFilters?.({ priority: e.target.value as TicketPriority | 'all' })}
+            className="h-7 px-1.5 bg-[#121316] border border-[#282A33] rounded text-text-secondary focus:text-text-primary focus:border-[#F59E0B] focus:outline-none text-[11px] font-mono cursor-pointer truncate"
+          >
+            <option value="all">Priority: All</option>
+            <option value="urgent">P0 Urgent</option>
+            <option value="high">P1 High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+
+          {/* Team Filter */}
+          <select
+            data-testid="filter-team-select"
+            aria-label="Filter by Team"
+            value={filters.teamId}
+            onChange={(e) => actions.setFilters?.({ teamId: e.target.value === 'all' ? 'all' : Number(e.target.value) })}
+            className="h-7 px-1.5 bg-[#121316] border border-[#282A33] rounded text-text-secondary focus:text-text-primary focus:border-[#F59E0B] focus:outline-none text-[11px] font-mono cursor-pointer truncate"
+          >
+            <option value="all">Team: All</option>
+            {state.teams.map((team) => (
+              <option key={team.id} value={team.id}>
+                {team.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Tag Filter */}
+          <select
+            data-testid="filter-tag-select"
+            aria-label="Filter by Tag"
+            value={filters.tagId}
+            onChange={(e) => actions.setFilters?.({ tagId: e.target.value === 'all' ? 'all' : Number(e.target.value) })}
+            className="h-7 px-1.5 bg-[#121316] border border-[#282A33] rounded text-text-secondary focus:text-text-primary focus:border-[#F59E0B] focus:outline-none text-[11px] font-mono cursor-pointer truncate"
+          >
+            <option value="all">Tag: All</option>
+            {state.allTags.map((tag) => (
+              <option key={tag.id} value={tag.id}>
+                #{tag.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Clear Filters Indicator */}
+        {hasActiveFilters && (
+          <div className="flex items-center justify-between pt-0.5 text-[10px] text-text-muted font-mono">
+            <span>Filtered queue</span>
+            <button
+              type="button"
+              data-testid="clear-filters-btn"
+              onClick={() => actions.resetFilters?.()}
+              className="text-[#F59E0B] hover:underline cursor-pointer"
+            >
+              Reset filters
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tickets List */}
       <div className="flex-1 overflow-y-auto divide-y divide-[#282A33]">
         {children ?? (
           state.filteredTickets.length === 0 ? (
-            <div className="p-8 text-center text-text-muted text-xs">
+            <div className="p-8 text-center text-text-muted text-xs font-mono">
               No tickets found matching this filter.
             </div>
           ) : (
@@ -591,6 +856,7 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
     </section>
   )
 }
+
 
 export interface TicketCockpitQueueCardProps {
   readonly ticket: TicketItem
