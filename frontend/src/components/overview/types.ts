@@ -79,6 +79,7 @@ export interface WorkspaceOverviewProps {
   readonly tickets?: readonly OverviewTicket[]
   readonly isLoading?: boolean
   readonly onNavigate?: (view: string) => void
+  readonly onViewAllTickets?: () => void
   readonly onInviteMemberClick?: () => void
   readonly onCreateTeamClick?: () => void
   readonly onClaimTicket?: (ticketId: string | number) => Promise<void> | void
