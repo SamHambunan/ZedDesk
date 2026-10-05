@@ -275,18 +275,20 @@ function ComposerInternalProvider({
 export interface ComposerFrameProps {
   readonly children: React.ReactNode
   readonly className?: string
+  readonly 'data-testid'?: string
 }
 
 export const ComposerFrame: React.FC<ComposerFrameProps> = ({
   children,
   className = '',
+  'data-testid': testId = 'ticket-composer',
 }) => {
   const { state } = useComposer()
   const isInternalNote = state.tab === 'internal_note'
 
   return (
     <div
-      data-testid="ticket-composer"
+      data-testid={testId}
       className={`bg-[#141518] border border-[#282A33] rounded-xl shadow-card overflow-hidden transition-all ${
         isInternalNote ? 'ring-1 ring-[#F59E0B]/30' : ''
       } ${className}`}
@@ -513,11 +515,13 @@ export const ComposerStatusSelector: React.FC<ComposerStatusSelectorProps> = ({
 export interface ComposerSubmitProps {
   readonly className?: string
   readonly isInternalNote?: boolean
+  readonly label?: string
 }
 
 export const ComposerSubmit: React.FC<ComposerSubmitProps> = ({
   className = '',
   isInternalNote: explicitInternalNote,
+  label,
 }) => {
   const { state, actions } = useComposer()
   const isInternal = explicitInternalNote ?? (state.tab === 'internal_note')
@@ -538,17 +542,18 @@ export const ComposerSubmit: React.FC<ComposerSubmitProps> = ({
       {isInternal ? (
         <>
           <Lock className="w-3.5 h-3.5" />
-          <span>Save Note</span>
+          <span>{label || 'Save Note'}</span>
         </>
       ) : (
         <>
           <CornerDownLeft className="w-3.5 h-3.5" />
           <span>
-            {state.nextStatus === 'pending'
-              ? 'Send & Pending'
-              : state.nextStatus === 'resolved'
-              ? 'Send & Resolve'
-              : 'Send Reply'}
+            {label ||
+              (state.nextStatus === 'pending'
+                ? 'Send & Pending'
+                : state.nextStatus === 'resolved'
+                ? 'Send & Resolve'
+                : 'Send Reply')}
           </span>
         </>
       )}

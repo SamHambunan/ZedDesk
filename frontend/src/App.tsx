@@ -169,6 +169,9 @@ function AppInner({
   // Auth State (for Workspace Shell)
   const activeSearch = search ?? (typeof window !== 'undefined' ? window.location?.search : '')
   const [token, setToken] = useState<string | null>(() => {
+    if (isPortalRoute) {
+      return null
+    }
     const urlToken = new URLSearchParams(activeSearch).get('token')
     if (urlToken) {
       if (typeof window !== 'undefined') {
@@ -183,16 +186,16 @@ function AppInner({
     return saved ? JSON.parse(saved) : null
   })
 
-  // Clean up ?token= from address bar after ingestion
+  // Clean up ?token= from address bar after ingestion for workspace shell
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || isPortalRoute) return
     const params = new URLSearchParams(window.location.search)
     if (params.has('token')) {
       params.delete('token')
       const newSearch = params.toString() ? `?${params.toString()}` : ''
       window.history.replaceState({}, '', `${window.location.pathname}${newSearch}${window.location.hash}`)
     }
-  }, [])
+  }, [isPortalRoute])
 
   // Workspace Shell State via TanStack Query
   const { data: workspaceData, isLoading: loadingWorkspace } = useWorkspace(isWorkspace ? subdomain : null, token)
@@ -891,7 +894,14 @@ function AppInner({
 
   // --- RENDER CUSTOMER PORTAL ---
   if (isPortalRoute) {
-    return <CustomerPortalView apiUrl={apiUrl} subdomain={subdomain} pathname={activePath} />
+    return (
+      <CustomerPortalView
+        apiUrl={apiUrl}
+        subdomain={subdomain}
+        pathname={activePath}
+        search={activeSearch}
+      />
+    )
   }
 
   // --- RENDER PUBLIC INVITATION ACCEPTANCE SCREEN ---

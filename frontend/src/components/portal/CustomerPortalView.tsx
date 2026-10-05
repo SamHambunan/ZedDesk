@@ -3,13 +3,18 @@ import { CustomerPortalLayout } from './CustomerPortalLayout'
 import { CustomerIntakeForm } from './CustomerIntakeForm'
 import { CustomerTicketConfirmation } from './CustomerTicketConfirmation'
 import { FindMyTicketsModal } from './FindMyTicketsModal'
-import { useSubmitTicketMutation } from '../../hooks/useCustomerPortal'
-import type { CreateTicketPayload } from '../../hooks/useCustomerPortal'
+import { CustomerPortalTicketDetail } from './CustomerPortalTicketDetail'
+import {
+  useSubmitTicketMutation,
+  parsePortalTicketUuidFromPath,
+  type CreateTicketPayload,
+} from '../../hooks/useCustomerPortal'
 
 export interface CustomerPortalViewProps {
   readonly apiUrl: string
   readonly subdomain?: string | null
   readonly pathname?: string
+  readonly search?: string
   readonly organizationName?: string | null
   readonly isLoading?: boolean
 }
@@ -26,15 +31,24 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({
   apiUrl,
   subdomain,
   pathname,
+  search,
   organizationName,
   isLoading = false,
 }) => {
   const [successData, setSuccessData] = useState<TicketSuccessState | null>(null)
   const [historyModalOverride, setHistoryModalOverride] = useState<boolean | null>(null)
 
+  const currentPath =
+    pathname ?? (typeof window !== 'undefined' ? window.location?.pathname : '/portal')
+  const currentSearch =
+    search ?? (typeof window !== 'undefined' ? window.location?.search : '')
+
+  const ticketUuid = parsePortalTicketUuidFromPath(currentPath)
+  const isTicketRoute = Boolean(ticketUuid)
+
   const isHistoryModalOpen =
     historyModalOverride ??
-    (pathname === '/portal/history' ||
+    (currentPath === '/portal/history' ||
       (typeof window !== 'undefined' && window.location.pathname === '/portal/history'))
 
   const submitTicketMutation = useSubmitTicketMutation(apiUrl)
@@ -66,6 +80,40 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({
     }
   }
 
+  // --- RENDER TICKET DETAIL CONVERSATION THREAD ---
+  if (isTicketRoute && ticketUuid) {
+    const urlToken = new URLSearchParams(currentSearch).get('token')
+
+    return (
+      <CustomerPortalLayout
+        subdomain={subdomain}
+        organizationName={organizationName}
+        onOpenHistory={() => setHistoryModalOverride(true)}
+        contentClassName="max-w-3xl"
+      >
+        <CustomerPortalTicketDetail
+          apiUrl={apiUrl}
+          ticketUuid={ticketUuid}
+          initialToken={urlToken}
+          onOpenHistory={() => setHistoryModalOverride(true)}
+          onNewInquiry={() => {
+            if (typeof window !== 'undefined') {
+              window.history.pushState({}, '', '/portal')
+              window.dispatchEvent(new PopStateEvent('popstate'))
+            }
+          }}
+        />
+
+        <FindMyTicketsModal
+          isOpen={isHistoryModalOpen}
+          onClose={handleCloseHistoryModal}
+          apiUrl={apiUrl}
+        />
+      </CustomerPortalLayout>
+    )
+  }
+
+  // --- RENDER INTAKE FORM OR CONFIRMATION SCREEN ---
   return (
     <CustomerPortalLayout
       subdomain={subdomain}

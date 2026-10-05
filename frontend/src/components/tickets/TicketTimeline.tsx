@@ -8,7 +8,7 @@ import {
   User,
   Paperclip,
 } from 'lucide-react'
-import { formatFileSize } from './constants'
+import { formatFileSize, formatRelativeTime } from './constants'
 import type { TicketMessage, TicketAttachment } from './types'
 
 export interface TicketTimelineItemProps {
@@ -21,20 +21,6 @@ export interface TicketTimelineProps {
   readonly messages: readonly TicketMessage[]
   readonly customerName?: string
   readonly className?: string
-}
-
-function formatRelativeTime(isoString: string): string {
-  try {
-    const diffMs = Date.now() - new Date(isoString).getTime()
-    const diffMins = Math.max(1, Math.round(diffMs / (60 * 1000)))
-    if (diffMins < 60) return `${diffMins}m ago`
-    const diffHours = Math.round(diffMins / 60)
-    if (diffHours < 24) return `${diffHours}h ago`
-    const diffDays = Math.round(diffHours / 24)
-    return `${diffDays}d ago`
-  } catch {
-    return 'recently'
-  }
 }
 
 /**
