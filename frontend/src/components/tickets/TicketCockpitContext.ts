@@ -14,7 +14,7 @@ export interface CompoundFilters {
   readonly status: TicketStatus | 'all'
   readonly priority: TicketPriority | 'all'
   readonly teamId: number | 'all'
-  readonly tagId: number | 'all'
+  readonly tagId: number | string | 'all'
 }
 
 export const DEFAULT_COMPOUND_FILTERS: CompoundFilters = {
@@ -51,14 +51,14 @@ export interface TicketCockpitActions {
   readonly setFilters: (filters: Partial<CompoundFilters>) => void
   readonly resetFilters: () => void
   readonly setMobilePane: (pane: 'queue' | 'detail') => void
-  readonly claimTicket: (ticketId: string) => void
-  readonly updateStatus: (ticketId: string, status: TicketStatus) => void
-  readonly updatePriority: (ticketId: string, priority: TicketPriority) => void
-  readonly assign: (ticketId: string, teamId: number | null, memberId: number | null) => void
-  readonly addTag: (ticketId: string, tag: TicketTag) => void
-  readonly removeTag: (ticketId: string, tagId: number) => void
-  readonly deleteTicket: (ticketId: string) => void
-  readonly submitComposer: (ticketId: string, payload: ComposerSubmitPayload) => void
+  readonly claimTicket: (ticketId: string) => Promise<void> | void
+  readonly updateStatus: (ticketId: string, status: TicketStatus) => Promise<void> | void
+  readonly updatePriority: (ticketId: string, priority: TicketPriority) => Promise<void> | void
+  readonly assign: (ticketId: string, teamId: number | null, memberId: number | null) => Promise<void> | void
+  readonly addTag: (ticketId: string, tag: TicketTag) => Promise<void> | void
+  readonly removeTag: (ticketId: string, tagId: number | string) => Promise<void> | void
+  readonly deleteTicket: (ticketId: string) => Promise<void> | void
+  readonly submitComposer: (ticketId: string, payload: ComposerSubmitPayload) => Promise<void> | void
 }
 
 export interface TicketCockpitMeta {

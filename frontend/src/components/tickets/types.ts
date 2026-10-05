@@ -13,7 +13,7 @@ export interface TicketCustomer {
 }
 
 export interface TicketTag {
-  readonly id: number
+  readonly id: number | string
   readonly name: string
   readonly slug: string
   readonly color?: string
@@ -41,7 +41,7 @@ export interface TicketMessage {
 }
 
 export interface TicketAssignmentAudit {
-  readonly id: string
+  readonly id: string | number
   readonly ticket_id: string
   readonly team_id: number | null
   readonly team_name?: string | null
