@@ -6,7 +6,7 @@ import {
   FolderArchive,
   Filter,
 } from 'lucide-react'
-import type { PresetFilter } from './types'
+import type { PresetFilter, TicketMessage } from './types'
 
 export const PRESET_DEFINITIONS: readonly {
   readonly id: PresetFilter
@@ -94,4 +94,24 @@ export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export function normalizeTicketMessage(m: any, defaultTicketId: string): TicketMessage {
+  return {
+    id: String(m.id),
+    ticket_id: String(m.ticket_id || defaultTicketId),
+    message_type: m.message_type,
+    author_type: (m.author_type && m.author_type.includes('Customer')) ? 'Customer' : 'OrganizationMember',
+    author_name: m.author_name || m.author?.user?.name || m.author?.name || ((m.author_type && m.author_type.includes('Customer')) ? 'Customer' : 'Staff'),
+    author_role: m.author_role || m.author?.role || ((m.author_type && m.author_type.includes('Customer')) ? undefined : 'Staff'),
+    body: m.body || '',
+    attachments: (m.attachments || []).map((att: any) => ({
+      id: String(att.id),
+      file_name: att.file_name || att.name || 'attachment',
+      file_size_bytes: att.file_size_bytes ?? att.size ?? 0,
+      mime_type: att.mime_type || 'application/octet-stream',
+      url: att.url || `/api/attachments/${att.id}/download`,
+    })),
+    created_at: m.created_at || new Date().toISOString(),
+  }
 }

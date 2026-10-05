@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, use } from 'react'
-import { useQuery, QueryClientContext, QueryClientProvider } from '@tanstack/react-query'
+import { useQuery, useQueryClient, QueryClientContext, QueryClientProvider } from '@tanstack/react-query'
 import { queryClient as defaultQueryClient } from '../../lib/query-client'
 import {
   Search,
@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import type {
   TicketItem,
+  TicketMessage,
   PresetFilter,
   TicketStatus,
   TicketPriority,
@@ -32,11 +33,25 @@ import {
   getPresetQueryParams,
   parseTicketNumberFromPath,
   matchesPreset,
+  normalizeTicketMessage,
 } from './constants'
 import { INITIAL_MOCK_TICKETS } from './mockData'
 import { TicketTimeline } from './TicketTimeline'
 import { TicketComposer, type ComposerSubmitPayload } from './TicketComposer'
 import { TicketMetadataInspector } from './TicketMetadataInspector'
+
+export function resolveApiEndpoint(baseUrl: string, endpoint: string): string {
+  const cleanBase = baseUrl.replace(/\/+$/, '')
+  const cleanEndpoint = endpoint.replace(/^\/+/, '')
+  const hasApi = cleanBase.endsWith('/api') || cleanEndpoint.startsWith('api/')
+  if (hasApi) {
+    if (cleanBase.endsWith('/api') && cleanEndpoint.startsWith('api/')) {
+      return `${cleanBase}/${cleanEndpoint.slice(4)}`
+    }
+    return `${cleanBase}/${cleanEndpoint}`
+  }
+  return `${cleanBase}/api/${cleanEndpoint}`
+}
 
 export function SafeQueryProvider({ children }: { readonly children: React.ReactNode }) {
   const client = use(QueryClientContext)
@@ -77,12 +92,16 @@ export const TicketCockpitProvider: React.FC<TicketCockpitProviderProps> = (prop
     return <TicketCockpitContext value={props.value}>{props.children}</TicketCockpitContext>
   }
 
-  return (
-    <SafeQueryProvider>
-      <TicketCockpitInternalProvider {...props} />
-    </SafeQueryProvider>
-  )
-}
+    return (
+      <SafeQueryProvider>
+        <TicketCockpitInternalProvider {...props} />
+      </SafeQueryProvider>
+    )
+  }
+
+  const EMPTY_TEAMS: readonly OrgTeamOption[] = []
+const EMPTY_MEMBERS: readonly OrgMemberOption[] = []
+const EMPTY_TAGS: readonly TicketTag[] = []
 
 function TicketCockpitInternalProvider({
   children,
@@ -91,9 +110,9 @@ function TicketCockpitInternalProvider({
   tickets: propTickets,
   selectedTicketId: controlledSelectedTicketId,
   onSelectTicket,
-  teams = [],
-  members = [],
-  allTags = [],
+  teams = EMPTY_TEAMS,
+  members = EMPTY_MEMBERS,
+  allTags = EMPTY_TAGS,
   currentUserId = 2,
   userRole = 'agent',
   initialTicketNumber,
@@ -107,6 +126,10 @@ function TicketCockpitInternalProvider({
   onDeleteTicket,
   onComposerSubmit,
 }: Omit<TicketCockpitProviderProps, 'value'>) {
+  const queryClient = useQueryClient()
+  const configRef = useRef({ apiUrl, token, userRole, onComposerSubmit, queryClient })
+  configRef.current = { apiUrl, token, userRole, onComposerSubmit, queryClient }
+
   // Initial fallback data if no tickets are passed and no API URL is configured
   const effectivePropTickets = propTickets ?? (apiUrl ? [] : INITIAL_MOCK_TICKETS)
 
@@ -166,7 +189,7 @@ function TicketCockpitInternalProvider({
   } = useQuery<readonly TicketItem[]>({
     queryKey: ['tickets', apiUrl, activePreset, presetParams],
     queryFn: async () => {
-      const url = `${apiUrl}/api/tickets?${presetParams}`
+      const url = resolveApiEndpoint(apiUrl ?? '', `tickets?${presetParams}`)
       const headers: Record<string, string> = {
         Accept: 'application/json',
       }
@@ -334,14 +357,71 @@ function TicketCockpitInternalProvider({
     })
   }, [effectiveTickets, activePreset, currentUserId, filters, searchQuery])
 
-  // Active Ticket
+  // Target ticket ID to query full details for (active ticket or explicitly selected ID)
+  const targetTicketId = selectedTicketId ?? (effectiveTickets[0]?.id ?? null)
+
+  const { data: serverTicketDetail } = useQuery({
+    queryKey: ['ticket', targetTicketId],
+    queryFn: async () => {
+      if (!apiUrl || !targetTicketId) return null
+      const url = resolveApiEndpoint(apiUrl, `tickets/${targetTicketId}`)
+      const headers: Record<string, string> = { Accept: 'application/json' }
+      if (token) headers.Authorization = `Bearer ${token}`
+      const res = await fetch(url, { headers })
+      if (!res.ok) throw new Error('Failed to fetch ticket detail')
+      const json = await res.json()
+      const raw = json.data || json.ticket || json
+
+      const normalizedMessages: TicketMessage[] = (raw.messages || json.messages || []).map((m: any) =>
+        normalizeTicketMessage(m, targetTicketId)
+      )
+
+      return {
+        id: String(raw.id),
+        organization_id: raw.organization_id ?? 1,
+        ticket_number: raw.ticket_number ?? 1001,
+        subject: raw.subject || 'Support Ticket',
+        status: (raw.status as TicketStatus) || 'open',
+        priority: (raw.priority as TicketPriority) || 'medium',
+        customer: raw.customer || json.customer || null,
+        assigned_team_id: raw.assigned_team_id ?? null,
+        assigned_team_name: raw.assigned_team?.name ?? raw.assigned_team_name ?? null,
+        assigned_member_id: raw.assigned_member_id ?? null,
+        assigned_member_name: raw.assigned_member?.user?.name ?? raw.assigned_member_name ?? null,
+        tags: raw.tags || json.tags || [],
+        messages: normalizedMessages,
+        assignments: raw.assignments || json.assignments || json.ticket_assignments || [],
+        attachments: raw.attachments || json.attachments || [],
+        created_at: raw.created_at,
+        updated_at: raw.updated_at,
+      } as TicketItem
+    },
+    enabled: Boolean(apiUrl && targetTicketId),
+    staleTime: 10_000,
+  })
+
+  // Active Ticket: derives base ticket from queue, merging live server details if available
   const activeTicket = useMemo(() => {
+    let baseTicket: TicketItem | null = null
     if (selectedTicketId) {
-      const found = effectiveTickets.find((t) => t.id === selectedTicketId)
-      if (found) return found
+      baseTicket = effectiveTickets.find((t) => t.id === selectedTicketId) ?? null
     }
-    return filteredTickets[0] ?? effectiveTickets[0] ?? null
-  }, [effectiveTickets, selectedTicketId, filteredTickets])
+    if (!baseTicket) {
+      baseTicket = filteredTickets[0] ?? effectiveTickets[0] ?? null
+    }
+
+    if (serverTicketDetail && (serverTicketDetail.id === targetTicketId || (baseTicket && serverTicketDetail.id === baseTicket.id))) {
+      return {
+        ...(baseTicket ?? {}),
+        ...serverTicketDetail,
+        messages: serverTicketDetail.messages && serverTicketDetail.messages.length > 0
+          ? serverTicketDetail.messages
+          : baseTicket?.messages ?? [],
+      } as TicketItem
+    }
+
+    return baseTicket
+  }, [effectiveTickets, selectedTicketId, filteredTickets, serverTicketDetail, targetTicketId])
 
   // Stable Actions with functional state updates & ref lookups
   const actions: TicketCockpitActions = useMemo(() => {
@@ -493,16 +573,17 @@ function TicketCockpitInternalProvider({
           return curr
         })
       },
-      submitComposer: (ticketId: string, payload: ComposerSubmitPayload) => {
-        onComposerSubmit?.(ticketId, payload)
+      submitComposer: async (ticketId: string, payload: ComposerSubmitPayload) => {
+        const { apiUrl: cfgApiUrl, token: cfgToken, userRole: cfgUserRole, onComposerSubmit: cfgOnComposerSubmit, queryClient: cfgQueryClient } = configRef.current
+        cfgOnComposerSubmit?.(ticketId, payload)
         const isInternal = payload.messageType === 'internal_note'
-        const newMsg = {
+        const newMsg: TicketMessage = {
           id: `msg-${Date.now()}`,
           ticket_id: ticketId,
           message_type: payload.messageType,
           author_type: 'OrganizationMember' as const,
-          author_name: userRole === 'admin' ? 'Super Admin' : 'Agent Support',
-          author_role: userRole === 'admin' ? 'Lead Administrator' : 'Support Specialist',
+          author_name: cfgUserRole === 'admin' ? 'Super Admin' : 'Agent Support',
+          author_role: cfgUserRole === 'admin' ? 'Lead Administrator' : 'Support Specialist',
           body: payload.body,
           attachments: payload.attachments,
           created_at: 'Just now',
@@ -519,6 +600,46 @@ function TicketCockpitInternalProvider({
             }
           })
         )
+
+        // Dispatch atomic multipart POST /api/tickets/{uuid}/messages if apiUrl configured
+        if (cfgApiUrl) {
+          try {
+            const formData = new FormData()
+            formData.append('message_type', payload.messageType)
+            formData.append('body', payload.body)
+            if (!isInternal && payload.nextStatus) {
+              formData.append('target_status', payload.nextStatus)
+              formData.append('status', payload.nextStatus)
+            }
+            if (payload.files && payload.files.length > 0) {
+              for (const file of payload.files) {
+                formData.append('attachments[]', file)
+              }
+            }
+
+            const headers: Record<string, string> = { Accept: 'application/json' }
+            if (cfgToken) {
+              headers.Authorization = `Bearer ${cfgToken}`
+            }
+
+            const url = resolveApiEndpoint(cfgApiUrl, `tickets/${ticketId}/messages`)
+            const res = await fetch(url, {
+              method: 'POST',
+              headers,
+              body: formData,
+            })
+
+            if (!res.ok) {
+              const err = await res.json().catch(() => null)
+              console.error('Failed to post message to backend:', err)
+            } else {
+              cfgQueryClient.invalidateQueries({ queryKey: ['ticket', ticketId] })
+              cfgQueryClient.invalidateQueries({ queryKey: ['tickets'] })
+            }
+          } catch (err) {
+            console.error('Error submitting ticket message:', err)
+          }
+        }
       },
     }
   }, [
