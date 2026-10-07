@@ -6,6 +6,7 @@ use App\Context\OrganizationContext;
 use App\Enums\TicketMessageType;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
+use App\Events\TicketChanged;
 use App\Events\TicketCreated;
 use App\Events\TicketMessageCreated;
 use App\Exceptions\InvalidTicketTransitionException;
@@ -96,12 +97,20 @@ class Ticket extends Model
             $originalStatus = $ticket->getOriginal('status');
             $originalStatusValue = $originalStatus instanceof TicketStatus ? $originalStatus->value : (string) $originalStatus;
 
-            if ($originalStatusValue === TicketStatus::CLOSED->value) {
+            if ($originalStatusValue === TicketStatus::CLOSED->value
+                && array_keys($ticket->getDirty()) !== ['deleted_at']) {
                 throw new InvalidTicketTransitionException(
                     "Ticket #{$ticket->ticket_number} is closed and immutable. Attribute updates are rejected."
                 );
             }
         });
+
+        static::deleted(function (Ticket $ticket) {
+            if (! $ticket->isForceDeleting()) {
+                TicketChanged::dispatch($ticket, TicketChanged::DELETED);
+            }
+        });
+        static::restored(fn (Ticket $ticket) => TicketChanged::dispatch($ticket, TicketChanged::RESTORED));
     }
 
     /**
@@ -266,7 +275,13 @@ class Ticket extends Model
 
         $resolved = is_string($priority) ? TicketPriority::from($priority) : $priority;
 
+        if ($this->priority === $resolved) {
+            return $this;
+        }
+
         $this->update(['priority' => $resolved]);
+        $this->refresh();
+        TicketChanged::dispatch($this, TicketChanged::PRIORITY_CHANGED);
 
         return $this;
     }
@@ -296,7 +311,12 @@ class Ticket extends Model
             throw new DomainException('Cross-organization tag assignment is rejected.');
         }
 
-        $this->tags()->syncWithoutDetaching([$tagModel->id]);
+        DB::transaction(function () use ($tagModel) {
+            $changes = $this->tags()->syncWithoutDetaching([$tagModel->id]);
+            if ($changes['attached'] !== []) {
+                $this->recordTagChange();
+            }
+        });
 
         return $this;
     }
@@ -317,7 +337,11 @@ class Ticket extends Model
             throw new DomainException('Cross-organization tag detachment is rejected.');
         }
 
-        $this->tags()->detach($tagModel->id);
+        DB::transaction(function () use ($tagModel) {
+            if ($this->tags()->detach($tagModel->id) > 0) {
+                $this->recordTagChange();
+            }
+        });
 
         return $this;
     }
@@ -345,8 +369,20 @@ class Ticket extends Model
             $tagIds[] = $tagModel->id;
         }
 
-        $this->tags()->sync($tagIds);
+        DB::transaction(function () use ($tagIds) {
+            $changes = $this->tags()->sync($tagIds);
+            if ($changes['attached'] !== [] || $changes['detached'] !== [] || $changes['updated'] !== []) {
+                $this->recordTagChange();
+            }
+        });
 
         return $this;
+    }
+
+    private function recordTagChange(): void
+    {
+        DB::table('tickets')->where('id', $this->id)->update(['updated_at' => now()]);
+        $this->refresh();
+        TicketChanged::dispatch($this, TicketChanged::TAGS_CHANGED);
     }
 }

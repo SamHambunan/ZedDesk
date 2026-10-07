@@ -19,6 +19,14 @@ class TicketChanged implements ShouldBroadcast
 
     public const ASSIGNMENT_CHANGED = 'assignment_changed';
 
+    public const PRIORITY_CHANGED = 'priority_changed';
+
+    public const TAGS_CHANGED = 'tags_changed';
+
+    public const DELETED = 'deleted';
+
+    public const RESTORED = 'restored';
+
     public bool $afterCommit = true;
 
     public int $tries = 5;
@@ -37,7 +45,7 @@ class TicketChanged implements ShouldBroadcast
 
     public function __construct(Ticket $ticket, public string $changeType)
     {
-        $current = $ticket->fresh();
+        $current = Ticket::withoutGlobalScopes()->withTrashed()->findOrFail($ticket->id);
         $this->eventId = (string) Str::uuid();
         $this->organizationId = (int) $current->organization_id;
         $this->ticketId = $current->id;
