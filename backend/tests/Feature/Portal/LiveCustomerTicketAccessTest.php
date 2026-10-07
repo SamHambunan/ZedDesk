@@ -157,3 +157,16 @@ test('queued Customer signals target the current generation after a delay', func
     expect($newChannel)->not->toBe($oldChannel);
     expect($newChannel)->toBe('private-customer.ticket.'.$this->ticket->id.'.'.intdiv(now()->timestamp, 300));
 });
+
+test('delayed deletion reaches the Customer channel that was active when access ended', function () {
+    $activeChannel = $this->withHeader('X-Customer-Token', $this->token)
+        ->getJson($this->path.'/live-channel')->assertOk()->json('channel');
+    $this->ticket->delete();
+    $unavailable = Event::dispatched(CustomerTicketChanged::class)[0][0];
+
+    Carbon::setTestNow('2026-10-07 12:06:00 UTC');
+
+    expect((string) $unavailable->broadcastOn()[0])->toBe($activeChannel);
+    expect($unavailable->broadcastAs())->toBe('ticket.unavailable');
+    expect($unavailable->broadcastWith())->toBe([]);
+});

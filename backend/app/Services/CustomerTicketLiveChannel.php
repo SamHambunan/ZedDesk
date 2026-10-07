@@ -8,6 +8,8 @@ use App\Models\Ticket;
 
 class CustomerTicketLiveChannel
 {
+    public function __construct(private OrganizationLiveChannel $organizationChannels) {}
+
     public function tokenMatchesTicket(array $payload, string $ticketId): bool
     {
         return isset($payload['ticket_id']) && $payload['ticket_id'] === $ticketId;
@@ -15,7 +17,7 @@ class CustomerTicketLiveChannel
 
     public function name(string $ticketId): string
     {
-        return 'customer.ticket.'.$ticketId.'.'.$this->generation();
+        return 'customer.ticket.'.$ticketId.'.'.$this->organizationChannels->generation();
     }
 
     public function mayJoin(Customer $customer, string $ticketId, string $generation): bool
@@ -24,17 +26,12 @@ class CustomerTicketLiveChannel
 
         return $organization !== null
             && (int) $organization->id === (int) $customer->organization_id
-            && $generation === $this->generation()
+            && $generation === $this->organizationChannels->generation()
             && Ticket::withoutGlobalScopes()
                 ->whereKey($ticketId)
                 ->where('organization_id', $organization->id)
                 ->where('customer_id', $customer->id)
                 ->whereNull('deleted_at')
                 ->exists();
-    }
-
-    public function generation(): string
-    {
-        return (string) intdiv(now()->timestamp, 300);
     }
 }

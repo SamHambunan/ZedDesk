@@ -38,6 +38,8 @@ class CustomerTicketChanged implements ShouldBroadcast
 
     public int $revision;
 
+    public ?string $deletionChannel = null;
+
     public function __construct(Ticket $ticket, public string $changeType)
     {
         $current = Ticket::withoutGlobalScopes()->withTrashed()->findOrFail($ticket->id);
@@ -46,6 +48,10 @@ class CustomerTicketChanged implements ShouldBroadcast
         $this->organizationId = (int) $current->organization_id;
         $this->customerId = (string) $current->customer_id;
         $this->revision = (int) $current->revision;
+        if ($changeType === self::DELETED) {
+            // This contains no Ticket data. Preserve the channel that held live subscribers at deletion.
+            $this->deletionChannel = app(CustomerTicketLiveChannel::class)->name($this->ticketId);
+        }
     }
 
     public function broadcastOn(): array
@@ -58,7 +64,7 @@ class CustomerTicketChanged implements ShouldBroadcast
             return [];
         }
 
-        return [new PrivateChannel(app(CustomerTicketLiveChannel::class)->name($this->ticketId))];
+        return [new PrivateChannel($this->deletionChannel ?? app(CustomerTicketLiveChannel::class)->name($this->ticketId))];
     }
 
     public function broadcastAs(): string
