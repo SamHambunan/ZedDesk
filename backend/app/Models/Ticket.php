@@ -50,6 +50,7 @@ class Ticket extends Model
     protected $attributes = [
         'status' => 'new',
         'priority' => 'medium',
+        'revision' => 1,
     ];
 
     /**
@@ -61,6 +62,7 @@ class Ticket extends Model
     {
         return [
             'ticket_number' => 'integer',
+            'revision' => 'integer',
             'status' => TicketStatus::class,
             'priority' => TicketPriority::class,
             'first_replied_at' => 'datetime',
