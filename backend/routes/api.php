@@ -1,5 +1,6 @@
 <?php
 
+use App\Context\OrganizationContext;
 use App\Http\Controllers\Api\AttachmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerPortalController;
@@ -11,6 +12,9 @@ use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\TicketPriorityController;
 use App\Http\Controllers\Api\WorkspaceController;
+use App\Services\OrganizationLiveChannel;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
@@ -54,6 +58,9 @@ Route::get('/invitations/{token}', [InvitationController::class, 'show']);
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept']);
 
 Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(function () {
+    Route::get('/live/organization-channel', function (OrganizationLiveChannel $channels) {
+        return response()->json(['channel' => 'private-'.$channels->name(OrganizationContext::getCurrentId())]);
+    });
     Route::get('/workspace', [WorkspaceController::class, 'show']);
     Route::get('/invitations', [InvitationController::class, 'index']);
     Route::post('/invitations', [InvitationController::class, 'store']);
@@ -88,6 +95,10 @@ Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(functio
     Route::get('/attachments/{id}/download', [AttachmentController::class, 'download']);
     Route::post('/tickets/{ticket}/messages/{message}/attachments', [AttachmentController::class, 'upload']);
 });
+
+Route::post('/broadcasting/auth', function (Request $request) {
+    return Broadcast::auth($request);
+})->middleware('auth:sanctum');
 
 Route::prefix('portal')->group(function () {
     Route::post('/tickets', [CustomerPortalController::class, 'store']);

@@ -260,6 +260,7 @@ class TicketController extends Controller
         $ticketData = [
             'id' => $ticket->id,
             'ticket_number' => $ticket->ticket_number,
+            'revision' => $ticket->revision,
             'subject' => $ticket->subject,
             'status' => $ticket->status instanceof TicketStatus ? $ticket->status->value : $ticket->status,
             'priority' => $ticket->priority instanceof TicketPriority ? $ticket->priority->value : $ticket->priority,
@@ -285,6 +286,7 @@ class TicketController extends Controller
             'ticket' => [
                 'id' => $ticket->id,
                 'ticket_number' => $ticket->ticket_number,
+                'revision' => $ticket->revision,
                 'subject' => $ticket->subject,
                 'status' => $ticket->status instanceof TicketStatus ? $ticket->status->value : $ticket->status,
                 'priority' => $ticket->priority instanceof TicketPriority ? $ticket->priority->value : $ticket->priority,

@@ -1,3 +1,26 @@
+x-backend-environment: &backend-environment
+  APP_ENV: local
+  APP_KEY: base64:49Dxr4bsMuVoxE7lt/tD/xsd3iCz1DhiZSsBHkZXjiM=
+  DB_CONNECTION: pgsql
+  DB_HOST: postgres
+  DB_PORT: 5432
+  DB_DATABASE: zeddesk
+  DB_USERNAME: zeddesk
+  DB_PASSWORD: zeddesk_secret
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  CACHE_STORE: redis
+  SESSION_DRIVER: redis
+  QUEUE_CONNECTION: redis
+  BROADCAST_CONNECTION: reverb
+  REVERB_APP_ID: ${REVERB_APP_ID:-zeddesk-local}
+  REVERB_APP_KEY: ${REVERB_APP_KEY:-zeddesk-local-key}
+  REVERB_APP_SECRET: ${REVERB_APP_SECRET:-zeddesk-local-secret}
+  REVERB_HOST: reverb
+  REVERB_PORT: 8080
+  REVERB_SCHEME: http
+  REVERB_ALLOWED_ORIGINS: ${REVERB_ALLOWED_ORIGINS:-localhost,*.localhost}
+
 services:
   nginx:
     image: nginx:alpine
@@ -10,10 +33,12 @@ services:
       - ./infrastructure/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - backend
+      - reverb
     networks:
       - zeddesk-network
 
   backend:
+    image: zeddesk-backend
     build:
       context: .
       dockerfile: infrastructure/docker/php/Dockerfile
@@ -22,25 +47,48 @@ services:
     volumes:
       - ./backend:/var/www/backend
       - backend_vendor:/var/www/backend/vendor
-    environment:
-      APP_ENV: local
-      APP_KEY: base64:49Dxr4bsMuVoxE7lt/tD/xsd3iCz1DhiZSsBHkZXjiM=
-      DB_CONNECTION: pgsql
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_DATABASE: zeddesk
-      DB_USERNAME: zeddesk
-      DB_PASSWORD: zeddesk_secret
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      CACHE_STORE: redis
-      SESSION_DRIVER: redis
-      QUEUE_CONNECTION: redis
+    environment: *backend-environment
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - zeddesk-network
+
+  reverb:
+    image: zeddesk-backend
+    container_name: zeddesk_reverb
+    restart: unless-stopped
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    volumes:
+      - ./backend:/var/www/backend
+      - backend_vendor:/var/www/backend/vendor
+    environment: *backend-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - zeddesk-network
+
+  broadcast-worker:
+    image: zeddesk-backend
+    container_name: zeddesk_broadcast_worker
+    restart: unless-stopped
+    command: php artisan queue:work redis --queue=broadcasts --sleep=1 --tries=5 --backoff=3
+    volumes:
+      - ./backend:/var/www/backend
+      - backend_vendor:/var/www/backend/vendor
+    environment: *backend-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      reverb:
+        condition: service_started
     networks:
       - zeddesk-network
 
