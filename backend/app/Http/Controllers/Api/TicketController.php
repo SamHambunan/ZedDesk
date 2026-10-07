@@ -378,7 +378,7 @@ class TicketController extends Controller
                     }
                 }
 
-                $freshTicket = $ticket->fresh();
+                $freshTicket = $ticket->recordConversationChange();
 
                 TicketMessageCreated::dispatch($message, $freshTicket);
 

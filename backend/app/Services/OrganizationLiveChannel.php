@@ -26,7 +26,7 @@ class OrganizationLiveChannel
                 ->exists();
     }
 
-    private function generation(): string
+    public function generation(): string
     {
         return (string) intdiv(now()->timestamp, 300);
     }

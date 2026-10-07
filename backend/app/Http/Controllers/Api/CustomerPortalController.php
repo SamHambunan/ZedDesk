@@ -7,6 +7,7 @@ use App\Context\OrganizationContext;
 use App\Enums\TicketMessageType;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
+use App\Events\TicketMessageCreated;
 use App\Exceptions\InvalidAttachmentException;
 use App\Exceptions\InvalidTicketTransitionException;
 use App\Http\Controllers\Controller;
@@ -258,7 +259,8 @@ class CustomerPortalController extends Controller
                     }
                 }
 
-                $ticketModel->refresh();
+                $ticketModel->recordConversationChange();
+                TicketMessageCreated::dispatch($message, $ticketModel);
 
                 return response()->json([
                     'message' => 'Reply submitted successfully.',

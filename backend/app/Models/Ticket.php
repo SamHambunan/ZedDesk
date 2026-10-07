@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class Ticket extends Model
 {
@@ -142,6 +143,14 @@ class Ticket extends Model
     public function canReply(): bool
     {
         return ! $this->isClosed();
+    }
+
+    /** Advance the revision for a committed conversation change. */
+    public function recordConversationChange(): self
+    {
+        DB::table('tickets')->where('id', $this->id)->update(['updated_at' => now()]);
+
+        return $this->refresh();
     }
 
     /**
