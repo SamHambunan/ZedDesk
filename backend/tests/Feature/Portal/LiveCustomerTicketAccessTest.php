@@ -2,6 +2,9 @@
 
 use App\Context\OrganizationContext;
 use App\Events\CustomerTicketChanged;
+use App\Events\TicketChanged;
+use App\Events\TicketCreated;
+use App\Events\TicketMessageCreated;
 use App\Models\Customer;
 use App\Models\Organization;
 use App\Models\OrganizationMember;
@@ -17,6 +20,12 @@ use Laravel\Sanctum\Sanctum;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Event::fake([
+        CustomerTicketChanged::class,
+        TicketChanged::class,
+        TicketCreated::class,
+        TicketMessageCreated::class,
+    ]);
     config([
         'broadcasting.default' => 'reverb',
         'broadcasting.connections.reverb.key' => 'test-key',
@@ -38,7 +47,6 @@ beforeEach(function () {
     ]);
     $this->token = app(CustomerTokenService::class)->generateToken($this->customer, $this->ticket);
     $this->path = "http://acme.localhost/api/portal/tickets/{$this->ticket->id}";
-    Event::fake([CustomerTicketChanged::class]);
 });
 
 afterEach(function () {
