@@ -9,6 +9,7 @@ use App\Models\Team;
 use App\Models\Ticket;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Event;
 use Laravel\Sanctum\Sanctum;
 
@@ -42,6 +43,13 @@ beforeEach(function () {
 
 afterEach(fn () => OrganizationContext::clear());
 
+function ticketStatusAssignmentSignals(int $expectedCount): Collection
+{
+    Event::assertDispatchedTimes(TicketChanged::class, $expectedCount);
+
+    return Event::dispatched(TicketChanged::class)->map(fn ($dispatch) => $dispatch[0]->broadcastWith());
+}
+
 test('direct Ticket Status change signals Organization and Ticket channels with current revision', function () {
     $url = "http://acme.localhost/api/tickets/{$this->ticket->id}";
 
@@ -69,8 +77,7 @@ test('claim advances Ticket Status and Assignment together and REST exposes both
 
     $this->postJson($url.'/claim')->assertOk();
 
-    Event::assertDispatchedTimes(TicketChanged::class, 2);
-    $signals = Event::dispatched(TicketChanged::class)->map(fn ($dispatch) => $dispatch[0]->broadcastWith());
+    $signals = ticketStatusAssignmentSignals(2);
     expect($signals->pluck('change_type')->all())->toBe(['status_changed', 'assignment_changed']);
     expect($signals->pluck('revision')->all())->toBe([2, 2]);
 
@@ -95,8 +102,7 @@ test('assignment change and unassignment each advance revision and emit a signal
         'member_id' => null,
     ])->assertOk();
 
-    Event::assertDispatchedTimes(TicketChanged::class, 2);
-    $signals = Event::dispatched(TicketChanged::class)->map(fn ($dispatch) => $dispatch[0]->broadcastWith());
+    $signals = ticketStatusAssignmentSignals(2);
     expect($signals->pluck('change_type')->all())->toBe(['assignment_changed', 'assignment_changed'])
         ->and($signals->pluck('revision')->all())->toBe([2, 3]);
     $this->getJson($url)->assertOk()
