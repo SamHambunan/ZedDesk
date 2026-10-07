@@ -2,6 +2,7 @@ import React from 'react'
 import type {
   TicketItem,
   TicketCustomer,
+  PresetFilter,
 } from './types'
 import {
   MOCK_TEAMS,
@@ -19,6 +20,7 @@ export interface TicketQueueViewProps {
   readonly currentUserId?: number
   readonly tickets?: readonly TicketItem[]
   readonly initialTicketNumber?: number | string
+  readonly initialPreset?: PresetFilter
 }
 
 export const TicketQueueView: React.FC<TicketQueueViewProps> = ({
@@ -28,6 +30,7 @@ export const TicketQueueView: React.FC<TicketQueueViewProps> = ({
   currentUserId = 2,
   tickets,
   initialTicketNumber,
+  initialPreset,
 }) => {
   return (
     <div
@@ -44,6 +47,7 @@ export const TicketQueueView: React.FC<TicketQueueViewProps> = ({
         currentUserId={currentUserId}
         userRole={userRole}
         initialTicketNumber={initialTicketNumber}
+        initialPreset={initialPreset}
       >
         <TicketCockpit.Frame>
           <TicketCockpit.SubRail />

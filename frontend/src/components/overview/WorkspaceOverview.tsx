@@ -52,6 +52,9 @@ const WorkspaceOverviewInner: React.FC<WorkspaceOverviewProps> = (props) => {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
 
+  // Optimistic tracking for claimed tickets to immediately decrement unassigned counters
+  const [claimedTicketIds, setClaimedTicketIds] = useState<readonly string[]>([])
+
   const getRequestConfig = () => {
     return effectiveToken ? { headers: { Authorization: `Bearer ${effectiveToken}` } } : {}
   }
@@ -159,8 +162,9 @@ const WorkspaceOverviewInner: React.FC<WorkspaceOverviewProps> = (props) => {
       const res = await apiClient.post(buildUrl(`/api/tickets/${ticketId}/claim`), {}, getRequestConfig())
       return res.data
     },
-    onSuccess: (_, ticketId) => {
-      setToastMessage(`Ticket #${ticketId} claimed and routed to your queue.`)
+    onSuccess: (data, ticketId) => {
+      const ticketNum = data?.data?.ticket_number ?? ticketId
+      setToastMessage(`Ticket #${ticketNum} claimed and routed to your queue.`)
       queryClient.invalidateQueries({ queryKey: ['tickets'] })
     },
   })
@@ -180,7 +184,24 @@ const WorkspaceOverviewInner: React.FC<WorkspaceOverviewProps> = (props) => {
   const effectiveTeams: readonly OverviewTeam[] = props.teams ?? fetchedTeams
   const effectiveMembers = props.members ?? fetchedMembers
   const effectiveInvitations: readonly OverviewInvitation[] = props.invitations ?? fetchedInvitations
-  const effectiveTickets: readonly OverviewTicket[] = props.tickets ?? fetchedTickets
+  const effectiveRawTickets: readonly OverviewTicket[] = props.tickets ?? fetchedTickets
+
+  const effectiveTickets: readonly OverviewTicket[] = useMemo(() => {
+    if (claimedTicketIds.length === 0) return effectiveRawTickets
+    const claimedSet = new Set(claimedTicketIds)
+    return effectiveRawTickets.map((t) => {
+      const isClaimed =
+        claimedSet.has(String(t.id)) ||
+        (t.ticket_number !== undefined && claimedSet.has(String(t.ticket_number)))
+      if (isClaimed) {
+        return {
+          ...t,
+          assigned_member_id: shellContext?.user?.id ?? 1,
+        }
+      }
+      return t
+    })
+  }, [effectiveRawTickets, claimedTicketIds, shellContext?.user?.id])
 
   // Derived Agents for On-Duty Shift Roster if not explicitly passed
   const effectiveAgents: readonly OverviewAgent[] = useMemo(() => {
@@ -274,12 +295,24 @@ const WorkspaceOverviewInner: React.FC<WorkspaceOverviewProps> = (props) => {
 
   // Handle Claim Ticket
   const handleClaimTicket = async (ticketId: string | number) => {
+    const idStr = String(ticketId)
+    const ticket = effectiveRawTickets.find(
+      (t) => String(t.id) === idStr || (t.ticket_number !== undefined && String(t.ticket_number) === idStr)
+    )
+    const ticketNum = ticket?.ticket_number ?? ticketId
+    const claimKey = ticket?.id ? String(ticket.id) : idStr
+
     if (props.onClaimTicket) {
       await props.onClaimTicket(ticketId)
+      setClaimedTicketIds((prev) => (prev.includes(claimKey) ? prev : [...prev, claimKey]))
+      handleNavigate(`tickets/${ticketNum}`)
       return
     }
     try {
-      await claimTicketMutation.mutateAsync(ticketId)
+      const res = await claimTicketMutation.mutateAsync(ticketId)
+      setClaimedTicketIds((prev) => (prev.includes(claimKey) ? prev : [...prev, claimKey]))
+      const finalTicketNum = res?.data?.ticket_number ?? ticketNum
+      handleNavigate(`tickets/${finalTicketNum}`)
     } catch {
       // Silently handled
     }
@@ -339,7 +372,7 @@ const WorkspaceOverviewInner: React.FC<WorkspaceOverviewProps> = (props) => {
           <TriageQueueBridge
             tickets={effectiveTickets}
             onClaimTicket={handleClaimTicket}
-            onViewAllTickets={() => handleNavigate('tickets')}
+            onViewAllTickets={() => handleNavigate('tickets?preset=unassigned')}
           />
         </section>
 

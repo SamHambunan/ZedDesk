@@ -3,11 +3,13 @@ import { QueryClientContext, QueryClientProvider } from '@tanstack/react-query'
 import { queryClient as defaultQueryClient } from './lib/query-client'
 import { CentralHubView } from './components/hub'
 import { WorkspaceShell, type WorkspaceShellUser } from './components/workspace'
+import { WorkspaceOverview } from './components/overview/WorkspaceOverview'
 import { TeamsView, TeamManagementView } from './components/teams'
 import { MembersView } from './components/members'
 import { PublicInvitationView } from './components/invitations'
 import { CustomerPortalView } from './components/portal'
 import { TicketQueueView } from './components/tickets/TicketQueueView'
+import type { PresetFilter } from './components/tickets/types'
 import { parseTicketNumberFromPath } from './components/tickets/constants'
 import { useWorkspace } from './hooks/useWorkspace'
 import { getApiBaseUrl, getCentralHubUrl, getOrganizationUrl, getSubdomain } from './utils/url'
@@ -68,6 +70,7 @@ interface TeamItem {
 }
 
 const ROUTE_VIEW_MAP: Record<string, 'overview' | 'invitations' | 'members' | 'teams' | 'team-management' | 'tickets'> = {
+  '/overview': 'overview',
   '/members': 'members',
   '/invitations': 'invitations',
   '/teams': 'teams',
@@ -111,6 +114,8 @@ function AppInner({
   // Tickets Route Check: /tickets or /tickets/:ticketNumber
   const isTicketsRoute = activePath === '/tickets' || activePath.startsWith('/tickets/')
   const initialTicketNumber = parseTicketNumberFromPath(activePath) ?? undefined
+  const activeSearch = search ?? (typeof window !== 'undefined' ? window.location?.search : '')
+  const initialPreset = (new URLSearchParams(activeSearch).get('preset') as PresetFilter | null) ?? undefined
 
   // Public Invitation State
   const [publicInvitation, setPublicInvitation] = useState<PublicInvitation | null>(null)
@@ -131,6 +136,8 @@ function AppInner({
       return ROUTE_VIEW_MAP[activePath] ?? 'overview'
     }
   )
+  const [activeTicketNumber, setActiveTicketNumber] = useState<number | string | undefined>(() => initialTicketNumber)
+  const [activePreset, setActivePreset] = useState<PresetFilter | undefined>(() => initialPreset)
   const [workspaceInvitations, setWorkspaceInvitations] = useState<InvitationItem[]>([])
   const [loadingWorkspaceInvitations, setLoadingWorkspaceInvitations] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
@@ -167,7 +174,6 @@ function AppInner({
   const [teamActionError, setTeamActionError] = useState<{ [teamId: number]: string | null }>({})
 
   // Auth State (for Workspace Shell)
-  const activeSearch = search ?? (typeof window !== 'undefined' ? window.location?.search : '')
   const [token, setToken] = useState<string | null>(() => {
     if (isPortalRoute) {
       return null
@@ -892,6 +898,72 @@ function AppInner({
     localStorage.removeItem('zeddesk_user')
   }
 
+  const handleWorkspaceNavigate = (view: string) => {
+    const [pathPart, queryPart] = view.split('?')
+    const cleanPath = pathPart.startsWith('/') ? pathPart.slice(1) : pathPart
+    const segments = cleanPath.split('/')
+    const baseSection = segments[0]
+    let targetPath = `/${cleanPath}`
+
+    if (baseSection === 'overview' || baseSection === '') {
+      setWorkspaceView('overview')
+      setActiveTicketNumber(undefined)
+      setActivePreset(undefined)
+      targetPath = '/overview'
+    } else if (baseSection === 'tickets') {
+      setWorkspaceView('tickets')
+      const ticketNum = segments[1] ? Number(segments[1]) : undefined
+      setActiveTicketNumber(ticketNum && !isNaN(ticketNum) ? ticketNum : undefined)
+
+      const urlPreset = queryPart ? (new URLSearchParams(queryPart).get('preset') as PresetFilter | null) : null
+      setActivePreset(urlPreset ?? undefined)
+    } else if (
+      baseSection === 'invitations' ||
+      baseSection === 'members' ||
+      baseSection === 'teams' ||
+      baseSection === 'team-management'
+    ) {
+      setWorkspaceView(baseSection as any)
+      setActiveTicketNumber(undefined)
+      setActivePreset(undefined)
+    }
+
+    if (typeof window !== 'undefined') {
+      const targetUrl = `${targetPath}${queryPart ? `?${queryPart}` : ''}`
+      if (window.location.pathname + window.location.search !== targetUrl) {
+        window.history.pushState({}, '', targetUrl)
+      }
+    }
+  }
+
+  // HTML5 popstate history synchronization
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handlePopState = () => {
+      const currentPath = window.location.pathname
+      const currentSearch = window.location.search
+
+      if (currentPath === '/tickets' || currentPath.startsWith('/tickets/')) {
+        setWorkspaceView('tickets')
+        setActiveTicketNumber(parseTicketNumberFromPath(currentPath) ?? undefined)
+        const p = (new URLSearchParams(currentSearch).get('preset') as PresetFilter | null) ?? undefined
+        setActivePreset(p)
+      } else if (currentPath === '/overview' || currentPath === '/') {
+        setWorkspaceView('overview')
+        setActiveTicketNumber(undefined)
+        setActivePreset(undefined)
+      } else if (ROUTE_VIEW_MAP[currentPath]) {
+        setWorkspaceView(ROUTE_VIEW_MAP[currentPath])
+        setActiveTicketNumber(undefined)
+        setActivePreset(undefined)
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
   // --- RENDER CUSTOMER PORTAL ---
   if (isPortalRoute) {
     return (
@@ -934,24 +1006,21 @@ function AppInner({
         subdomain={subdomain!}
         token={token}
         activeView={workspaceView}
-        onNavigate={(view) => {
-          if (
-            view === 'overview' ||
-            view === 'invitations' ||
-            view === 'members' ||
-            view === 'teams' ||
-            view === 'team-management' ||
-            view === 'tickets'
-          ) {
-            setWorkspaceView(view)
-            if (view === 'tickets' && typeof window !== 'undefined' && !window.location.pathname.startsWith('/tickets')) {
-              window.history.pushState({}, '', '/tickets')
-            }
-          }
-        }}
+        onNavigate={handleWorkspaceNavigate}
         onLogout={handleLogout}
         onAuthSuccess={persistSession}
       >
+        {!loadingWorkspace && workspaceData && workspaceView === 'overview' ? (
+          <WorkspaceOverview
+            organization={workspaceData.organization}
+            subdomain={subdomain!}
+            role={workspaceData.role as 'admin' | 'agent'}
+            token={token ?? undefined}
+            apiUrl={apiUrl}
+            onNavigate={handleWorkspaceNavigate}
+          />
+        ) : null}
+
         {(workspaceView === 'invitations' || workspaceView === 'members') && (
           <MembersView
             members={rosterMembers}
@@ -1053,7 +1122,8 @@ function AppInner({
                 token={token}
                 userRole={workspaceData.role as 'admin' | 'agent'}
                 currentUserId={user?.id}
-                initialTicketNumber={initialTicketNumber}
+                initialTicketNumber={activeTicketNumber}
+                initialPreset={activePreset}
               />
             )}
 

@@ -237,11 +237,15 @@ describe('WorkspaceOverview Console', () => {
         expect(handleClaim).toHaveBeenCalledWith('t-101')
       })
 
-      // Direct link to /tickets
+      // Immediate optimistic unassigned counter decrement and direct route to claimed ticket
+      expect(screen.getByTestId('counter-unassigned')).toHaveTextContent('2')
+      expect(handleNavigate).toHaveBeenCalledWith('tickets/101')
+
+      // Direct link to /tickets with unassigned preset pre-selected
       const viewAllLink = screen.getByTestId('view-all-tickets-link')
       expect(viewAllLink).toBeInTheDocument()
       fireEvent.click(viewAllLink)
-      expect(handleNavigate).toHaveBeenCalledWith('tickets')
+      expect(handleNavigate).toHaveBeenCalledWith('tickets?preset=unassigned')
     })
   })
 

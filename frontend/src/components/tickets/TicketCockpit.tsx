@@ -173,6 +173,15 @@ function TicketCockpitInternalProvider({
     }
     return 'all_open'
   })
+
+  // Adjust activePreset during render when initialPreset prop changes
+  const [prevInitialPreset, setPrevInitialPreset] = useState(initialPreset)
+  if (initialPreset && initialPreset !== prevInitialPreset) {
+    setPrevInitialPreset(initialPreset)
+    if (activePreset !== initialPreset) {
+      setActivePreset(initialPreset)
+    }
+  }
   const [filters, setFiltersState] = useState<CompoundFilters>(DEFAULT_COMPOUND_FILTERS)
   const [searchQuery, setSearchQuery] = useState('')
   const [mobilePane, setMobilePane] = useState<'queue' | 'detail'>(() => {
@@ -304,12 +313,12 @@ function TicketCockpitInternalProvider({
     ? controlledSelectedTicketId
     : internalSelectedTicketId
 
-  // Boot hydration: If booting with initialTicketNum, select targeted ticket when available
-  const [hydratedNum, setHydratedNum] = useState<number | null>(null)
-  if (initialTicketNum !== null && hydratedNum !== initialTicketNum && effectiveTickets.length > 0) {
+  // Target ticket synchronization: When initialTicketNum updates or tickets hydrate, select targeted ticket
+  const [syncedTicketNum, setSyncedTicketNum] = useState<number | null>(null)
+  if (initialTicketNum !== null && syncedTicketNum !== initialTicketNum && effectiveTickets.length > 0) {
     const match = effectiveTickets.find((t) => t.ticket_number === initialTicketNum)
     if (match) {
-      setHydratedNum(initialTicketNum)
+      setSyncedTicketNum(initialTicketNum)
       if (internalSelectedTicketId !== match.id) {
         setInternalSelectedTicketId(match.id)
       }
