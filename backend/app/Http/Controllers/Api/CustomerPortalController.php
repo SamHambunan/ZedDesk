@@ -258,7 +258,7 @@ class CustomerPortalController extends Controller
                     }
                 }
 
-                $ticketModel->refresh();
+                $ticketModel->recordConversationChange($message);
 
                 return response()->json([
                     'message' => 'Reply submitted successfully.',

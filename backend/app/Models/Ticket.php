@@ -7,6 +7,7 @@ use App\Enums\TicketMessageType;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Events\TicketCreated;
+use App\Events\TicketMessageCreated;
 use App\Exceptions\InvalidTicketTransitionException;
 use App\Services\TicketNumberGenerator;
 use App\Traits\BelongsToOrganization;
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class Ticket extends Model
 {
@@ -142,6 +144,16 @@ class Ticket extends Model
     public function canReply(): bool
     {
         return ! $this->isClosed();
+    }
+
+    /** Advance the revision and signal a successful conversation change. */
+    public function recordConversationChange(TicketMessage $message): self
+    {
+        DB::table('tickets')->where('id', $this->id)->update(['updated_at' => now()]);
+        $this->refresh();
+        TicketMessageCreated::dispatch($message, $this);
+
+        return $this;
     }
 
     /**

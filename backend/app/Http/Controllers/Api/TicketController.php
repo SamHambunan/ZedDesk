@@ -6,7 +6,6 @@ use App\Context\OrganizationContext;
 use App\Enums\TicketMessageType;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
-use App\Events\TicketMessageCreated;
 use App\Exceptions\InvalidAssignmentException;
 use App\Exceptions\InvalidAttachmentException;
 use App\Exceptions\InvalidTicketTransitionException;
@@ -378,9 +377,7 @@ class TicketController extends Controller
                     }
                 }
 
-                $freshTicket = $ticket->fresh();
-
-                TicketMessageCreated::dispatch($message, $freshTicket);
+                $freshTicket = $ticket->recordConversationChange($message);
 
                 return response()->json([
                     'message' => 'Ticket message created successfully.',

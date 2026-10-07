@@ -12,10 +12,13 @@ use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\TicketPriorityController;
 use App\Http\Controllers\Api\WorkspaceController;
+use App\Models\Ticket;
 use App\Services\OrganizationLiveChannel;
+use App\Services\TicketLiveChannel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
 
@@ -78,6 +81,12 @@ Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(functio
 
     Route::get('/tickets', [TicketController::class, 'index']);
     Route::get('/tickets/{ticket}', [TicketController::class, 'show']);
+    Route::get('/tickets/{ticket}/live-channel', function (string $ticket, TicketLiveChannel $channels) {
+        $ticketModel = Ticket::findOrFail($ticket);
+        Gate::authorize('view', $ticketModel);
+
+        return response()->json(['channel' => 'private-'.$channels->name($ticketModel->id)]);
+    });
     Route::post('/tickets/{ticket}/messages', [TicketController::class, 'storeMessage']);
     Route::post('/tickets/{ticket}/assign', [TicketController::class, 'assign']);
     Route::post('/tickets/{ticket}/claim', [TicketController::class, 'claim']);
