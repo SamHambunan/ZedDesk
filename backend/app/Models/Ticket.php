@@ -6,6 +6,7 @@ use App\Context\OrganizationContext;
 use App\Enums\TicketMessageType;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
+use App\Events\CustomerTicketChanged;
 use App\Events\TicketChanged;
 use App\Events\TicketCreated;
 use App\Events\TicketMessageCreated;
@@ -108,6 +109,7 @@ class Ticket extends Model
         static::deleted(function (Ticket $ticket) {
             if (! $ticket->isForceDeleting()) {
                 TicketChanged::dispatch($ticket, TicketChanged::DELETED);
+                CustomerTicketChanged::dispatch($ticket, CustomerTicketChanged::DELETED);
             }
         });
         static::restored(fn (Ticket $ticket) => TicketChanged::dispatch($ticket, TicketChanged::RESTORED));
@@ -161,6 +163,9 @@ class Ticket extends Model
         DB::table('tickets')->where('id', $this->id)->update(['updated_at' => now()]);
         $this->refresh();
         TicketMessageCreated::dispatch($message, $this);
+        if ($message->isPublicReply()) {
+            CustomerTicketChanged::dispatch($this, CustomerTicketChanged::MESSAGE_CREATED);
+        }
 
         return $this;
     }

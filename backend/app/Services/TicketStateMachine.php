@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\TicketStatus;
+use App\Events\CustomerTicketChanged;
 use App\Events\TicketChanged;
 use App\Events\TicketStatusChanged;
 use App\Exceptions\InvalidTicketTransitionException;
@@ -97,6 +98,7 @@ class TicketStateMachine
             TicketStatus::from($targetValue)
         );
         TicketChanged::dispatch($ticket, TicketChanged::STATUS_CHANGED);
+        CustomerTicketChanged::dispatch($ticket, CustomerTicketChanged::STATUS_CHANGED);
 
         return $ticket;
     }
