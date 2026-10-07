@@ -12,13 +12,6 @@ use Laravel\Sanctum\Sanctum;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    config([
-        'broadcasting.default' => 'reverb',
-        'broadcasting.connections.reverb.key' => 'test-key',
-        'broadcasting.connections.reverb.secret' => 'test-secret',
-        'broadcasting.connections.reverb.app_id' => 'test-app',
-    ]);
-    (new AppServiceProvider(app()))->boot();
     $this->organization = Organization::create(['name' => 'Acme', 'slug' => 'acme']);
     $this->user = User::create([
         'name' => 'Agent',
@@ -65,6 +58,13 @@ test('authorized REST reads expose a higher revision after a Ticket change', fun
 });
 
 test('only a current Organization Member can discover and authorize the current channel generation', function () {
+    config([
+        'broadcasting.default' => 'reverb',
+        'broadcasting.connections.reverb.key' => 'test-key',
+        'broadcasting.connections.reverb.secret' => 'test-secret',
+        'broadcasting.connections.reverb.app_id' => 'test-app',
+    ]);
+    (new AppServiceProvider(app()))->boot();
     Carbon::setTestNow('2026-10-07 12:01:00 UTC');
     $other = Organization::create(['name' => 'Beta', 'slug' => 'beta']);
 
