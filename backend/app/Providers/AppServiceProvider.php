@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\Customer;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
 use App\Policies\TicketMessagePolicy;
 use App\Policies\TicketPolicy;
+use App\Services\CustomerTicketLiveChannel;
 use App\Services\OrganizationLiveChannel;
 use App\Services\TicketLiveChannel;
 use Illuminate\Support\Facades\Broadcast;
@@ -39,6 +41,10 @@ class AppServiceProvider extends ServiceProvider
             fn ($user, $ticketId, $generation) => app(TicketLiveChannel::class)
                 ->mayJoin($user, $ticketId, $generation),
             ['guards' => ['sanctum']]
+        );
+        Broadcast::channel('customer.ticket.{ticketId}.{generation}',
+            fn ($customer, $ticketId, $generation) => $customer instanceof Customer
+                && app(CustomerTicketLiveChannel::class)->mayJoin($customer, $ticketId, $generation)
         );
     }
 }

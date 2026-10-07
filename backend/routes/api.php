@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\TicketPriorityController;
 use App\Http\Controllers\Api\WorkspaceController;
 use App\Models\Ticket;
+use App\Services\CustomerTicketLiveChannel;
 use App\Services\OrganizationLiveChannel;
 use App\Services\TicketLiveChannel;
 use Illuminate\Http\Request;
@@ -115,6 +116,22 @@ Route::prefix('portal')->group(function () {
 
     Route::middleware('customer.token')->group(function () {
         Route::get('/tickets/{ticket}', [CustomerPortalController::class, 'show']);
+        Route::get('/tickets/{ticket}/live-channel', function (Request $request, string $ticket, CustomerTicketLiveChannel $channels) {
+            abort_unless($channels->tokenMatchesTicket($request->attributes->get('customer_token_payload'), $ticket), 403);
+
+            return response()->json(['channel' => 'private-'.$channels->name($ticket)]);
+        });
+        Route::post('/tickets/{ticket}/broadcasting/auth', function (Request $request, string $ticket, CustomerTicketLiveChannel $channels) {
+            if (! $channels->tokenMatchesTicket($request->attributes->get('customer_token_payload'), $ticket)
+                || $request->input('channel_name') !== 'private-'.$channels->name($ticket)) {
+                abort(403);
+            }
+
+            $customer = $request->attributes->get('customer');
+            $request->setUserResolver(fn (?string $guard = null) => $guard === null ? $customer : null);
+
+            return Broadcast::auth($request);
+        });
         Route::post('/tickets/{ticket}/reply', [CustomerPortalController::class, 'reply']);
         Route::get('/tickets/{ticket}/attachments/{attachment}', [CustomerPortalController::class, 'downloadAttachment']);
         Route::get('/auth/verify', [CustomerPortalController::class, 'verify']);
