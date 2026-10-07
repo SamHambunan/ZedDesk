@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\TicketStatus;
 use App\Events\TicketAssigned;
+use App\Events\TicketChanged;
 use App\Exceptions\InvalidAssignmentException;
 use App\Exceptions\InvalidTicketTransitionException;
 use App\Models\OrganizationMember;
@@ -90,6 +91,7 @@ class TicketAssignmentService
             ]);
 
             TicketAssigned::dispatch($ticket, $assignment);
+            TicketChanged::dispatch($ticket, TicketChanged::ASSIGNMENT_CHANGED);
 
             return $assignment;
         });
@@ -169,6 +171,7 @@ class TicketAssignmentService
             ]);
 
             TicketAssigned::dispatch($ticket, $assignment);
+            TicketChanged::dispatch($ticket, TicketChanged::ASSIGNMENT_CHANGED);
 
             return $assignment;
         });
