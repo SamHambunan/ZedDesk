@@ -560,6 +560,10 @@ class TicketController extends Controller
 
         Gate::authorize('restore', $ticket);
 
+        if (! $ticket->trashed()) {
+            return response()->json(['message' => 'Ticket is not deleted.'], 422);
+        }
+
         $ticket->restore();
 
         return response()->json([
