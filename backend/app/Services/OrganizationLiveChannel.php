@@ -10,7 +10,7 @@ class OrganizationLiveChannel
 {
     public function name(int $organizationId): string
     {
-        return 'organization.'.$organizationId.'.'.intdiv(now()->timestamp, 300);
+        return 'organization.'.$organizationId.'.'.$this->generation();
     }
 
     public function mayJoin(User $user, string $organizationId, string $generation): bool
@@ -19,10 +19,15 @@ class OrganizationLiveChannel
 
         return $organization !== null
             && (string) $organization->id === $organizationId
-            && $generation === (string) intdiv(now()->timestamp, 300)
+            && $generation === $this->generation()
             && OrganizationMember::withoutGlobalScopes()
                 ->where('organization_id', $organizationId)
                 ->where('user_id', $user->id)
                 ->exists();
+    }
+
+    private function generation(): string
+    {
+        return (string) intdiv(now()->timestamp, 300);
     }
 }

@@ -50,6 +50,20 @@ test('customer creation exposes revision one through authorized staff REST reads
         ->assertJsonPath('data.revision', 1);
 });
 
+test('authorized REST reads expose a higher revision after a Ticket change', function () {
+    $created = $this->postJson('http://acme.localhost/api/portal/tickets', [
+        'name' => 'Customer',
+        'email' => 'customer@acme.test',
+        'subject' => 'Changing ticket',
+        'message' => 'Please help',
+    ])->assertCreated();
+
+    Sanctum::actingAs($this->user);
+    $ticketUrl = 'http://acme.localhost/api/tickets/'.$created->json('ticket.id');
+    $this->patchJson($ticketUrl.'/status', ['status' => 'open'])->assertOk();
+    $this->getJson($ticketUrl)->assertOk()->assertJsonPath('ticket.revision', 2);
+});
+
 test('only a current Organization Member can discover and authorize the current channel generation', function () {
     Carbon::setTestNow('2026-10-07 12:01:00 UTC');
     $other = Organization::create(['name' => 'Beta', 'slug' => 'beta']);
