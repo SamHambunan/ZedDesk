@@ -1,6 +1,5 @@
 <?php
 
-use App\Events\TicketMessageCreated;
 use App\Models\Customer;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
@@ -18,19 +17,10 @@ function multipartReply(string $host, string $path, string $token, string $messa
         ."--{$boundary}\r\nContent-Disposition: form-data; name=\"body\"\r\n\r\n{$body}\r\n"
         ."--{$boundary}\r\nContent-Disposition: form-data; name=\"attachments[]\"; filename=\"private.png\"\r\n"
         ."Content-Type: image/png\r\n\r\n{$png}\r\n--{$boundary}--\r\n";
-    $headers = "Host: {$host}\r\nAccept: application/json\r\nAuthorization: Bearer {$token}\r\n"
+    $headers = "Authorization: Bearer {$token}\r\n"
         ."Content-Type: multipart/form-data; boundary={$boundary}\r\n";
-    $context = stream_context_create(['http' => [
-        'method' => 'POST',
-        'header' => $headers,
-        'content' => $content,
-        'ignore_errors' => true,
-        'timeout' => 10,
-    ]]);
-    $response = file_get_contents('http://nginx'.$path, false, $context);
-    $status = (int) (explode(' ', $http_response_header[0])[1] ?? 0);
 
-    return [$status, json_decode($response ?: '{}', true, flags: JSON_THROW_ON_ERROR)];
+    return apiRequest('POST', $host, $path, $content, $headers);
 }
 
 function expectConversationSignal($socket, string $ticketId, int $previousRevision): int
@@ -181,7 +171,7 @@ try {
             'author_id' => $customer->id,
             'body' => 'Rolled-back draft',
         ]);
-        TicketMessageCreated::dispatch($message, $ticket->recordConversationChange());
+        $ticket->recordConversationChange($message);
         throw new RuntimeException('Simulated rollback');
     });
 } catch (RuntimeException $error) {

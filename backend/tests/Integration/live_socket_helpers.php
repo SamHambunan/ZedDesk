@@ -2,17 +2,23 @@
 
 function api(string $method, string $host, string $path, ?array $body = null, ?string $token = null): array
 {
-    $headers = "Host: {$host}\r\nAccept: application/json\r\n";
+    $headers = '';
     if ($body !== null) {
         $headers .= "Content-Type: application/json\r\n";
     }
     if ($token !== null) {
         $headers .= "Authorization: Bearer {$token}\r\n";
     }
+
+    return apiRequest($method, $host, $path, $body === null ? '' : json_encode($body, JSON_THROW_ON_ERROR), $headers);
+}
+
+function apiRequest(string $method, string $host, string $path, string $content, string $extraHeaders): array
+{
     $context = stream_context_create(['http' => [
         'method' => $method,
-        'header' => $headers,
-        'content' => $body === null ? '' : json_encode($body, JSON_THROW_ON_ERROR),
+        'header' => "Host: {$host}\r\nAccept: application/json\r\n".$extraHeaders,
+        'content' => $content,
         'ignore_errors' => true,
         'timeout' => 10,
     ]]);

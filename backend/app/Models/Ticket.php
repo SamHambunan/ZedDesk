@@ -7,6 +7,7 @@ use App\Enums\TicketMessageType;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Events\TicketCreated;
+use App\Events\TicketMessageCreated;
 use App\Exceptions\InvalidTicketTransitionException;
 use App\Services\TicketNumberGenerator;
 use App\Traits\BelongsToOrganization;
@@ -145,12 +146,14 @@ class Ticket extends Model
         return ! $this->isClosed();
     }
 
-    /** Advance the revision for a committed conversation change. */
-    public function recordConversationChange(): self
+    /** Advance the revision and signal a successful conversation change. */
+    public function recordConversationChange(TicketMessage $message): self
     {
         DB::table('tickets')->where('id', $this->id)->update(['updated_at' => now()]);
+        $this->refresh();
+        TicketMessageCreated::dispatch($message, $this);
 
-        return $this->refresh();
+        return $this;
     }
 
     /**
