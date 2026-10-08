@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AttachmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerPortalController;
 use App\Http\Controllers\Api\InvitationController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OrganizationController;
 use App\Http\Controllers\Api\OrganizationMemberController;
 use App\Http\Controllers\Api\TagController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Api\TicketPriorityController;
 use App\Http\Controllers\Api\WorkspaceController;
 use App\Models\Ticket;
 use App\Services\CustomerTicketLiveChannel;
+use App\Services\MemberNotificationChannel;
 use App\Services\OrganizationLiveChannel;
 use App\Services\TicketLiveChannel;
 use Illuminate\Http\Request;
@@ -62,6 +64,15 @@ Route::get('/invitations/{token}', [InvitationController::class, 'show']);
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept']);
 
 Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(function () {
+    Route::get('/live/notification-channel', function (Request $request, MemberNotificationChannel $channels) {
+        $member = $request->attributes->get('organization_member');
+
+        return response()->json(['channel' => 'private-'.$channels->name((int) $member->organization_id, (int) $member->id)]);
+    });
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
+    Route::post('/notifications/{notification}/mark-read', [NotificationController::class, 'markRead']);
     Route::get('/live/organization-channel', function (OrganizationLiveChannel $channels) {
         return response()->json(['channel' => 'private-'.$channels->name(OrganizationContext::getCurrentId())]);
     });

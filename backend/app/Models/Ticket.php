@@ -12,6 +12,7 @@ use App\Events\TicketCreated;
 use App\Events\TicketMessageCreated;
 use App\Exceptions\InvalidTicketTransitionException;
 use App\Services\TicketNumberGenerator;
+use App\Services\TicketNotificationService;
 use App\Traits\BelongsToOrganization;
 use DomainException;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -91,6 +92,7 @@ class Ticket extends Model
         });
 
         static::created(function (Ticket $ticket) {
+            app(TicketNotificationService::class)->ticketCreated($ticket);
             TicketCreated::dispatch($ticket);
         });
 
@@ -162,6 +164,7 @@ class Ticket extends Model
     {
         DB::table('tickets')->where('id', $this->id)->update(['updated_at' => now()]);
         $this->refresh();
+        app(TicketNotificationService::class)->messageCreated($this, $message);
         TicketMessageCreated::dispatch($message, $this);
         if ($message->isPublicReply()) {
             CustomerTicketChanged::dispatch($this, CustomerTicketChanged::MESSAGE_CREATED);
