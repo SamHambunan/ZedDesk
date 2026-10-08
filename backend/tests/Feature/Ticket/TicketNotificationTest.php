@@ -45,13 +45,6 @@ test('customer Ticket creation leaves a durable inbox item for each active Organ
 });
 
 test('inbox actions and private Notification channel stay with the current Organization Member', function () {
-    config([
-        'broadcasting.default' => 'reverb',
-        'broadcasting.connections.reverb.key' => 'test-key',
-        'broadcasting.connections.reverb.secret' => 'test-secret',
-        'broadcasting.connections.reverb.app_id' => 'test-app',
-    ]);
-    (new AppServiceProvider(app()))->boot();
     Carbon::setTestNow('2026-10-07 12:01:00 UTC');
     $acme = Organization::create(['name' => 'Acme', 'slug' => 'acme']);
     $beta = Organization::create(['name' => 'Beta', 'slug' => 'beta']);
@@ -77,6 +70,13 @@ test('inbox actions and private Notification channel stay with the current Organ
     $this->postJson("http://acme.localhost/api/notifications/{$betaId}/mark-read")->assertNotFound();
     $this->postJson("http://beta.localhost/api/notifications/{$acmeId}/mark-read")->assertNotFound();
     $this->postJson("http://acme.localhost/api/notifications/{$otherId}/mark-read")->assertNotFound();
+    config([
+        'broadcasting.default' => 'reverb',
+        'broadcasting.connections.reverb.key' => 'test-key',
+        'broadcasting.connections.reverb.secret' => 'test-secret',
+        'broadcasting.connections.reverb.app_id' => 'test-app',
+    ]);
+    (new AppServiceProvider(app()))->boot();
     $channel = $this->getJson('http://acme.localhost/api/live/notification-channel')->assertOk()->json('channel');
     expect($channel)->toBe('private-organization.'.$acme->id.'.member.'.$acmeMember->id.'.notifications.'.intdiv(Carbon::now()->timestamp, 300));
     $auth = fn ($slug, $name) => $this->postJson("http://{$slug}.localhost/api/broadcasting/auth", [
