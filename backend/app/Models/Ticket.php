@@ -11,6 +11,7 @@ use App\Events\TicketChanged;
 use App\Events\TicketCreated;
 use App\Events\TicketMessageCreated;
 use App\Exceptions\InvalidTicketTransitionException;
+use App\Services\TicketNotificationService;
 use App\Services\TicketNumberGenerator;
 use App\Traits\BelongsToOrganization;
 use DomainException;
@@ -91,6 +92,7 @@ class Ticket extends Model
         });
 
         static::created(function (Ticket $ticket) {
+            app(TicketNotificationService::class)->ticketCreated($ticket);
             TicketCreated::dispatch($ticket);
         });
 

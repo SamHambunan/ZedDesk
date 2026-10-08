@@ -8,6 +8,7 @@ use App\Models\TicketMessage;
 use App\Policies\TicketMessagePolicy;
 use App\Policies\TicketPolicy;
 use App\Services\CustomerTicketLiveChannel;
+use App\Services\MemberNotificationChannel;
 use App\Services\OrganizationLiveChannel;
 use App\Services\TicketLiveChannel;
 use Illuminate\Support\Facades\Broadcast;
@@ -45,6 +46,11 @@ class AppServiceProvider extends ServiceProvider
         Broadcast::channel('customer.ticket.{ticketId}.{generation}',
             fn ($customer, $ticketId, $generation) => $customer instanceof Customer
                 && app(CustomerTicketLiveChannel::class)->mayJoin($customer, $ticketId, $generation)
+        );
+        Broadcast::channel('organization.{organizationId}.member.{memberId}.notifications.{generation}',
+            fn ($user, $organizationId, $memberId, $generation) => app(MemberNotificationChannel::class)
+                ->mayJoin($user, $organizationId, $memberId, $generation),
+            ['guards' => ['sanctum']]
         );
     }
 }
