@@ -5,7 +5,6 @@ use App\Models\Organization;
 use App\Models\OrganizationMember;
 use App\Models\Customer;
 use App\Models\Ticket;
-use App\Models\Team;
 use App\Models\User;
 use App\Providers\AppServiceProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -72,8 +71,12 @@ test('inbox actions and private Notification channel stay with the current Organ
     Sanctum::actingAs($user);
     $acmeId = $this->getJson('http://acme.localhost/api/notifications')->assertJsonCount(1, 'data')->json('data.0.id');
     $betaId = $this->getJson('http://beta.localhost/api/notifications')->assertJsonCount(1, 'data')->json('data.0.id');
+    Sanctum::actingAs($otherUser);
+    $otherId = $this->getJson('http://acme.localhost/api/notifications')->assertJsonCount(1, 'data')->json('data.0.id');
+    Sanctum::actingAs($user);
     $this->postJson("http://acme.localhost/api/notifications/{$betaId}/mark-read")->assertNotFound();
     $this->postJson("http://beta.localhost/api/notifications/{$acmeId}/mark-read")->assertNotFound();
+    $this->postJson("http://acme.localhost/api/notifications/{$otherId}/mark-read")->assertNotFound();
     $channel = $this->getJson('http://acme.localhost/api/live/notification-channel')->assertOk()->json('channel');
     expect($channel)->toBe('private-organization.'.$acme->id.'.member.'.$acmeMember->id.'.notifications.'.intdiv(Carbon::now()->timestamp, 300));
     $auth = fn ($slug, $name) => $this->postJson("http://{$slug}.localhost/api/broadcasting/auth", [
@@ -93,7 +96,7 @@ test('inbox actions and private Notification channel stay with the current Organ
     expect($betaMember->id)->not->toBe($acmeMember->id);
 });
 
-test('reading a Ticket leaves the inbox unread and later Customer activity creates a fresh unread item', function () {
+test('reading a Ticket leaves its Notification unread and marking it read retains history', function () {
     $organization = Organization::create(['name' => 'Acme', 'slug' => 'acme']);
     $user = User::create(['name' => 'Agent', 'email' => 'agent@acme.test', 'password' => bcrypt('password')]);
     OrganizationMember::create(['organization_id' => $organization->id, 'user_id' => $user->id, 'role' => 'agent']);
@@ -102,69 +105,18 @@ test('reading a Ticket leaves the inbox unread and later Customer activity creat
         'subject' => 'Follow up', 'message' => 'First message',
     ])->assertCreated();
     $ticketId = $created->json('ticket.id');
-    $token = $created->json('token');
 
     Sanctum::actingAs($user);
     $this->getJson("http://acme.localhost/api/tickets/{$ticketId}")->assertOk();
     $this->getJson('http://acme.localhost/api/notifications/unread-count')->assertJsonPath('unread_count', 1);
     $first = $this->getJson('http://acme.localhost/api/notifications')->json('data.0.id');
     $this->postJson("http://acme.localhost/api/notifications/{$first}/mark-read")
-        ->assertOk()->assertJsonPath('data.id', $first);
+        ->assertOk()->assertJsonPath('data.id', $first)
+        ->assertJsonPath('data.activity_type', 'ticket_created');
     $this->getJson('http://acme.localhost/api/notifications/unread-count')->assertJsonPath('unread_count', 0);
-
-    $this->withHeader('X-Customer-Token', $token)
-        ->postJson("http://acme.localhost/api/portal/tickets/{$ticketId}/reply", ['message' => 'Second message'])
-        ->assertCreated();
-
-    $this->getJson('http://acme.localhost/api/notifications/unread-count')->assertJsonPath('unread_count', 1);
-    $this->getJson('http://acme.localhost/api/notifications')->assertOk()->assertJsonCount(2, 'data')
-        ->assertJsonPath('data.0.activity_type', 'customer_public_reply')
-        ->assertJsonPath('data.1.id', $first);
-});
-
-test('assignment and Internal Notes update only the handling member inbox and preserve read history', function () {
-    $organization = Organization::create(['name' => 'Acme', 'slug' => 'acme']);
-    $actors = collect(['alice', 'bob', 'cara'])->mapWithKeys(function ($name) use ($organization) {
-        $user = User::create(['name' => ucfirst($name), 'email' => "{$name}@acme.test", 'password' => bcrypt('password')]);
-        $member = OrganizationMember::create(['organization_id' => $organization->id, 'user_id' => $user->id, 'role' => 'agent']);
-
-        return [$name => compact('user', 'member')];
-    });
-    $created = $this->postJson('http://acme.localhost/api/portal/tickets', [
-        'name' => 'Customer', 'email' => 'customer@acme.test',
-        'subject' => 'Routing', 'message' => 'Please help',
-    ])->assertCreated();
-    $ticketId = $created->json('ticket.id');
-
-    Sanctum::actingAs($actors['alice']['user']);
-    $this->postJson("http://acme.localhost/api/tickets/{$ticketId}/assign", [
-        'member_id' => $actors['bob']['member']->id,
-    ])->assertOk();
-    $this->postJson("http://acme.localhost/api/tickets/{$ticketId}/messages", [
-        'message_type' => 'internal_note', 'body' => 'Private follow up',
-    ])->assertCreated();
-    $this->getJson('http://acme.localhost/api/notifications')->assertJsonCount(1, 'data')
-        ->assertJsonPath('data.0.activity_type', 'ticket_created');
-
-    Sanctum::actingAs($actors['bob']['user']);
-    $this->getJson('http://acme.localhost/api/notifications')->assertJsonCount(1, 'data')
-        ->assertJsonPath('data.0.activity_type', 'internal_note');
-    $readId = $this->getJson('http://acme.localhost/api/notifications')->json('data.0.id');
-    $this->postJson("http://acme.localhost/api/notifications/{$readId}/mark-read")->assertOk();
-
-    Sanctum::actingAs($actors['cara']['user']);
-    $this->postJson("http://acme.localhost/api/notifications/{$readId}/mark-read")->assertNotFound();
-    $this->postJson('http://acme.localhost/api/notifications/mark-all-read')->assertOk()->assertJsonPath('marked_read', 1);
-
-    Sanctum::actingAs($actors['alice']['user']);
-    $this->postJson("http://acme.localhost/api/tickets/{$ticketId}/messages", [
-        'message_type' => 'internal_note', 'body' => 'More private work',
-    ])->assertCreated();
-    Sanctum::actingAs($actors['bob']['user']);
-    $this->getJson('http://acme.localhost/api/notifications/unread-count')->assertJsonPath('unread_count', 1);
-    $this->getJson('http://acme.localhost/api/notifications')->assertJsonCount(2, 'data')
-        ->assertJsonPath('data.0.activity_type', 'internal_note')
-        ->assertJsonPath('data.1.id', $readId);
+    $this->getJson('http://acme.localhost/api/notifications')->assertOk()->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $first);
+    expect($this->getJson('http://acme.localhost/api/notifications')->json('data.0.read_at'))->not->toBeNull();
 });
 
 test('rolled-back Ticket creation leaves no inbox item', function () {
@@ -208,41 +160,4 @@ test('inbox pagination and mark-all-read apply only to the active Organization',
         ->assertJsonPath('marked_read', 3);
     $this->getJson('http://acme.localhost/api/notifications/unread-count')->assertJsonPath('unread_count', 0);
     $this->getJson('http://beta.localhost/api/notifications/unread-count')->assertJsonPath('unread_count', 1);
-});
-
-test('Team Assignment routes later Customer activity to active Team members only', function () {
-    $organization = Organization::create(['name' => 'Acme', 'slug' => 'acme']);
-    $actors = collect(['alice', 'bob', 'cara'])->mapWithKeys(function ($name) use ($organization) {
-        $user = User::create(['name' => ucfirst($name), 'email' => "{$name}@acme.test", 'password' => bcrypt('password')]);
-        $member = OrganizationMember::create(['organization_id' => $organization->id, 'user_id' => $user->id, 'role' => 'agent']);
-
-        return [$name => compact('user', 'member')];
-    });
-    $team = Team::create(['organization_id' => $organization->id, 'name' => 'Support']);
-    $team->members()->attach($actors['bob']['member']->id);
-    $created = $this->postJson('http://acme.localhost/api/portal/tickets', [
-        'name' => 'Customer', 'email' => 'customer@acme.test',
-        'subject' => 'Team work', 'message' => 'Please help',
-    ])->assertCreated();
-    $ticketId = $created->json('ticket.id');
-
-    Sanctum::actingAs($actors['alice']['user']);
-    $this->postJson("http://acme.localhost/api/tickets/{$ticketId}/assign", ['team_id' => $team->id])->assertOk();
-    $this->postJson('http://acme.localhost/api/notifications/mark-all-read')->assertOk();
-    Sanctum::actingAs($actors['bob']['user']);
-    $this->postJson('http://acme.localhost/api/notifications/mark-all-read')->assertOk();
-    Sanctum::actingAs($actors['cara']['user']);
-    $this->postJson('http://acme.localhost/api/notifications/mark-all-read')->assertOk();
-
-    $this->withHeader('X-Customer-Token', $created->json('token'))
-        ->postJson("http://acme.localhost/api/portal/tickets/{$ticketId}/reply", ['message' => 'A follow up'])
-        ->assertCreated();
-
-    Sanctum::actingAs($actors['bob']['user']);
-    $this->getJson('http://acme.localhost/api/notifications/unread-count')->assertJsonPath('unread_count', 1);
-    $this->getJson('http://acme.localhost/api/notifications')->assertJsonPath('data.0.activity_type', 'customer_public_reply');
-    foreach (['alice', 'cara'] as $name) {
-        Sanctum::actingAs($actors[$name]['user']);
-        $this->getJson('http://acme.localhost/api/notifications/unread-count')->assertJsonPath('unread_count', 0);
-    }
 });

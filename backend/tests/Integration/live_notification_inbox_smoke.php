@@ -87,11 +87,28 @@ required((frame($sockets['acme'])['event'] ?? null) === 'inbox.changed', 'Mark-r
 
 fclose($sockets['acme']);
 $missed = $createTicket('Missed while disconnected');
+[$reconnectedSocket, $reconnectedSocketId] = connect($host);
+[$status, $rediscovered] = api('GET', $host, '/api/live/notification-channel', token: $members['acme']);
+required($status === 200, 'Notification channel rediscovery failed after reconnect.');
+[$status, $reauthorized] = api('POST', $host, '/api/broadcasting/auth', [
+    'socket_id' => $reconnectedSocketId, 'channel_name' => $rediscovered['channel'],
+], $members['acme']);
+required($status === 200, 'Notification channel reauthorization failed after reconnect.');
+subscribe($reconnectedSocket, $rediscovered['channel'], $reauthorized['auth']);
+
 [$status, $count] = api('GET', $host, '/api/notifications/unread-count', token: $members['acme']);
 required($status === 200 && $count['unread_count'] === 1, 'Reconnect REST count did not recover current state.');
 [$status, $recovered] = api('GET', $host, '/api/notifications', token: $members['acme']);
 required($status === 200 && count($recovered['data']) === 2, 'Reconnect REST list missed Notification history.');
 required($recovered['data'][0]['ticket_id'] === $missed['ticket']['id'], 'Reconnect REST list did not show current Ticket.');
+$later = $createTicket('Live after reconnect');
+$laterSignal = frame($reconnectedSocket);
+required(($laterSignal['event'] ?? null) === 'inbox.changed', 'Reconnected member missed the next live signal.');
+[$status, $current] = api('GET', $host, '/api/notifications', token: $members['acme']);
+required($status === 200 && count($current['data']) === 3
+    && in_array($later['ticket']['id'], array_column($current['data'], 'ticket_id'), true),
+    'REST did not expose the Ticket signaled after reconnect.');
 
+fclose($reconnectedSocket);
 fclose($sockets['beta']);
 echo "Live Notification inbox smoke passed.\n";

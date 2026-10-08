@@ -78,8 +78,6 @@ class TicketAssignmentService
         }
 
         return DB::transaction(function () use ($ticket, $teamModel, $memberModel, $assignedByModel) {
-            $outgoingMemberId = $ticket->assigned_member_id;
-            $previousTeamId = $ticket->assigned_team_id;
             $ticket->assigned_team_id = $teamModel?->id;
             $ticket->assigned_member_id = $memberModel?->id;
             $ticket->save();
@@ -91,10 +89,6 @@ class TicketAssignmentService
                 'member_id' => $ticket->assigned_member_id,
                 'assigned_by_id' => $assignedByModel?->id,
             ]);
-
-            if ($outgoingMemberId !== $ticket->assigned_member_id || $previousTeamId !== $ticket->assigned_team_id) {
-                app(TicketNotificationService::class)->assignmentChanged($ticket, $outgoingMemberId, $assignedByModel?->id);
-            }
 
             TicketAssigned::dispatch($ticket, $assignment);
             TicketChanged::dispatch($ticket, TicketChanged::ASSIGNMENT_CHANGED);
@@ -156,7 +150,6 @@ class TicketAssignmentService
         }
 
         return DB::transaction(function () use ($ticket, $memberModel) {
-            $outgoingMemberId = $ticket->assigned_member_id;
             $ticket->assigned_member_id = $memberModel->id;
 
             $currentStatus = $ticket->status instanceof TicketStatus
@@ -176,8 +169,6 @@ class TicketAssignmentService
                 'member_id' => $memberModel->id,
                 'assigned_by_id' => $memberModel->id,
             ]);
-
-            app(TicketNotificationService::class)->assignmentChanged($ticket, $outgoingMemberId, $memberModel->id);
 
             TicketAssigned::dispatch($ticket, $assignment);
             TicketChanged::dispatch($ticket, TicketChanged::ASSIGNMENT_CHANGED);
