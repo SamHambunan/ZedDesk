@@ -1,9 +1,9 @@
 <?php
 
 use App\Context\OrganizationContext;
+use App\Models\Customer;
 use App\Models\Organization;
 use App\Models\OrganizationMember;
-use App\Models\Customer;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Providers\AppServiceProvider;
