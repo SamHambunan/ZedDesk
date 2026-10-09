@@ -164,7 +164,7 @@ test('unread conversation activity groups by Ticket and activity after read crea
         ->assertJsonPath('unread_count', 1);
 });
 
-test('standalone Ticket Status Priority and Tag changes and staff Public Replies do not notify', function () {
+test('standalone Ticket Status Priority and Tag changes and Organization Member Public Replies do not notify', function () {
     $organization = Organization::create(['name' => 'Acme', 'slug' => 'acme']);
     [$ticket] = conversationTicket($organization);
     $actor = conversationMember($organization, 'Actor');
@@ -186,7 +186,7 @@ test('standalone Ticket Status Priority and Tag changes and staff Public Replies
     $this->getJson('http://acme.localhost/api/notifications')->assertJsonCount(0, 'data');
 });
 
-test('conversation Notifications roll back with the message and survive live delivery outage', function () {
+test('conversation Notifications roll back with the message and persist with a successful reply', function () {
     $organization = Organization::create(['name' => 'Acme', 'slug' => 'acme']);
     [$ticket, $token] = conversationTicket($organization);
     $handler = conversationMember($organization, 'Handler');
@@ -208,7 +208,6 @@ test('conversation Notifications roll back with the message and survive live del
     $this->getJson("http://acme.localhost/api/tickets/{$ticket->id}")
         ->assertDontSee('Rolled back reply');
 
-    config(['broadcasting.connections.reverb.host' => '127.0.0.1', 'broadcasting.connections.reverb.port' => 1]);
     $this->withHeader('X-Customer-Token', $token)
         ->postJson($url, ['message' => 'Durable reply'])->assertCreated();
     Sanctum::actingAs($handler->user);
