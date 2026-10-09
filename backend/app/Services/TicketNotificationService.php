@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Events\MemberInboxChanged;
 use App\Models\OrganizationMember;
 use App\Models\Ticket;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -12,19 +13,53 @@ class TicketNotificationService
 {
     public function ticketCreated(Ticket $ticket): void
     {
-        $this->notify($ticket);
+        $members = OrganizationMember::withoutGlobalScopes()
+            ->where('organization_id', $ticket->organization_id)
+            ->pluck('id');
+
+        $this->notify($ticket, $members, 'ticket_created', []);
+    }
+
+    public function assignmentChanged(Ticket $ticket, ?int $previousTeamId, ?int $previousMemberId, ?int $actorMemberId): void
+    {
+        $members = OrganizationMember::withoutGlobalScopes()
+            ->where('organization_id', $ticket->organization_id);
+
+        if ($ticket->assigned_member_id !== null) {
+            $recipientIds = [$ticket->assigned_member_id];
+        } elseif ($ticket->assigned_team_id !== null) {
+            $recipientIds = DB::table('team_members')
+                ->where('team_id', $ticket->assigned_team_id)
+                ->pluck('organization_member_id')->all();
+        } else {
+            $recipientIds = $members->pluck('id')->all();
+        }
+
+        if ($previousMemberId !== null) {
+            $recipientIds[] = $previousMemberId;
+        }
+
+        $recipients = OrganizationMember::withoutGlobalScopes()
+            ->where('organization_id', $ticket->organization_id)
+            ->whereIn('id', array_unique($recipientIds))
+            ->when($actorMemberId !== null, fn ($query) => $query->where('id', '!=', $actorMemberId))
+            ->pluck('id');
+
+        $this->notify($ticket, $recipients, 'assignment_changed', [
+            'from_team_id' => $previousTeamId,
+            'from_member_id' => $previousMemberId,
+            'to_team_id' => $ticket->assigned_team_id,
+            'to_member_id' => $ticket->assigned_member_id,
+            'actor_member_id' => $actorMemberId,
+        ]);
     }
 
     /**
      * Write notifications in the caller's Ticket transaction. The partial unique index
      * and UPSERT keep one unread item per member and Ticket under concurrent activity.
      */
-    private function notify(Ticket $ticket): void
+    private function notify(Ticket $ticket, Collection $members, string $activityType, array $metadata): void
     {
-        $members = OrganizationMember::withoutGlobalScopes()
-            ->where('organization_id', $ticket->organization_id)
-            ->pluck('id');
-
         foreach ($members as $memberId) {
             $now = now();
             DB::statement(
@@ -35,8 +70,8 @@ class TicketNotificationService
                     latest_activity_metadata = EXCLUDED.latest_activity_metadata,
                     latest_activity_at = EXCLUDED.latest_activity_at,
                     updated_at = EXCLUDED.updated_at',
-                [(string) Str::uuid(), $ticket->organization_id, $memberId, $ticket->id, 'ticket_created',
-                    '{}', $now, $now, $now]
+                [(string) Str::uuid(), $ticket->organization_id, $memberId, $ticket->id, $activityType,
+                    json_encode((object) $metadata, JSON_THROW_ON_ERROR), $now, $now, $now]
             );
 
             MemberInboxChanged::dispatch((int) $ticket->organization_id, (int) $memberId);

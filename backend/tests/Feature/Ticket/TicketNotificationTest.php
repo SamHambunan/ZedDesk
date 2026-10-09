@@ -41,6 +41,8 @@ test('customer Ticket creation leaves a durable inbox item for each active Organ
             ->assertJsonPath('data.0.ticket_id', $created->json('ticket.id'))
             ->assertJsonPath('data.0.activity_type', 'ticket_created')
             ->assertJsonPath('data.0.recipient_member_id', $member->id);
+        expect(DB::table('notifications')->where('recipient_member_id', $member->id)
+            ->selectRaw('jsonb_typeof(latest_activity_metadata) as metadata_type')->value('metadata_type'))->toBe('object');
     }
 });
 

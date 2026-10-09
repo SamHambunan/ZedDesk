@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\DB;
 class TicketAssignmentService
 {
     public function __construct(
-        protected TicketStateMachine $stateMachine
+        protected TicketStateMachine $stateMachine,
+        protected TicketNotificationService $notifications
     ) {}
 
     /**
@@ -78,6 +79,8 @@ class TicketAssignmentService
         }
 
         return DB::transaction(function () use ($ticket, $teamModel, $memberModel, $assignedByModel) {
+            $previousTeamId = $ticket->assigned_team_id;
+            $previousMemberId = $ticket->assigned_member_id;
             $ticket->assigned_team_id = $teamModel?->id;
             $ticket->assigned_member_id = $memberModel?->id;
             $ticket->save();
@@ -89,6 +92,10 @@ class TicketAssignmentService
                 'member_id' => $ticket->assigned_member_id,
                 'assigned_by_id' => $assignedByModel?->id,
             ]);
+
+            if ($previousTeamId !== $ticket->assigned_team_id || $previousMemberId !== $ticket->assigned_member_id) {
+                $this->notifications->assignmentChanged($ticket, $previousTeamId, $previousMemberId, $assignedByModel?->id);
+            }
 
             TicketAssigned::dispatch($ticket, $assignment);
             TicketChanged::dispatch($ticket, TicketChanged::ASSIGNMENT_CHANGED);
@@ -150,6 +157,7 @@ class TicketAssignmentService
         }
 
         return DB::transaction(function () use ($ticket, $memberModel) {
+            $previousTeamId = $ticket->assigned_team_id;
             $ticket->assigned_member_id = $memberModel->id;
 
             $currentStatus = $ticket->status instanceof TicketStatus
@@ -169,6 +177,8 @@ class TicketAssignmentService
                 'member_id' => $memberModel->id,
                 'assigned_by_id' => $memberModel->id,
             ]);
+
+            $this->notifications->assignmentChanged($ticket, $previousTeamId, null, $memberModel->id);
 
             TicketAssigned::dispatch($ticket, $assignment);
             TicketChanged::dispatch($ticket, TicketChanged::ASSIGNMENT_CHANGED);
