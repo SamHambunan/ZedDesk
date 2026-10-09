@@ -26,6 +26,22 @@ class OrganizationPresenceChannelManager extends ArrayChannelManager
 
     public function findOrCreate(string $channelName): Channel
     {
+        if (preg_match('/^presence-ticket\.[0-9a-f-]+\.viewers\.(\d+)$/', $channelName, $matches)) {
+            if ($matches[1] !== app(OrganizationLiveChannel::class)->generation()) {
+                throw new ConnectionUnauthorized;
+            }
+
+            if ($channel = $this->find($channelName)) {
+                return $channel;
+            }
+
+            $channel = new TicketViewingPresenceChannel($channelName);
+            $this->applications[$this->application->id()][$channelName] = $channel;
+            ChannelCreated::dispatch($channel);
+
+            return $channel;
+        }
+
         if (! preg_match('/^presence-organization\.\d+\.members\.(\d+)$/', $channelName, $matches)) {
             return parent::findOrCreate($channelName);
         }
