@@ -10,6 +10,7 @@ use App\Policies\TicketPolicy;
 use App\Services\CustomerTicketLiveChannel;
 use App\Services\MemberNotificationChannel;
 use App\Services\OrganizationLiveChannel;
+use App\Services\OrganizationPresenceChannel;
 use App\Services\TicketLiveChannel;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Gate;
@@ -35,6 +36,11 @@ class AppServiceProvider extends ServiceProvider
 
         Broadcast::channel('organization.{organizationId}.{generation}',
             fn ($user, $organizationId, $generation) => app(OrganizationLiveChannel::class)
+                ->mayJoin($user, $organizationId, $generation),
+            ['guards' => ['sanctum']]
+        );
+        Broadcast::channel('organization.{organizationId}.members.{generation}',
+            fn ($user, $organizationId, $generation) => app(OrganizationPresenceChannel::class)
                 ->mayJoin($user, $organizationId, $generation),
             ['guards' => ['sanctum']]
         );
