@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Services\OrganizationPresenceChannel;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -18,7 +19,7 @@ class User extends Authenticatable
     public function getAuthIdentifierForBroadcasting(): int
     {
         return app(OrganizationPresenceChannel::class)->memberFor($this)?->id
-            ?? throw new \Illuminate\Auth\Access\AuthorizationException;
+            ?? throw new AuthorizationException;
     }
 
     /**
