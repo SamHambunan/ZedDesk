@@ -9,6 +9,31 @@ use Laravel\Reverb\Protocols\Pusher\Exceptions\ConnectionUnauthorized;
 
 class TicketViewingPresenceChannel extends PresenceChannel
 {
+    public function broadcast(array $payload, ?Connection $except = null): void
+    {
+        if (! str_starts_with($payload['event'] ?? '', 'client-')) {
+            parent::broadcast($payload, $except);
+
+            return;
+        }
+
+        $memberId = $except === null ? null : $this->find($except)?->data('user_id');
+
+        if (! $this->isCurrentGeneration()
+            || $payload['event'] !== 'client-typing'
+            || ! is_bool($payload['data']['typing'] ?? null)
+            || $memberId === null) {
+            return;
+        }
+
+        parent::broadcast([
+            'event' => 'client-typing',
+            'channel' => $this->name(),
+            'data' => ['typing' => $payload['data']['typing']],
+            'user_id' => $memberId,
+        ], $except);
+    }
+
     public function subscribe(Connection $connection, ?string $auth = null, ?string $data = null): void
     {
         if (! $this->isCurrentGeneration()) {

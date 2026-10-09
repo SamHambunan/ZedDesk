@@ -6,6 +6,8 @@ use App\Models\User;
 
 class TicketViewingPresenceChannel
 {
+    public const TYPING_EXPIRES_AFTER_SECONDS = 5;
+
     public function __construct(
         private TicketLiveChannel $ticketChannels,
         private OrganizationPresenceChannel $organizationPresence,
