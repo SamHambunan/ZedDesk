@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Events\MemberInboxChanged;
 use App\Models\OrganizationMember;
 use App\Models\Ticket;
+use App\Models\TicketMessage;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -22,28 +23,13 @@ class TicketNotificationService
 
     public function assignmentChanged(Ticket $ticket, ?int $previousTeamId, ?int $previousMemberId, ?int $actorMemberId): void
     {
-        $members = OrganizationMember::withoutGlobalScopes()
-            ->where('organization_id', $ticket->organization_id);
-
-        if ($ticket->assigned_member_id !== null) {
-            $recipientIds = [$ticket->assigned_member_id];
-        } elseif ($ticket->assigned_team_id !== null) {
-            $recipientIds = DB::table('team_members')
-                ->where('team_id', $ticket->assigned_team_id)
-                ->pluck('organization_member_id')->all();
-        } else {
-            $recipientIds = $members->pluck('id')->all();
-        }
+        $recipientIds = $this->currentHandlerIds($ticket);
 
         if ($previousMemberId !== null) {
             $recipientIds[] = $previousMemberId;
         }
 
-        $recipients = OrganizationMember::withoutGlobalScopes()
-            ->where('organization_id', $ticket->organization_id)
-            ->whereIn('id', array_unique($recipientIds))
-            ->when($actorMemberId !== null, fn ($query) => $query->where('id', '!=', $actorMemberId))
-            ->pluck('id');
+        $recipients = $this->eligibleRecipients($ticket, $recipientIds, $actorMemberId);
 
         $this->notify($ticket, $recipients, 'assignment_changed', [
             'from_team_id' => $previousTeamId,
@@ -52,6 +38,49 @@ class TicketNotificationService
             'to_member_id' => $ticket->assigned_member_id,
             'actor_member_id' => $actorMemberId,
         ]);
+    }
+
+    public function conversationChanged(Ticket $ticket, TicketMessage $message): void
+    {
+        $customerReply = $message->isPublicReply() && $message->isCustomerAuthor();
+        $memberNote = $message->isInternalNote() && $message->author_type === OrganizationMember::class;
+        if (! $customerReply && ! $memberNote) {
+            return;
+        }
+
+        $actorMemberId = $memberNote ? (int) $message->author_id : null;
+        $recipients = $this->eligibleRecipients($ticket, $this->currentHandlerIds($ticket), $actorMemberId);
+
+        $this->notify($ticket, $recipients, $customerReply ? 'customer_public_reply' : 'internal_note', [
+            'message_id' => $message->id,
+            'actor_member_id' => $actorMemberId,
+        ]);
+    }
+
+    private function currentHandlerIds(Ticket $ticket): array
+    {
+        if ($ticket->assigned_member_id !== null) {
+            return [$ticket->assigned_member_id];
+        }
+
+        if ($ticket->assigned_team_id !== null) {
+            return DB::table('team_members')
+                ->where('team_id', $ticket->assigned_team_id)
+                ->pluck('organization_member_id')->all();
+        }
+
+        return OrganizationMember::withoutGlobalScopes()
+            ->where('organization_id', $ticket->organization_id)
+            ->pluck('id')->all();
+    }
+
+    private function eligibleRecipients(Ticket $ticket, array $recipientIds, ?int $actorMemberId): Collection
+    {
+        return OrganizationMember::withoutGlobalScopes()
+            ->where('organization_id', $ticket->organization_id)
+            ->whereIn('id', array_unique($recipientIds))
+            ->when($actorMemberId !== null, fn ($query) => $query->where('id', '!=', $actorMemberId))
+            ->pluck('id');
     }
 
     /**

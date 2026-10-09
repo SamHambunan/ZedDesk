@@ -164,6 +164,7 @@ class Ticket extends Model
     {
         DB::table('tickets')->where('id', $this->id)->update(['updated_at' => now()]);
         $this->refresh();
+        app(TicketNotificationService::class)->conversationChanged($this, $message);
         TicketMessageCreated::dispatch($message, $this);
         if ($message->isPublicReply()) {
             CustomerTicketChanged::dispatch($this, CustomerTicketChanged::MESSAGE_CREATED);
