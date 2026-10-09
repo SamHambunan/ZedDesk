@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Events\MemberInboxChanged;
 use App\Models\OrganizationMember;
 use App\Models\Ticket;
+use App\Models\TicketMessage;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -50,6 +51,39 @@ class TicketNotificationService
             'from_member_id' => $previousMemberId,
             'to_team_id' => $ticket->assigned_team_id,
             'to_member_id' => $ticket->assigned_member_id,
+            'actor_member_id' => $actorMemberId,
+        ]);
+    }
+
+    public function conversationChanged(Ticket $ticket, TicketMessage $message): void
+    {
+        $customerReply = $message->isPublicReply() && $message->isCustomerAuthor();
+        $memberNote = $message->isInternalNote() && $message->author_type === OrganizationMember::class;
+        if (! $customerReply && ! $memberNote) {
+            return;
+        }
+
+        if ($ticket->assigned_member_id !== null) {
+            $recipientIds = [$ticket->assigned_member_id];
+        } elseif ($ticket->assigned_team_id !== null) {
+            $recipientIds = DB::table('team_members')
+                ->where('team_id', $ticket->assigned_team_id)
+                ->pluck('organization_member_id')->all();
+        } else {
+            $recipientIds = OrganizationMember::withoutGlobalScopes()
+                ->where('organization_id', $ticket->organization_id)
+                ->pluck('id')->all();
+        }
+
+        $actorMemberId = $memberNote ? (int) $message->author_id : null;
+        $recipients = OrganizationMember::withoutGlobalScopes()
+            ->where('organization_id', $ticket->organization_id)
+            ->whereIn('id', $recipientIds)
+            ->when($actorMemberId !== null, fn ($query) => $query->where('id', '!=', $actorMemberId))
+            ->pluck('id');
+
+        $this->notify($ticket, $recipients, $customerReply ? 'customer_public_reply' : 'internal_note', [
+            'message_id' => $message->id,
             'actor_member_id' => $actorMemberId,
         ]);
     }
