@@ -114,10 +114,15 @@ required(($typing['data'] ?? null) === ['typing' => true] && ! str_contains(json
 required($typing['user_id'] === $senderMembership['user_id'],
     'Typing sender did not match signed Presence membership.');
 
-// A consumer expires its last true state after five seconds; a new subscriber gets no typing replay.
+// An idle sender expires automatically; a new subscriber gets no typing replay.
 $lastInput = microtime(true);
 usleep(5_100_000);
 required(microtime(true) - $lastInput >= $discovery['typing_expires_after_seconds'], 'Typing did not expire.');
+$expiry = frame($observerSocket);
+required(($expiry['event'] ?? null) === 'client-typing'
+    && ($expiry['user_id'] ?? null) === (string) $member->id
+    && ($expiry['data'] ?? null) === ['typing' => false],
+    'Idle typing was not cleared over the live socket.');
 [$lateSocket, $lateSocketId] = connect($hosts['acme']);
 [$status, $lateAuth] = api('POST', $hosts['acme'], '/api/broadcasting/auth', [
     'socket_id' => $lateSocketId, 'channel_name' => $channel,
@@ -130,6 +135,25 @@ fclose($lateSocket);
 sendFrame($senderSocket, ['event' => 'client-typing', 'channel' => $channel, 'data' => ['typing' => false]]);
 required((frame($observerSocket)['data'] ?? null) === ['typing' => false], 'Typing stop was not delivered.');
 
+// A second tab keeps the member present after the typing tab disconnects.
+[$secondSenderSocket, $secondSenderSocketId] = connect($hosts['acme']);
+[$status, $secondSenderAuth] = api('POST', $hosts['acme'], '/api/broadcasting/auth', [
+    'socket_id' => $secondSenderSocketId, 'channel_name' => $channel,
+], $tokens['acme']);
+required($status === 200, 'Second sender tab authorization failed.');
+subscribePresence($secondSenderSocket, $channel, $secondSenderAuth);
+sendFrame($senderSocket, ['event' => 'client-typing', 'channel' => $channel, 'data' => ['typing' => true]]);
+required((frame($observerSocket)['data'] ?? null) === ['typing' => true], 'Typing was not delivered before disconnect.');
+required((frame($secondSenderSocket)['data'] ?? null) === ['typing' => true], 'Second tab missed typing before disconnect.');
+fclose($senderSocket);
+$senderSocket = $secondSenderSocket;
+$expiryAfterDisconnect = frame($observerSocket);
+required(($expiryAfterDisconnect['data'] ?? null) === ['typing' => false]
+    && ($expiryAfterDisconnect['user_id'] ?? null) === (string) $member->id,
+    'Typing did not expire while another member tab remained connected: '.json_encode($expiryAfterDisconnect));
+required((frame($senderSocket)['data'] ?? null) === ['typing' => false],
+    'The remaining tab missed typing expiry.');
+
 // Reverb bounds all socket messages, including client whispers.
 for ($attempt = 0; $attempt < 50; $attempt++) {
     sendFrame($senderSocket, ['event' => 'client-typing', 'channel' => $channel, 'data' => ['typing' => true]]);
@@ -137,7 +161,8 @@ for ($attempt = 0; $attempt < 50; $attempt++) {
 stream_set_timeout($senderSocket, 3);
 $limited = frame($senderSocket);
 required(($limited['event'] ?? null) === 'pusher:error'
-    && str_contains($limited['data'] ?? '', 'Rate limit exceeded'), 'Reverb did not rate-limit typing traffic.');
+    && str_contains($limited['data'] ?? '', 'Rate limit exceeded'),
+    'Reverb did not rate-limit typing traffic: '.json_encode($limited));
 required(DB::table('notifications')->where('ticket_id', $ticketId)->count() === $notificationCount,
     'Typing wrote a durable Notification.');
 
