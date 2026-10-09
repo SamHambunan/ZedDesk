@@ -13,6 +13,10 @@ require __DIR__.'/live_socket_helpers.php';
 require __DIR__.'/../../vendor/autoload.php';
 $app = require __DIR__.'/../../bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
+set_exception_handler(function (Throwable $error): never {
+    fwrite(STDERR, $error->getMessage()."\n");
+    exit(1);
+});
 
 $suffix = bin2hex(random_bytes(5));
 $hosts = [];
@@ -124,27 +128,30 @@ fclose($firstSocket);
 required(frame($observerSocket) === null, 'First tab disconnect removed an online Organization Member.');
 
 fclose($secondSocket);
-stream_set_timeout($observerSocket, 10);
-$removed = frame($observerSocket);
-required(($removed['event'] ?? null) === 'pusher_internal:member_removed', 'Last tab disconnect did not announce departure.');
-required(json_decode($removed['data'], true, flags: JSON_THROW_ON_ERROR)['user_id'] === (string) $member->id,
-    'Departure identified the wrong Organization Member.');
-$departedAt = microtime(true);
+required(frame($observerSocket) === null, 'Last tab departure was announced before reconnect grace.');
+[$graceObserverSocket, $graceObserverSocketId] = connect($hosts['acme']);
+[$status, $graceObserverAuth] = api('POST', $hosts['acme'], '/api/broadcasting/auth', [
+    'socket_id' => $graceObserverSocketId, 'channel_name' => $channel,
+], $observer['token']);
+required($status === 200, 'Observer reauthorization during grace failed.');
+$graceSnapshot = subscribePresence($graceObserverSocket, $channel, $graceObserverAuth);
+required(in_array((string) $member->id, array_map('strval', $graceSnapshot['presence']['ids']), true),
+    'A new observer could not see the member during reconnect grace.');
+fclose($graceObserverSocket);
 
-// Consumers retain the online indication for this server-advertised reconnect window.
 [$reconnectedSocket, $reconnectedSocketId] = connect($hosts['acme']);
 $reconnectedAuth = $authorizeAgent($reconnectedSocketId);
 subscribePresence($reconnectedSocket, $channel, $reconnectedAuth);
-$readded = frame($observerSocket);
-required(($readded['event'] ?? null) === 'pusher_internal:member_added'
-    && microtime(true) - $departedAt < $discovery['offline_grace_seconds'], 'Reconnection missed the grace window.');
+required(frame($observerSocket) === null, 'Reconnection during grace produced a duplicate arrival.');
+$lastDepartureAt = microtime(true);
 fclose($reconnectedSocket);
-$removedAgain = frame($observerSocket);
-required(($removedAgain['event'] ?? null) === 'pusher_internal:member_removed', 'Final disconnect was not announced.');
-$offlineAfter = microtime(true) + $discovery['offline_grace_seconds'];
-while (microtime(true) < $offlineAfter) {
-    usleep(250000);
-}
+required(frame($observerSocket) === null, 'Final departure was announced before reconnect grace.');
+stream_set_timeout($observerSocket, 35);
+$removed = frame($observerSocket);
+required(($removed['event'] ?? null) === 'pusher_internal:member_removed', 'Grace expiry did not announce departure.');
+required(microtime(true) - $lastDepartureAt >= 28, 'Departure was announced before grace expired.');
+required(json_decode($removed['data'], true, flags: JSON_THROW_ON_ERROR)['user_id'] === (string) $member->id,
+    'Departure identified the wrong Organization Member.');
 [$afterGraceSocket, $afterGraceSocketId] = connect($hosts['acme']);
 [$status, $afterGraceChannel] = api('GET', $hosts['acme'], '/api/live/presence-channel', token: $observer['token']);
 required($status === 200, 'Presence rediscovery failed after grace.');

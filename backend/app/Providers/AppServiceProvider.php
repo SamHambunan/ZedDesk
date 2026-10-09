@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Broadcasting\OrganizationPresenceChannelManager;
 use App\Models\Customer;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
@@ -15,6 +16,7 @@ use App\Services\TicketLiveChannel;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Reverb\Protocols\Pusher\Contracts\ChannelManager;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -23,7 +25,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(ChannelManager::class, OrganizationPresenceChannelManager::class);
     }
 
     /**
