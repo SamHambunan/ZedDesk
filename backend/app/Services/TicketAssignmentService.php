@@ -93,7 +93,9 @@ class TicketAssignmentService
                 'assigned_by_id' => $assignedByModel?->id,
             ]);
 
-            $this->notifications->assignmentChanged($ticket, $previousTeamId, $previousMemberId, $assignedByModel?->id);
+            if ($previousTeamId !== $ticket->assigned_team_id || $previousMemberId !== $ticket->assigned_member_id) {
+                $this->notifications->assignmentChanged($ticket, $previousTeamId, $previousMemberId, $assignedByModel?->id);
+            }
 
             TicketAssigned::dispatch($ticket, $assignment);
             TicketChanged::dispatch($ticket, TicketChanged::ASSIGNMENT_CHANGED);

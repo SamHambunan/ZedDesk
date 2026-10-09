@@ -120,10 +120,11 @@ test('repeated Assignment activity updates one unread item and later activity pr
     Sanctum::actingAs($recipient->user);
     $first = $this->getJson('http://acme.localhost/api/notifications')->assertJsonCount(1, 'data')->json('data.0.id');
     Sanctum::actingAs($actor->user);
-    $this->postJson($url, ['member_id' => $recipient->id])->assertOk();
+    $this->postJson($url, ['member_id' => $actor->id])->assertOk();
     Sanctum::actingAs($recipient->user);
     $this->getJson('http://acme.localhost/api/notifications')->assertJsonCount(1, 'data')
-        ->assertJsonPath('data.0.id', $first);
+        ->assertJsonPath('data.0.id', $first)
+        ->assertJsonPath('data.0.latest_activity_metadata.to_member_id', $actor->id);
     $this->postJson("http://acme.localhost/api/notifications/{$first}/mark-read")->assertOk();
 
     Sanctum::actingAs($actor->user);
@@ -133,6 +134,12 @@ test('repeated Assignment activity updates one unread item and later activity pr
     expect(collect($inbox)->whereNull('read_at')->count())->toBe(1)
         ->and(collect($inbox)->pluck('id')->contains($first))->toBeTrue();
     $this->getJson('http://acme.localhost/api/notifications/unread-count')->assertJsonPath('unread_count', 1);
+    $this->postJson("http://acme.localhost/api/notifications/{$inbox[0]['id']}/mark-read")->assertOk();
+    Sanctum::actingAs($actor->user);
+    $this->postJson($url, ['member_id' => $recipient->id])->assertOk();
+    Sanctum::actingAs($recipient->user);
+    $this->getJson('http://acme.localhost/api/notifications/unread-count')->assertJsonPath('unread_count', 0);
+    $this->getJson('http://acme.localhost/api/notifications')->assertJsonCount(2, 'data');
 });
 
 test('claim with a Ticket Status transition does not create duplicate Assignment Notifications', function () {

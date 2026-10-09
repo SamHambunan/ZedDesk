@@ -71,7 +71,7 @@ class TicketNotificationService
                     latest_activity_at = EXCLUDED.latest_activity_at,
                     updated_at = EXCLUDED.updated_at',
                 [(string) Str::uuid(), $ticket->organization_id, $memberId, $ticket->id, $activityType,
-                    json_encode($metadata, JSON_THROW_ON_ERROR), $now, $now, $now]
+                    json_encode((object) $metadata, JSON_THROW_ON_ERROR), $now, $now, $now]
             );
 
             MemberInboxChanged::dispatch((int) $ticket->organization_id, (int) $memberId);
