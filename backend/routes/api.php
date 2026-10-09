@@ -111,7 +111,10 @@ Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(functio
         $ticketModel = Ticket::findOrFail($ticket);
         Gate::authorize('view', $ticketModel);
 
-        return response()->json(['channel' => 'presence-'.$channels->name($ticketModel->id)]);
+        return response()->json([
+            'channel' => 'presence-'.$channels->name($ticketModel->id),
+            'typing_expires_after_seconds' => TicketViewingPresenceChannel::TYPING_EXPIRES_AFTER_SECONDS,
+        ]);
     });
     Route::post('/tickets/{ticket}/messages', [TicketController::class, 'storeMessage']);
     Route::post('/tickets/{ticket}/assign', [TicketController::class, 'assign']);
