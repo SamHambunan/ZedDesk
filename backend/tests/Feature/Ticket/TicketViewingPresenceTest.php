@@ -1,6 +1,8 @@
 <?php
 
 use App\Context\OrganizationContext;
+use App\Events\MemberInboxChanged;
+use App\Events\TicketCreated;
 use App\Models\Customer;
 use App\Models\Organization;
 use App\Models\OrganizationMember;
@@ -10,6 +12,7 @@ use App\Providers\AppServiceProvider;
 use App\Services\CustomerTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Event;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -20,6 +23,7 @@ afterEach(function () {
 });
 
 test('only a current Organization Member can join current Ticket viewing Presence with authenticated identity', function () {
+    Event::fake([MemberInboxChanged::class, TicketCreated::class]);
     config([
         'broadcasting.default' => 'reverb',
         'broadcasting.connections.reverb.key' => 'test-key',
