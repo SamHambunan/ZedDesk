@@ -109,3 +109,16 @@ function subscribe($socket, string $channel, string $auth): void
     $message = frame($socket);
     required(($message['event'] ?? null) === 'pusher_internal:subscription_succeeded', 'Subscription was not accepted.');
 }
+
+function subscribePresence($socket, string $channel, array $authorization): array
+{
+    sendFrame($socket, ['event' => 'pusher:subscribe', 'data' => [
+        'channel' => $channel,
+        'auth' => $authorization['auth'],
+        'channel_data' => $authorization['channel_data'],
+    ]]);
+    $message = frame($socket);
+    required(($message['event'] ?? null) === 'pusher_internal:subscription_succeeded', 'Presence subscription was not accepted.');
+
+    return json_decode($message['data'], true, flags: JSON_THROW_ON_ERROR);
+}

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Broadcasting\OrganizationPresenceChannelManager;
 use App\Models\Customer;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
@@ -10,10 +11,12 @@ use App\Policies\TicketPolicy;
 use App\Services\CustomerTicketLiveChannel;
 use App\Services\MemberNotificationChannel;
 use App\Services\OrganizationLiveChannel;
+use App\Services\OrganizationPresenceChannel;
 use App\Services\TicketLiveChannel;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Reverb\Protocols\Pusher\Contracts\ChannelManager;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,7 +25,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(ChannelManager::class, OrganizationPresenceChannelManager::class);
     }
 
     /**
@@ -35,6 +38,11 @@ class AppServiceProvider extends ServiceProvider
 
         Broadcast::channel('organization.{organizationId}.{generation}',
             fn ($user, $organizationId, $generation) => app(OrganizationLiveChannel::class)
+                ->mayJoin($user, $organizationId, $generation),
+            ['guards' => ['sanctum']]
+        );
+        Broadcast::channel('organization.{organizationId}.members.{generation}',
+            fn ($user, $organizationId, $generation) => app(OrganizationPresenceChannel::class)
                 ->mayJoin($user, $organizationId, $generation),
             ['guards' => ['sanctum']]
         );

@@ -17,6 +17,7 @@ use App\Models\Ticket;
 use App\Services\CustomerTicketLiveChannel;
 use App\Services\MemberNotificationChannel;
 use App\Services\OrganizationLiveChannel;
+use App\Services\OrganizationPresenceChannel;
 use App\Services\TicketLiveChannel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
@@ -64,6 +65,12 @@ Route::get('/invitations/{token}', [InvitationController::class, 'show']);
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept']);
 
 Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(function () {
+    Route::get('/live/presence-channel', function (OrganizationPresenceChannel $channels) {
+        return response()->json([
+            'channel' => 'presence-'.$channels->name(OrganizationContext::getCurrentId()),
+            'offline_grace_seconds' => OrganizationPresenceChannel::OFFLINE_GRACE_SECONDS,
+        ]);
+    });
     Route::get('/live/notification-channel', function (Request $request, MemberNotificationChannel $channels) {
         $member = $request->attributes->get('organization_member');
 
