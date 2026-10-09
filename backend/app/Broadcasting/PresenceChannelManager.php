@@ -8,7 +8,7 @@ use Laravel\Reverb\Protocols\Pusher\Channels\Channel;
 use Laravel\Reverb\Protocols\Pusher\Exceptions\ConnectionUnauthorized;
 use Laravel\Reverb\Protocols\Pusher\Managers\ArrayChannelManager;
 
-class OrganizationPresenceChannelManager extends ArrayChannelManager
+class PresenceChannelManager extends ArrayChannelManager
 {
     public function remove(Channel $channel): void
     {
@@ -26,7 +26,11 @@ class OrganizationPresenceChannelManager extends ArrayChannelManager
 
     public function findOrCreate(string $channelName): Channel
     {
-        if (! preg_match('/^presence-organization\.\d+\.members\.(\d+)$/', $channelName, $matches)) {
+        if (preg_match('/^presence-ticket\.[0-9a-f-]+\.viewers\.(\d+)$/', $channelName, $matches)) {
+            $channelClass = TicketViewingPresenceChannel::class;
+        } elseif (preg_match('/^presence-organization\.\d+\.members\.(\d+)$/', $channelName, $matches)) {
+            $channelClass = GracefulOrganizationPresenceChannel::class;
+        } else {
             return parent::findOrCreate($channelName);
         }
 
@@ -38,7 +42,7 @@ class OrganizationPresenceChannelManager extends ArrayChannelManager
             return $channel;
         }
 
-        $channel = new GracefulOrganizationPresenceChannel($channelName);
+        $channel = new $channelClass($channelName);
         $this->applications[$this->application->id()][$channelName] = $channel;
         ChannelCreated::dispatch($channel);
 

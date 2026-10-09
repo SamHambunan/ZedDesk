@@ -19,6 +19,7 @@ use App\Services\MemberNotificationChannel;
 use App\Services\OrganizationLiveChannel;
 use App\Services\OrganizationPresenceChannel;
 use App\Services\TicketLiveChannel;
+use App\Services\TicketViewingPresenceChannel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\DB;
@@ -105,6 +106,12 @@ Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(functio
         Gate::authorize('view', $ticketModel);
 
         return response()->json(['channel' => 'private-'.$channels->name($ticketModel->id)]);
+    });
+    Route::get('/tickets/{ticket}/viewing-channel', function (string $ticket, TicketViewingPresenceChannel $channels) {
+        $ticketModel = Ticket::findOrFail($ticket);
+        Gate::authorize('view', $ticketModel);
+
+        return response()->json(['channel' => 'presence-'.$channels->name($ticketModel->id)]);
     });
     Route::post('/tickets/{ticket}/messages', [TicketController::class, 'storeMessage']);
     Route::post('/tickets/{ticket}/assign', [TicketController::class, 'assign']);
