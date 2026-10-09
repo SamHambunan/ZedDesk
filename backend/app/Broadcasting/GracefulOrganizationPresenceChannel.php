@@ -93,7 +93,7 @@ class GracefulOrganizationPresenceChannel extends PresenceChannel
     {
         if ($this->connections->isEmpty() && $this->pendingDepartures === []) {
             $manager = app(ChannelManager::class)->for($connection->app());
-            if ($manager instanceof OrganizationPresenceChannelManager) {
+            if ($manager instanceof PresenceChannelManager) {
                 $manager->retire($this);
             }
         }

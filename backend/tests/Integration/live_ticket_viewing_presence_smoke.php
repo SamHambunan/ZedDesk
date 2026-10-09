@@ -56,9 +56,13 @@ OrganizationMember::create([
     'message' => 'Current viewers only.',
 ]);
 required($status === 201, 'Ticket creation failed.');
-$notificationCount = DB::table('notifications')->count();
+$notificationCount = DB::table('notifications')->where('ticket_id', $created['ticket']['id'])->count();
 $ticketId = $created['ticket']['id'];
 $path = '/api/tickets/'.$ticketId.'/viewing-channel';
+// Keep setup away from a boundary so subscriptions can finish before renewal.
+while (300 - time() % 300 < 45) {
+    usleep(500000);
+}
 [$status, $discovery] = api('GET', $hosts['acme'], $path, token: $tokens['acme']);
 required($status === 200, 'Ticket viewing channel discovery failed.');
 $channel = $discovery['channel'];
@@ -150,32 +154,56 @@ required((frame($observerSocket)['event'] ?? null) === 'pusher_internal:member_a
 sendFrame($lastSocket, ['event' => 'pusher:unsubscribe', 'data' => ['channel' => $channel]]);
 required((frame($observerSocket)['event'] ?? null) === 'pusher_internal:member_removed', 'Hiding the final tab did not remove the viewer.');
 
-// A previously signed old-generation channel is rejected by the socket server itself.
-$oldChannel = 'presence-ticket.'.$ticketId.'.viewers.'.(intdiv(time(), 300) - 1);
-$oldData = $lastAuth['channel_data'];
-$signature = hash_hmac('sha256', $lastSocketId.':'.$oldChannel.':'.$oldData, getenv('REVERB_APP_SECRET'));
-sendFrame($lastSocket, ['event' => 'pusher:subscribe', 'data' => [
-    'channel' => $oldChannel,
-    'auth' => getenv('REVERB_APP_KEY').':'.$signature,
-    'channel_data' => $oldData,
-]]);
-required((frame($lastSocket)['event'] ?? null) === 'pusher:error', 'An old generation accepted a signed subscription.');
-[$status] = api('POST', $hosts['acme'], '/api/broadcasting/auth', [
-    'socket_id' => $lastSocketId, 'channel_name' => $oldChannel,
-], $tokens['acme']);
-required($status === 403, 'An old generation was reauthorized.');
-[$status, $renewed] = api('GET', $hosts['acme'], $path, token: $tokens['acme']);
-required($status === 200, 'Current generation discovery failed.');
-[$status, $renewedAuth] = api('POST', $hosts['acme'], '/api/broadcasting/auth', [
-    'socket_id' => $lastSocketId, 'channel_name' => $renewed['channel'],
-], $tokens['acme']);
-required($status === 200, 'Current generation reauthorization failed.');
-subscribePresence($lastSocket, $renewed['channel'], $renewedAuth);
-
-required(! in_array('ticket_viewing_presence', Schema::getTableListing(), true), 'Viewing Presence created a durable table.');
-required(! Schema::hasTable('ticket_view_history'), 'Viewing Presence created a history table.');
-required(DB::table('notifications')->count() === $notificationCount, 'Viewing Presence wrote a Notification.');
+// Authorize just before rotation so the test socket remains active at the boundary.
+$oldChannel = $channel;
 fclose($lastSocket);
 fclose($firstSocket);
 fclose($observerSocket);
+while (300 - time() % 300 > 15) {
+    usleep(500000);
+}
+[$renewalSocket, $renewalSocketId] = connect($hosts['acme']);
+[$status, $oldAuth] = api('POST', $hosts['acme'], '/api/broadcasting/auth', [
+    'socket_id' => $renewalSocketId, 'channel_name' => $oldChannel,
+], $tokens['acme']);
+required($status === 200, 'Pre-rotation viewing authorization failed.');
+
+$deadline = time() + 25;
+do {
+    [$status, $renewed] = api('GET', $hosts['acme'], $path, token: $tokens['acme']);
+    required($status === 200, 'Viewing channel discovery failed during generation renewal.');
+    if ($renewed['channel'] !== $oldChannel) {
+        break;
+    }
+    usleep(250000);
+} while (time() < $deadline);
+required($renewed['channel'] !== $oldChannel, 'Viewing generation did not rotate.');
+
+// The previously authorized generation is rejected by HTTP and by Reverb.
+sendFrame($renewalSocket, ['event' => 'pusher:subscribe', 'data' => [
+    'channel' => $oldChannel,
+    'auth' => $oldAuth['auth'],
+    'channel_data' => $oldAuth['channel_data'],
+]]);
+$oldSubscription = frame($renewalSocket);
+while (($oldSubscription['event'] ?? null) === 'pusher:ping') {
+    sendFrame($renewalSocket, ['event' => 'pusher:pong', 'data' => []]);
+    $oldSubscription = frame($renewalSocket);
+}
+required(($oldSubscription['event'] ?? null) === 'pusher:error',
+    'An old generation accepted a signed subscription: '.json_encode($oldSubscription));
+[$status] = api('POST', $hosts['acme'], '/api/broadcasting/auth', [
+    'socket_id' => $renewalSocketId, 'channel_name' => $oldChannel,
+], $tokens['acme']);
+required($status === 403, 'An old generation was reauthorized.');
+[$status, $renewedAuth] = api('POST', $hosts['acme'], '/api/broadcasting/auth', [
+    'socket_id' => $renewalSocketId, 'channel_name' => $renewed['channel'],
+], $tokens['acme']);
+required($status === 200, 'Current generation reauthorization failed.');
+subscribePresence($renewalSocket, $renewed['channel'], $renewedAuth);
+
+required(! in_array('ticket_viewing_presence', Schema::getTableListing(), true), 'Viewing Presence created a durable table.');
+required(! Schema::hasTable('ticket_view_history'), 'Viewing Presence created a history table.');
+required(DB::table('notifications')->where('ticket_id', $ticketId)->count() === $notificationCount, 'Viewing Presence wrote a Notification.');
+fclose($renewalSocket);
 echo "Live Ticket viewing Presence smoke passed.\n";

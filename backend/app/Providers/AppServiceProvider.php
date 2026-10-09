@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use App\Broadcasting\OrganizationPresenceChannelManager;
+use App\Broadcasting\PresenceChannelManager;
 use App\Models\Customer;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
@@ -26,7 +26,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton(ChannelManager::class, OrganizationPresenceChannelManager::class);
+        $this->app->singleton(ChannelManager::class, PresenceChannelManager::class);
     }
 
     /**
