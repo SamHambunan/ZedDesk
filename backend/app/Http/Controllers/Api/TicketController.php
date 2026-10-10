@@ -15,7 +15,7 @@ use App\Models\Ticket;
 use App\Models\TicketMessage;
 use App\Services\AttachmentService;
 use App\Services\TicketAssignmentService;
-use App\Services\TicketStateMachine;
+use App\Services\TicketFieldEditor;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -260,6 +260,8 @@ class TicketController extends Controller
             'id' => $ticket->id,
             'ticket_number' => $ticket->ticket_number,
             'revision' => $ticket->revision,
+            'status_revision' => $ticket->status_revision,
+            'priority_revision' => $ticket->priority_revision,
             'subject' => $ticket->subject,
             'status' => $ticket->status instanceof TicketStatus ? $ticket->status->value : $ticket->status,
             'priority' => $ticket->priority instanceof TicketPriority ? $ticket->priority->value : $ticket->priority,
@@ -286,6 +288,8 @@ class TicketController extends Controller
                 'id' => $ticket->id,
                 'ticket_number' => $ticket->ticket_number,
                 'revision' => $ticket->revision,
+                'status_revision' => $ticket->status_revision,
+                'priority_revision' => $ticket->priority_revision,
                 'subject' => $ticket->subject,
                 'status' => $ticket->status instanceof TicketStatus ? $ticket->status->value : $ticket->status,
                 'priority' => $ticket->priority instanceof TicketPriority ? $ticket->priority->value : $ticket->priority,
@@ -314,12 +318,6 @@ class TicketController extends Controller
         $ticket = Ticket::findOrFail($ticketId);
 
         Gate::authorize('create', [TicketMessage::class, $ticket]);
-
-        if ($ticket->isClosed()) {
-            return response()->json([
-                'message' => "Ticket #{$ticket->ticket_number} is closed and immutable. New conversation replies are rejected.",
-            ], 422);
-        }
 
         $validated = $request->validate([
             'message_type' => ['required', new Enum(TicketMessageType::class)],
@@ -355,6 +353,14 @@ class TicketController extends Controller
 
         try {
             return DB::transaction(function () use ($ticket, $currentMember, $messageType, $body, $statusOverride, $files, $attachmentService) {
+                $ticket = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
+
+                if ($ticket->isClosed()) {
+                    return response()->json([
+                        'message' => "Ticket #{$ticket->ticket_number} is closed and immutable. New conversation replies are rejected.",
+                    ], 422);
+                }
+
                 $messageData = [
                     'organization_id' => $ticket->organization_id,
                     'ticket_id' => $ticket->id,
@@ -513,7 +519,7 @@ class TicketController extends Controller
     /**
      * Update the status of a ticket using the lifecycle state machine.
      */
-    public function updateStatus(Request $request, string $ticketId, TicketStateMachine $stateMachine): JsonResponse
+    public function updateStatus(Request $request, string $ticketId, TicketFieldEditor $fieldEditor): JsonResponse
     {
         $ticket = Ticket::findOrFail($ticketId);
 
@@ -521,12 +527,21 @@ class TicketController extends Controller
 
         $validated = $request->validate([
             'status' => ['required', new Enum(TicketStatus::class)],
+            'expected_status_revision' => ['sometimes', 'required', 'integer', 'min:1'],
         ]);
 
         try {
-            $stateMachine->transitionTo($ticket, $validated['status']);
+            $conflict = $fieldEditor->updateStatus($ticket, $validated['status'],
+                isset($validated['expected_status_revision']) ? (int) $validated['expected_status_revision'] : null);
         } catch (InvalidTicketTransitionException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        if ($conflict !== null) {
+            return response()->json([
+                'message' => 'Ticket status has changed since it was read.',
+                'current' => $conflict,
+            ], 409);
         }
 
         return response()->json([
