@@ -48,17 +48,19 @@ afterEach(fn () => OrganizationContext::clear());
 test('a second Status edit from the same read conflicts without changing the winner or signaling', function () {
     Sanctum::actingAs($this->members[0]);
     $read = $this->getJson($this->url)->assertOk()->json('ticket');
-    expect($read['status'])->toBe('new');
+    expect($read['status'])->toBe('new')
+        ->and($read['status_revision'])->toBe(1);
 
     $this->patchJson($this->url.'/status', [
-        'status' => 'open', 'expected_status' => $read['status'],
+        'status' => 'open', 'expected_status_revision' => $read['status_revision'],
     ])->assertOk();
 
     Sanctum::actingAs($this->members[1]);
     $this->patchJson($this->url.'/status', [
-        'status' => 'open', 'expected_status' => $read['status'],
+        'status' => 'open', 'expected_status_revision' => $read['status_revision'],
     ])->assertStatus(409)
         ->assertJsonPath('current.status', 'open')
+        ->assertJsonPath('current.status_revision', 2)
         ->assertJsonPath('current.revision', 2);
 
     $this->getJson($this->url)->assertJsonPath('ticket.status', 'open');
@@ -68,17 +70,19 @@ test('a second Status edit from the same read conflicts without changing the win
 test('a second Priority edit from the same read conflicts without changing the winner or signaling', function () {
     Sanctum::actingAs($this->members[0]);
     $read = $this->getJson($this->url)->assertOk()->json('ticket');
-    expect($read['priority'])->toBe('medium');
+    expect($read['priority'])->toBe('medium')
+        ->and($read['priority_revision'])->toBe(1);
 
     $this->patchJson($this->url.'/priority', [
-        'priority' => 'high', 'expected_priority' => $read['priority'],
+        'priority' => 'high', 'expected_priority_revision' => $read['priority_revision'],
     ])->assertOk();
 
     Sanctum::actingAs($this->members[1]);
     $this->patchJson($this->url.'/priority', [
-        'priority' => 'urgent', 'expected_priority' => $read['priority'],
+        'priority' => 'urgent', 'expected_priority_revision' => $read['priority_revision'],
     ])->assertStatus(409)
         ->assertJsonPath('current.priority', 'high')
+        ->assertJsonPath('current.priority_revision', 2)
         ->assertJsonPath('current.revision', 2);
 
     $this->getJson($this->url)->assertJsonPath('ticket.priority', 'high');
@@ -90,27 +94,50 @@ test('Status and Priority edits based on one read succeed independently in eithe
     $read = $this->getJson($this->url)->assertOk()->json('ticket');
 
     $this->patchJson($this->url.'/status', [
-        'status' => 'open', 'expected_status' => $read['status'],
+        'status' => 'open', 'expected_status_revision' => $read['status_revision'],
     ])->assertOk();
 
     Sanctum::actingAs($this->members[1]);
     $this->patchJson($this->url.'/priority', [
-        'priority' => 'high', 'expected_priority' => $read['priority'],
+        'priority' => 'high', 'expected_priority_revision' => $read['priority_revision'],
     ])->assertOk();
 
     $read = $this->getJson($this->url)->assertOk()->json('ticket');
     $this->patchJson($this->url.'/priority', [
-        'priority' => 'urgent', 'expected_priority' => $read['priority'],
+        'priority' => 'urgent', 'expected_priority_revision' => $read['priority_revision'],
     ])->assertOk();
 
     Sanctum::actingAs($this->members[0]);
     $this->patchJson($this->url.'/status', [
-        'status' => 'pending', 'expected_status' => $read['status'],
+        'status' => 'pending', 'expected_status_revision' => $read['status_revision'],
     ])->assertOk();
 
     $this->getJson($this->url)->assertOk()
         ->assertJsonPath('ticket.status', 'pending')
         ->assertJsonPath('ticket.priority', 'urgent');
+});
+
+test('a field revision rejects an edit after the field returns to its earlier value', function () {
+    Sanctum::actingAs($this->members[0]);
+    $read = $this->getJson($this->url)->assertOk()->json('ticket');
+
+    $this->patchJson($this->url.'/priority', ['priority' => 'high'])->assertOk();
+    $this->patchJson($this->url.'/priority', ['priority' => 'medium'])->assertOk();
+    $this->patchJson($this->url.'/status', ['status' => 'open'])->assertOk();
+    $this->patchJson($this->url.'/status', ['status' => 'pending'])->assertOk();
+    $this->patchJson($this->url.'/status', ['status' => 'open'])->assertOk();
+
+    Sanctum::actingAs($this->members[1]);
+    $this->patchJson($this->url.'/priority', [
+        'priority' => 'urgent', 'expected_priority_revision' => $read['priority_revision'],
+    ])->assertStatus(409)
+        ->assertJsonPath('current.priority', 'medium')
+        ->assertJsonPath('current.priority_revision', 3);
+    $this->patchJson($this->url.'/status', [
+        'status' => 'pending', 'expected_status_revision' => $read['status_revision'],
+    ])->assertStatus(409)
+        ->assertJsonPath('current.status', 'open')
+        ->assertJsonPath('current.status_revision', 4);
 });
 
 test('Public Replies and Internal Notes append after Priority edits and closed Tickets still reject them', function () {

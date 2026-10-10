@@ -15,7 +15,7 @@ use App\Models\Ticket;
 use App\Models\TicketMessage;
 use App\Services\AttachmentService;
 use App\Services\TicketAssignmentService;
-use App\Services\TicketStateMachine;
+use App\Services\TicketFieldEditor;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -260,6 +260,8 @@ class TicketController extends Controller
             'id' => $ticket->id,
             'ticket_number' => $ticket->ticket_number,
             'revision' => $ticket->revision,
+            'status_revision' => $ticket->status_revision,
+            'priority_revision' => $ticket->priority_revision,
             'subject' => $ticket->subject,
             'status' => $ticket->status instanceof TicketStatus ? $ticket->status->value : $ticket->status,
             'priority' => $ticket->priority instanceof TicketPriority ? $ticket->priority->value : $ticket->priority,
@@ -286,6 +288,8 @@ class TicketController extends Controller
                 'id' => $ticket->id,
                 'ticket_number' => $ticket->ticket_number,
                 'revision' => $ticket->revision,
+                'status_revision' => $ticket->status_revision,
+                'priority_revision' => $ticket->priority_revision,
                 'subject' => $ticket->subject,
                 'status' => $ticket->status instanceof TicketStatus ? $ticket->status->value : $ticket->status,
                 'priority' => $ticket->priority instanceof TicketPriority ? $ticket->priority->value : $ticket->priority,
@@ -515,7 +519,7 @@ class TicketController extends Controller
     /**
      * Update the status of a ticket using the lifecycle state machine.
      */
-    public function updateStatus(Request $request, string $ticketId, TicketStateMachine $stateMachine): JsonResponse
+    public function updateStatus(Request $request, string $ticketId, TicketFieldEditor $fieldEditor): JsonResponse
     {
         $ticket = Ticket::findOrFail($ticketId);
 
@@ -523,32 +527,21 @@ class TicketController extends Controller
 
         $validated = $request->validate([
             'status' => ['required', new Enum(TicketStatus::class)],
-            'expected_status' => ['sometimes', 'required', new Enum(TicketStatus::class)],
+            'expected_status_revision' => ['sometimes', 'required', 'integer', 'min:1'],
         ]);
 
         try {
-            $conflict = DB::transaction(function () use ($ticket, $validated, $stateMachine) {
-                $current = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
-                $currentStatus = $current->status instanceof TicketStatus
-                    ? $current->status->value : (string) $current->status;
-
-                if (isset($validated['expected_status']) && $validated['expected_status'] !== $currentStatus) {
-                    return response()->json([
-                        'message' => 'Ticket status has changed since it was read.',
-                        'current' => ['status' => $currentStatus, 'revision' => $current->revision],
-                    ], 409);
-                }
-
-                $stateMachine->transitionTo($current, $validated['status']);
-
-                return null;
-            });
+            $conflict = $fieldEditor->updateStatus($ticket, $validated['status'],
+                isset($validated['expected_status_revision']) ? (int) $validated['expected_status_revision'] : null);
         } catch (InvalidTicketTransitionException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
         if ($conflict !== null) {
-            return $conflict;
+            return response()->json([
+                'message' => 'Ticket status has changed since it was read.',
+                'current' => $conflict,
+            ], 409);
         }
 
         return response()->json([
