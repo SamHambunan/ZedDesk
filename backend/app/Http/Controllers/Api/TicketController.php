@@ -315,12 +315,6 @@ class TicketController extends Controller
 
         Gate::authorize('create', [TicketMessage::class, $ticket]);
 
-        if ($ticket->isClosed()) {
-            return response()->json([
-                'message' => "Ticket #{$ticket->ticket_number} is closed and immutable. New conversation replies are rejected.",
-            ], 422);
-        }
-
         $validated = $request->validate([
             'message_type' => ['required', new Enum(TicketMessageType::class)],
             'body' => ['required', 'string'],
@@ -355,6 +349,14 @@ class TicketController extends Controller
 
         try {
             return DB::transaction(function () use ($ticket, $currentMember, $messageType, $body, $statusOverride, $files, $attachmentService) {
+                $ticket = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
+
+                if ($ticket->isClosed()) {
+                    return response()->json([
+                        'message' => "Ticket #{$ticket->ticket_number} is closed and immutable. New conversation replies are rejected.",
+                    ], 422);
+                }
+
                 $messageData = [
                     'organization_id' => $ticket->organization_id,
                     'ticket_id' => $ticket->id,
@@ -521,12 +523,32 @@ class TicketController extends Controller
 
         $validated = $request->validate([
             'status' => ['required', new Enum(TicketStatus::class)],
+            'expected_status' => ['sometimes', 'required', new Enum(TicketStatus::class)],
         ]);
 
         try {
-            $stateMachine->transitionTo($ticket, $validated['status']);
+            $conflict = DB::transaction(function () use ($ticket, $validated, $stateMachine) {
+                $current = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
+                $currentStatus = $current->status instanceof TicketStatus
+                    ? $current->status->value : (string) $current->status;
+
+                if (isset($validated['expected_status']) && $validated['expected_status'] !== $currentStatus) {
+                    return response()->json([
+                        'message' => 'Ticket status has changed since it was read.',
+                        'current' => ['status' => $currentStatus, 'revision' => $current->revision],
+                    ], 409);
+                }
+
+                $stateMachine->transitionTo($current, $validated['status']);
+
+                return null;
+            });
         } catch (InvalidTicketTransitionException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        if ($conflict !== null) {
+            return $conflict;
         }
 
         return response()->json([
