@@ -146,7 +146,7 @@ export const ModalRoot: React.FC<ModalRootProps> = ({
           aria-describedby={descId}
           tabIndex={-1}
           className={cn(
-            'relative w-full max-w-lg bg-surface-subpanel border border-border-subtle rounded-lg shadow-modal text-on-surface overflow-hidden outline-none focus-visible:ring-1 focus-visible:ring-focus-amber',
+            'relative w-full max-w-lg bg-surface-subpanel border border-white/10 theme-dialog-border rounded-lg shadow-modal text-on-surface overflow-hidden outline-none focus-visible:ring-1 focus-visible:ring-focus-amber',
             className
           )}
         >

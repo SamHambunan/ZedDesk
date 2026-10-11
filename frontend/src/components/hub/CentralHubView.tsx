@@ -426,6 +426,11 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
   if (!token || !user) {
     return (
       <div data-theme="internal" className={`min-h-screen bg-canvas-base flex flex-col justify-center items-center p-4 md:p-6 antialiased selection:bg-primary-container/30 selection:text-on-primary ${className}`}>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+          precedence="default"
+        />
         {/* Subtle Ambient Glow */}
         <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden">
           <div className="absolute w-[600px] h-[600px] bg-primary-container/5 rounded-full blur-3xl opacity-30 mix-blend-screen" />

@@ -72,6 +72,10 @@
   outline-offset: 2px;
 }
 
+[data-theme] .theme-dialog-border {
+  border-color: rgb(var(--zd-border-subtle));
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-theme] *, [data-theme] *::before, [data-theme] *::after {
     animation-duration: 0.01ms !important;
