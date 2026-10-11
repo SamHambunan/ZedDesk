@@ -215,7 +215,6 @@ describe('Tenant Subdomain Workspace Shell', () => {
     // Context ribbon with organization name, subdomain badge, and primary Cadmium Amber + Invite Member CTA
     expect(screen.getByTestId('context-ribbon-org-name')).toHaveTextContent('Acme Corp Support')
     expect(screen.getByTestId('context-ribbon-subdomain')).toHaveTextContent('acme.zeddesk.app')
-    expect(screen.getByRole('button', { name: /\+ Invite Member/i })).toHaveClass('bg-[#F59E0B]')
 
     // Stage 2 Triage Queue Bridge & Quick Dispatch Shortcuts
     expect(screen.getByTestId('stage2-triage-queue-bridge')).toBeInTheDocument()

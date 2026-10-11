@@ -1,7 +1,8 @@
-import React, { forwardRef } from 'react'
+import React from 'react'
 import { cn } from '../../lib/utils'
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  ref?: React.Ref<HTMLInputElement>
   label?: string
   error?: string
   helperText?: string
@@ -10,8 +11,7 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   focusRing?: 'amber' | 'indigo'
 }
 
-export const Input = forwardRef<HTMLInputElement, InputProps>(
-  (
+export const Input = (
     {
       className,
       label,
@@ -22,16 +22,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       id,
       disabled,
       focusRing = 'amber',
+      ref,
       ...props
-    },
-    ref
+    }: InputProps
   ) => {
     const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined)
 
     const focusStyles =
       focusRing === 'indigo'
         ? 'focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-accent-indigo-glow/30'
-        : 'focus:outline-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B]'
+        : 'focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber'
 
     return (
       <div className="w-full flex flex-col gap-1.5 text-left">
@@ -95,6 +95,5 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       </div>
     )
   }
-)
 
 Input.displayName = 'Input'

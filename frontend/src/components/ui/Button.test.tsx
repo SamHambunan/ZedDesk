@@ -26,8 +26,8 @@ describe('Button Primitive', () => {
 
     rerender(<Button variant="amber">Cadmium Amber</Button>)
     button = screen.getByRole('button', { name: 'Cadmium Amber' })
-    expect(button.className).toContain('bg-[#F59E0B]')
-    expect(button.className).toContain('text-[#0F1012]')
+    expect(button.className).toContain('bg-amber-action')
+    expect(button.className).toContain('text-on-amber-action')
   })
 
   it('renders AI action variant with sparkle icon prefix', () => {
@@ -73,7 +73,7 @@ describe('Button Primitive', () => {
   it('features accessible Cadmium Amber focus ring classes by default', () => {
     render(<Button>Focusable</Button>)
     const button = screen.getByRole('button', { name: 'Focusable' })
-    expect(button.className).toContain('focus-visible:ring-[#F59E0B]')
+    expect(button.className).toContain('focus-visible:ring-focus-amber')
     button.focus()
     expect(button).toHaveFocus()
   })
@@ -84,5 +84,13 @@ describe('Button Primitive', () => {
     expect(button.className).toContain('focus-visible:ring-accent-indigo-glow')
     button.focus()
     expect(button).toHaveFocus()
+  })
+
+  it.each(['internal', 'customer'] as const)('keeps button actions usable in the %s theme', async (theme) => {
+    const user = userEvent.setup()
+    const onClick = vi.fn()
+    render(<div data-theme={theme}><Button onClick={onClick}>Continue</Button></div>)
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(onClick).toHaveBeenCalledOnce()
   })
 })

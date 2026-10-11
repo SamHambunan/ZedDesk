@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react'
+import React from 'react'
 import { Sparkles, Loader2 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
@@ -6,6 +6,7 @@ export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'ai' | 'danger' 
 export type ButtonSize = 'compact' | 'standard' | 'lg' | 'icon'
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  ref?: React.Ref<HTMLButtonElement>
   variant?: ButtonVariant
   size?: ButtonSize
   isLoading?: boolean
@@ -14,8 +15,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   focusRing?: 'amber' | 'indigo'
 }
 
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  (
+export const Button = (
     {
       children,
       className,
@@ -26,13 +26,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       leftIcon,
       rightIcon,
       focusRing = 'amber',
+      ref,
       ...props
-    },
-    ref
+    }: ButtonProps
   ) => {
     const isAmberFocus = focusRing !== 'indigo'
     const ringClass = isAmberFocus
-      ? 'focus-visible:ring-[#F59E0B]'
+      ? 'focus-visible:ring-focus-amber'
       : 'focus-visible:ring-accent-indigo-glow'
 
     const baseStyles =
@@ -44,17 +44,17 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variantStyles: Record<ButtonVariant, string> = {
       primary:
-        'bg-primary-container hover:bg-primary-dark text-white shadow-keylight-primary border border-transparent',
+        'bg-primary-container hover:bg-primary-dark text-on-primary shadow-keylight-primary border border-transparent',
       secondary:
         'bg-surface-subpanel hover:bg-surface-container-high text-on-surface border border-border-prominent shadow-keylight',
       ghost:
         'bg-transparent hover:bg-surface-subpanel text-on-surface-variant hover:text-on-surface border border-transparent',
       ai:
-        'bg-gradient-to-b from-accent-indigo-glow to-primary-container hover:brightness-110 text-white border border-secondary/40 shadow-keylight-primary',
+        'bg-gradient-to-b from-accent-indigo-glow to-primary-container hover:brightness-110 text-on-primary border border-secondary/40 shadow-keylight-primary',
       danger:
         'bg-sentiment-negative hover:bg-rose-600 text-white shadow-keylight-primary border border-transparent',
       amber:
-        'bg-[#F59E0B] hover:bg-[#D97706] active:bg-[#B45309] text-[#0F1012] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] border border-transparent',
+        'bg-amber-action hover:bg-amber-hover active:bg-amber-pressed text-on-amber-action font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] border border-transparent',
     }
 
     const sizeStyles: Record<ButtonSize, string> = {
@@ -87,6 +87,5 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       </button>
     )
   }
-)
 
 Button.displayName = 'Button'

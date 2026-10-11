@@ -127,9 +127,9 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
       {error && (
         <div
           role="alert"
-          className="bg-[#EF4444]/10 border border-[#EF4444]/30 rounded p-3 flex items-start gap-2.5 text-xs text-[#EF4444] font-medium"
+          className="bg-sentiment-negative/10 border border-sentiment-negative/30 rounded p-3 flex items-start gap-2.5 text-xs text-sentiment-negative font-medium"
         >
-          <AlertCircle className="w-4 h-4 text-[#EF4444] mt-0.5 flex-shrink-0" />
+          <AlertCircle className="w-4 h-4 text-sentiment-negative mt-0.5 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
@@ -139,12 +139,12 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
         <div className="space-y-1.5 text-left">
           <label
             htmlFor="signup-name"
-            className="text-xs font-medium text-[#A0A6B5] block select-none"
+            className="text-sm font-medium text-on-surface-variant block select-none"
           >
             {authContentData.signup.nameLabel}
           </label>
           <div className="relative group">
-            <UserIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#525866] pointer-events-none" />
+            <UserIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
             <input
               id="signup-name"
               type="text"
@@ -155,15 +155,15 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
               onBlur={() => handleBlur('name')}
               aria-invalid={nameHasError}
               aria-describedby={nameHasError ? 'signup-name-error' : undefined}
-              className={`w-full h-10 bg-[#121316] rounded px-3 py-2 pl-9 text-xs text-[#F1F3F7] placeholder-[#525866] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] transition-all ${
+              className={`w-full h-11 bg-surface-container-lowest rounded px-3 py-2 pl-9 text-sm text-text-primary placeholder-text-muted shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] transition-all ${
                 nameHasError
-                  ? 'border border-[#EF4444] focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]'
-                  : 'border border-[#282A33] focus:outline-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B]'
+                  ? 'border border-sentiment-negative focus:outline-none focus:border-sentiment-negative focus:ring-1 focus:ring-sentiment-negative'
+                  : 'border border-border-subtle focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container'
               }`}
             />
           </div>
           {nameHasError && (
-            <p id="signup-name-error" role="alert" className="text-[11px] text-[#EF4444] font-medium mt-1">
+            <p id="signup-name-error" role="alert" className="text-[11px] text-sentiment-negative font-medium mt-1">
               {fieldErrors.name}
             </p>
           )}
@@ -173,12 +173,12 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
         <div className="space-y-1.5 text-left">
           <label
             htmlFor="signup-email"
-            className="text-xs font-medium text-[#A0A6B5] block select-none"
+            className="text-sm font-medium text-on-surface-variant block select-none"
           >
             {authContentData.signup.emailLabel}
           </label>
           <div className="relative group">
-            <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#525866] pointer-events-none" />
+            <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
             <input
               id="signup-email"
               type="email"
@@ -189,15 +189,15 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
               onBlur={() => handleBlur('email')}
               aria-invalid={emailHasError}
               aria-describedby={emailHasError ? 'signup-email-error' : undefined}
-              className={`w-full h-10 bg-[#121316] rounded px-3 py-2 pl-9 text-xs text-[#F1F3F7] placeholder-[#525866] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] transition-all font-mono ${
+              className={`w-full h-11 bg-surface-container-lowest rounded px-3 py-2 pl-9 text-sm text-text-primary placeholder-text-muted shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] transition-all ${
                 emailHasError
-                  ? 'border border-[#EF4444] focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]'
-                  : 'border border-[#282A33] focus:outline-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B]'
+                  ? 'border border-sentiment-negative focus:outline-none focus:border-sentiment-negative focus:ring-1 focus:ring-sentiment-negative'
+                  : 'border border-border-subtle focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container'
               }`}
             />
           </div>
           {emailHasError && (
-            <p id="signup-email-error" role="alert" className="text-[11px] text-[#EF4444] font-medium mt-1">
+            <p id="signup-email-error" role="alert" className="text-[11px] text-sentiment-negative font-medium mt-1">
               {fieldErrors.email}
             </p>
           )}
@@ -207,12 +207,12 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
         <div className="space-y-1.5 text-left">
           <label
             htmlFor="signup-password"
-            className="text-xs font-medium text-[#A0A6B5] block select-none"
+            className="text-sm font-medium text-on-surface-variant block select-none"
           >
             {authContentData.signup.passwordLabel}
           </label>
           <div className="relative group">
-            <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#525866] pointer-events-none" />
+            <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
             <input
               id="signup-password"
               type={showPassword ? 'text' : 'password'}
@@ -224,10 +224,10 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
               onBlur={() => handleBlur('password')}
               aria-invalid={passwordHasError}
               aria-describedby={passwordHasError ? 'signup-password-error' : undefined}
-              className={`w-full h-10 bg-[#121316] rounded px-3 py-2 pl-9 pr-10 text-xs text-[#F1F3F7] placeholder-[#525866] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] transition-all font-mono ${
+              className={`w-full h-11 bg-surface-container-lowest rounded px-3 py-2 pl-9 pr-10 text-sm text-text-primary placeholder-text-muted shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] transition-all ${
                 passwordHasError
-                  ? 'border border-[#EF4444] focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]'
-                  : 'border border-[#282A33] focus:outline-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B]'
+                  ? 'border border-sentiment-negative focus:outline-none focus:border-sentiment-negative focus:ring-1 focus:ring-sentiment-negative'
+                  : 'border border-border-subtle focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container'
               }`}
             />
             {onToggleShowPassword && (
@@ -235,7 +235,7 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
                 type="button"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                 onClick={onToggleShowPassword}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#525866] hover:text-[#F1F3F7] transition-colors focus:outline-none cursor-pointer"
+                className="absolute right-0 top-0 h-11 w-11 flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors focus:outline-none cursor-pointer"
               >
                 {showPassword ? (
                   <EyeOff className="w-4 h-4" />
@@ -246,7 +246,7 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
             )}
           </div>
           {passwordHasError && (
-            <p id="signup-password-error" role="alert" className="text-[11px] text-[#EF4444] font-medium mt-1">
+            <p id="signup-password-error" role="alert" className="text-[11px] text-sentiment-negative font-medium mt-1">
               {fieldErrors.password}
             </p>
           )}
@@ -256,12 +256,12 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
         <div className="space-y-1.5 text-left">
           <label
             htmlFor="signup-confirm"
-            className="text-xs font-medium text-[#A0A6B5] block select-none"
+            className="text-sm font-medium text-on-surface-variant block select-none"
           >
             {authContentData.signup.confirmPasswordLabel}
           </label>
           <div className="relative group">
-            <Shield className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#525866] pointer-events-none" />
+            <Shield className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
             <input
               id="signup-confirm"
               type={showPasswordConfirm ? 'text' : 'password'}
@@ -273,10 +273,10 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
               onBlur={() => handleBlur('passwordConfirm')}
               aria-invalid={confirmHasError}
               aria-describedby={confirmHasError ? 'signup-confirm-error' : undefined}
-              className={`w-full h-10 bg-[#121316] rounded px-3 py-2 pl-9 pr-10 text-xs text-[#F1F3F7] placeholder-[#525866] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] transition-all font-mono ${
+              className={`w-full h-11 bg-surface-container-lowest rounded px-3 py-2 pl-9 pr-10 text-sm text-text-primary placeholder-text-muted shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] transition-all ${
                 confirmHasError
-                  ? 'border border-[#EF4444] focus:outline-none focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]'
-                  : 'border border-[#282A33] focus:outline-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B]'
+                  ? 'border border-sentiment-negative focus:outline-none focus:border-sentiment-negative focus:ring-1 focus:ring-sentiment-negative'
+                  : 'border border-border-subtle focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container'
               }`}
             />
             {onToggleShowPasswordConfirm && (
@@ -284,7 +284,7 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
                 type="button"
                 aria-label={showPasswordConfirm ? 'Hide password' : 'Show password'}
                 onClick={onToggleShowPasswordConfirm}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#525866] hover:text-[#F1F3F7] transition-colors focus:outline-none cursor-pointer"
+                className="absolute right-0 top-0 h-11 w-11 flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors focus:outline-none cursor-pointer"
               >
                 {showPasswordConfirm ? (
                   <EyeOff className="w-4 h-4" />
@@ -295,7 +295,7 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
             )}
           </div>
           {confirmHasError && (
-            <p id="signup-confirm-error" role="alert" className="text-[11px] text-[#EF4444] font-medium mt-1">
+            <p id="signup-confirm-error" role="alert" className="text-[11px] text-sentiment-negative font-medium mt-1">
               {fieldErrors.passwordConfirm}
             </p>
           )}
@@ -307,7 +307,7 @@ export const AuthRegisterForm: React.FC<AuthRegisterFormProps> = ({
         type="submit"
         disabled={isLoading}
         aria-label="Register"
-        className="w-full h-10 mt-2 bg-[#F59E0B] hover:bg-[#D97706] active:bg-[#B45309] text-[#0F1012] font-semibold text-xs rounded shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full h-11 mt-2 bg-primary-container hover:bg-primary-dark active:bg-primary-pressed text-on-primary font-semibold text-sm rounded shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <span>{isLoading ? 'Registering...' : 'Register User'}</span>
         <ArrowRight className="w-3.5 h-3.5" />

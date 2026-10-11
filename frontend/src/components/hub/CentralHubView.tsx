@@ -422,13 +422,13 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
     }
   }
 
-  // If unauthenticated, render Kinetic Operational Dark AuthCard
+  // The internal theme starts at authentication; other routes migrate separately.
   if (!token || !user) {
     return (
-      <div className={`min-h-screen bg-[#0F1012] flex flex-col justify-center items-center p-4 md:p-6 antialiased selection:bg-[#F59E0B]/30 selection:text-white ${className}`}>
+      <div data-theme="internal" className={`min-h-screen bg-canvas-base flex flex-col justify-center items-center p-4 md:p-6 antialiased selection:bg-primary-container/30 selection:text-on-primary ${className}`}>
         {/* Subtle Ambient Glow */}
         <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden">
-          <div className="absolute w-[600px] h-[600px] bg-[#F59E0B]/5 rounded-full blur-3xl opacity-30 mix-blend-screen" />
+          <div className="absolute w-[600px] h-[600px] bg-primary-container/5 rounded-full blur-3xl opacity-30 mix-blend-screen" />
         </div>
 
         <AuthCard

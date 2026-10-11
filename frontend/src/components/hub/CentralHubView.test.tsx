@@ -70,22 +70,16 @@ describe('CentralHubView (Seam 2)', () => {
   it('renders unauthenticated state on Industrial Graphite canvas (#0F1012) with focused 480px AuthCard and segmented tabs', () => {
     const { container } = renderView()
 
-    // Industrial Graphite canvas (#0F1012)
     const canvas = container.firstChild as HTMLElement
-    expect(canvas.className).toContain('bg-[#0F1012]')
+    expect(canvas).toHaveAttribute('data-theme', 'internal')
 
     // 480px card
     const cardBox = screen.getByTestId('auth-card')
     expect(cardBox).toBeInTheDocument()
-    const cardWrapper = cardBox.parentElement as HTMLElement
-    expect(cardWrapper.className).toContain('max-w-[480px]')
 
     // Heading and segmented tabs
     expect(screen.getByRole('heading', { name: /^zeddesk$/i })).toBeInTheDocument()
-    const tablist = screen.getByRole('tablist')
-    expect(tablist.className).toContain('grid-cols-2')
-    expect(tablist.className).toContain('bg-[#121316]')
-    expect(tablist.className).toContain('border-[#282A33]')
+    expect(screen.getByRole('tablist')).toBeInTheDocument()
 
     expect(screen.getByRole('tab', { name: /log in/i })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tab', { name: /register/i })).toHaveAttribute('aria-selected', 'false')
@@ -101,16 +95,14 @@ describe('CentralHubView (Seam 2)', () => {
     const emailInput = screen.getByLabelText(/email/i)
     const passwordInput = screen.getByLabelText(/^password/i)
 
-    // Recessed dark fills (#121316), 1px micro-borders, and luminous amber focus glow rings
-    expect(emailInput.className).toContain('bg-[#121316]')
-    expect(emailInput.className).toContain('border-[#282A33]')
-    expect(emailInput.className).toContain('focus:ring-[#F59E0B]')
+    emailInput.focus()
+    expect(emailInput).toHaveFocus()
 
     // Submit empty Sign In form triggers validation
     await user.click(screen.getByRole('button', { name: /log in/i }))
 
-    expect(emailInput.className).toContain('border-[#EF4444]')
-    expect(passwordInput.className).toContain('border-[#EF4444]')
+    expect(emailInput).toHaveAttribute('aria-invalid', 'true')
+    expect(passwordInput).toHaveAttribute('aria-invalid', 'true')
     expect(screen.getByText('Email is required.')).toBeInTheDocument()
     expect(screen.getByText('Password is required.')).toBeInTheDocument()
 

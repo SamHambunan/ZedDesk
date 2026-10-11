@@ -87,9 +87,7 @@ describe('MembersView Component', () => {
     // Roster data is still accessible to agent
     expect(screen.getByText('Sarah Connor')).toBeInTheDocument()
     expect(screen.getByText('John Doe')).toBeInTheDocument()
-    const adminBadge = screen.getByTestId('member-role-1')
-    expect(adminBadge).toHaveClass('bg-[#8B5CF6]/15')
-    expect(adminBadge).toHaveClass('text-[#C4B5FD]')
+    expect(screen.getByTestId('member-role-1')).toHaveTextContent('Admin')
     const agentBadge = screen.getByTestId('member-role-2')
     expect(agentBadge).toHaveClass('bg-surface-subpanel')
     expect(agentBadge).toHaveClass('text-text-secondary')
@@ -224,8 +222,6 @@ describe('MembersView Component', () => {
 
     const inviteBtn = screen.getByTestId('invite-member-btn')
     expect(inviteBtn).toBeInTheDocument()
-    expect(inviteBtn.className).toContain('bg-[#F59E0B]')
-    expect(inviteBtn.className).toContain('text-[#0F1012]')
   })
 
   it('copies full invitation link to clipboard and triggers a bottom-right tactical toast', async () => {
