@@ -58,6 +58,7 @@ class Ticket extends Model
         'revision' => 1,
         'status_revision' => 1,
         'priority_revision' => 1,
+        'assignment_revision' => 1,
     ];
 
     /**
@@ -72,6 +73,7 @@ class Ticket extends Model
             'revision' => 'integer',
             'status_revision' => 'integer',
             'priority_revision' => 'integer',
+            'assignment_revision' => 'integer',
             'status' => TicketStatus::class,
             'priority' => TicketPriority::class,
             'first_replied_at' => 'datetime',

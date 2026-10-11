@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Context\OrganizationContext;
+use App\Enums\AssignmentField;
 use App\Enums\TicketMessageType;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
+use App\Exceptions\AssignmentConflictException;
 use App\Exceptions\InvalidAssignmentException;
 use App\Exceptions\InvalidAttachmentException;
 use App\Exceptions\InvalidTicketTransitionException;
@@ -262,6 +264,7 @@ class TicketController extends Controller
             'revision' => $ticket->revision,
             'status_revision' => $ticket->status_revision,
             'priority_revision' => $ticket->priority_revision,
+            'assignment_revision' => $ticket->assignment_revision,
             'subject' => $ticket->subject,
             'status' => $ticket->status instanceof TicketStatus ? $ticket->status->value : $ticket->status,
             'priority' => $ticket->priority instanceof TicketPriority ? $ticket->priority->value : $ticket->priority,
@@ -290,6 +293,7 @@ class TicketController extends Controller
                 'revision' => $ticket->revision,
                 'status_revision' => $ticket->status_revision,
                 'priority_revision' => $ticket->priority_revision,
+                'assignment_revision' => $ticket->assignment_revision,
                 'subject' => $ticket->subject,
                 'status' => $ticket->status instanceof TicketStatus ? $ticket->status->value : $ticket->status,
                 'priority' => $ticket->priority instanceof TicketPriority ? $ticket->priority->value : $ticket->priority,
@@ -460,20 +464,21 @@ class TicketController extends Controller
                 'integer',
                 Rule::exists('organization_members', 'id')->where('organization_id', $orgId),
             ],
+            'expected_assignment_revision' => ['sometimes', 'required', 'integer', 'min:1'],
         ]);
-
-        $teamId = $request->has('team_id') ? $validated['team_id'] : $ticket->assigned_team_id;
-        $memberId = $request->has('member_id') ? $validated['member_id'] : $ticket->assigned_member_id;
 
         $currentMember = $this->resolveCurrentMember($request, $ticket->organization_id);
 
         try {
             $assignment = $assignmentService->assign(
                 ticket: $ticket,
-                team: $teamId,
-                member: $memberId,
-                assignedBy: $currentMember
+                team: $request->exists('team_id') ? $validated['team_id'] : AssignmentField::UNCHANGED,
+                member: $request->exists('member_id') ? $validated['member_id'] : AssignmentField::UNCHANGED,
+                assignedBy: $currentMember,
+                expectedRevision: isset($validated['expected_assignment_revision']) ? (int) $validated['expected_assignment_revision'] : null
             );
+        } catch (AssignmentConflictException $e) {
+            return response()->json(['message' => $e->getMessage(), 'current' => $e->current], 409);
         } catch (InvalidAssignmentException|InvalidTicketTransitionException|DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -500,11 +505,18 @@ class TicketController extends Controller
             return response()->json(['message' => 'Forbidden. You are not an Organization Member of this Organization.'], 403);
         }
 
+        $validated = $request->validate([
+            'expected_assignment_revision' => ['sometimes', 'required', 'integer', 'min:1'],
+        ]);
+
         try {
             $assignment = $assignmentService->claim(
                 ticket: $ticket,
-                member: $currentMember
+                member: $currentMember,
+                expectedRevision: isset($validated['expected_assignment_revision']) ? (int) $validated['expected_assignment_revision'] : null
             );
+        } catch (AssignmentConflictException $e) {
+            return response()->json(['message' => $e->getMessage(), 'current' => $e->current], 409);
         } catch (InvalidAssignmentException|InvalidTicketTransitionException|DomainException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
