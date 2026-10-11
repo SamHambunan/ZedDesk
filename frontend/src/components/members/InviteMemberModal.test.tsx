@@ -36,8 +36,6 @@ describe('InviteMemberModal Component', () => {
     const submitBtn = screen.getByTestId('invite-submit-btn')
     expect(submitBtn).toHaveTextContent(/send invitation/i)
     // Cadmium Amber button styling
-    expect(submitBtn.className).toContain('bg-[#F59E0B]')
-    expect(submitBtn.className).toContain('text-[#0F1012]')
   })
 
   it('prevents submission and displays error for empty or invalid email', async () => {

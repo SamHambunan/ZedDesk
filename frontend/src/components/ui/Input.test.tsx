@@ -61,8 +61,8 @@ describe('Input Primitive', () => {
   it('features accessible Cadmium Amber focus border styling by default', () => {
     render(<Input placeholder="Focus test" />)
     const input = screen.getByPlaceholderText('Focus test')
-    expect(input.className).toContain('focus:border-[#F59E0B]')
-    expect(input.className).toContain('focus:ring-[#F59E0B]')
+    expect(input.className).toContain('focus:border-focus-amber')
+    expect(input.className).toContain('focus:ring-focus-amber')
   })
 
   it('supports indigo focus styling when explicitly requested', () => {
@@ -70,5 +70,12 @@ describe('Input Primitive', () => {
     const input = screen.getByPlaceholderText('Indigo focus')
     expect(input.className).toContain('focus:border-primary-container')
     expect(input.className).toContain('focus:ring-accent-indigo-glow/30')
+  })
+
+  it.each(['internal', 'customer'] as const)('keeps labeled input usable in the %s theme', async (theme) => {
+    const user = userEvent.setup()
+    render(<div data-theme={theme}><Input label="Email" /></div>)
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'alex@example.com')
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveValue('alex@example.com')
   })
 })

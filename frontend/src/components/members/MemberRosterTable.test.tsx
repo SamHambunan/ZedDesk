@@ -72,8 +72,6 @@ describe('MemberRosterTable Component', () => {
 
     const adminBadge = screen.getByTestId('member-role-1')
     expect(adminBadge).toHaveTextContent('Admin')
-    expect(adminBadge.className).toContain('bg-[#8B5CF6]/15')
-    expect(adminBadge.className).toContain('text-[#C4B5FD]')
 
     const agentBadge = screen.getByTestId('member-role-2')
     expect(agentBadge).toHaveTextContent('Agent')

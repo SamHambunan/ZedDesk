@@ -54,7 +54,7 @@ export const TableRow = forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTM
       tabIndex={tabIndex}
       className={cn(
         'h-10 transition-colors hover:bg-surface-container-high/60 border-b border-border-subtle data-[state=selected]:bg-surface-container-high',
-        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#F59E0B]',
+        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus-amber',
         className
       )}
       {...props}

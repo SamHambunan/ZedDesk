@@ -68,7 +68,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({
       <AuthMasthead />
 
       {/* Auth Card Box */}
-      <div data-testid="auth-card" className="bg-[#16181C] rounded-lg border border-[#3B3F4D] relative overflow-hidden flex flex-col shadow-2xl p-6">
+      <div data-testid="auth-card" className="bg-surface-panel rounded-lg border border-border-prominent relative overflow-hidden flex flex-col shadow-2xl p-6">
         {/* Top keylight edge highlight */}
         <div className="absolute inset-x-0 top-0 h-[1px] bg-white/10 pointer-events-none" />
 

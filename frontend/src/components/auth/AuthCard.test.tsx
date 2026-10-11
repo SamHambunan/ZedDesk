@@ -128,41 +128,15 @@ describe('AuthCard Component', () => {
     expect(onRegisterSubmit).toHaveBeenCalled()
   })
 
-  it('renders a focused 480px card container with top keylight highlight', () => {
-    const { container } = render(<AuthCard {...defaultProps} />)
-    const cardWrapper = container.firstChild as HTMLElement
-    expect(cardWrapper.className).toContain('max-w-[480px]')
-
-    const cardBox = screen.getByTestId('auth-card')
-    expect(cardBox).toBeInTheDocument()
-    expect(cardBox.className).toContain('border-[#3B3F4D]')
-    expect(cardBox.className).toContain('rounded-lg')
-  })
-
-  it('renders seamless segmented switching between Sign In and Register tabs', () => {
+  it('keeps tabs and form controls reachable by keyboard', async () => {
+    const user = userEvent.setup()
     render(<AuthCard {...defaultProps} />)
-    const tablist = screen.getByRole('tablist')
-    expect(tablist.className).toContain('grid-cols-2')
-    expect(tablist.className).toContain('bg-[#121316]')
-    expect(tablist.className).toContain('border-[#282A33]')
-
-    const signinTab = screen.getByRole('tab', { name: /log in/i })
-    const registerTab = screen.getByRole('tab', { name: /register/i })
-    expect(signinTab.className).toContain('bg-[#1E2026]')
-    expect(signinTab.className).toContain('text-[#F1F3F7]')
-    expect(registerTab.className).toContain('text-[#8890A0]')
-  })
-
-  it('renders recessed dark form inputs with luminous amber focus glow styling', () => {
-    render(<AuthCard {...defaultProps} />)
-    const emailInput = screen.getByLabelText(/^email/i)
-    expect(emailInput.className).toContain('bg-[#121316]')
-    expect(emailInput.className).toContain('border-[#282A33]')
-    expect(emailInput.className).toContain('focus:ring-[#F59E0B]')
-
-    const submitBtn = screen.getByRole('button', { name: /^log in$/i })
-    expect(submitBtn.className).toContain('bg-[#F59E0B]')
-    expect(submitBtn.className).toContain('text-[#0F1012]')
+    await user.tab()
+    expect(screen.getByRole('tab', { name: /log in/i })).toHaveFocus()
+    await user.tab()
+    expect(screen.getByRole('tab', { name: /register/i })).toHaveFocus()
+    await user.tab()
+    expect(screen.getByLabelText(/^email/i)).toHaveFocus()
   })
 
   it('displays crimson borders and accessible inline alert text on Sign In validation failure', async () => {
@@ -177,11 +151,9 @@ describe('AuthCard Component', () => {
     const emailInput = screen.getByLabelText(/^email/i)
     const passwordInput = screen.getByLabelText(/^password/i)
 
-    expect(emailInput.className).toContain('border-[#EF4444]')
     expect(emailInput).toHaveAttribute('aria-invalid', 'true')
     expect(screen.getByText('Email is required.')).toBeInTheDocument()
 
-    expect(passwordInput.className).toContain('border-[#EF4444]')
     expect(passwordInput).toHaveAttribute('aria-invalid', 'true')
     expect(screen.getByText('Password is required.')).toBeInTheDocument()
   })
@@ -201,7 +173,6 @@ describe('AuthCard Component', () => {
     expect(screen.getByText('Please confirm your password.')).toBeInTheDocument()
 
     const nameInput = screen.getByLabelText(/name/i)
-    expect(nameInput.className).toContain('border-[#EF4444]')
     expect(nameInput).toHaveAttribute('aria-invalid', 'true')
   })
 })

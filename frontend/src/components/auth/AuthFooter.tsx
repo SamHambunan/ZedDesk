@@ -9,19 +9,17 @@ export interface AuthFooterProps {
 }
 
 export const AuthFooter: React.FC<AuthFooterProps> = ({
-  sessionText = 'Laravel Sanctum Encrypted Session',
-  architectureText = 'Adhering to ADR-0002 for decoupled identities across multi-tenant infrastructures.',
+  sessionText = 'Secure access for your organization',
+  architectureText,
   className = '',
 }) => {
   return (
     <footer className={`text-center space-y-2 pb-8 ${className}`}>
-      <div className="flex items-center justify-center gap-2 text-[#8890A0] font-mono text-xs">
-        <Lock className="w-3.5 h-3.5 text-[#F59E0B]" />
+      <div className="flex items-center justify-center gap-2 text-text-secondary text-xs">
+        <Lock className="w-3.5 h-3.5 text-primary-container" />
         <span>{sessionText}</span>
       </div>
-      <p className="text-[11px] text-[#525866] max-w-xs mx-auto">
-        {architectureText}
-      </p>
+      {architectureText && <p className="text-xs text-text-muted max-w-xs mx-auto">{architectureText}</p>}
     </footer>
   )
 }

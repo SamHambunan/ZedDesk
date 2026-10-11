@@ -2,6 +2,87 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme tokens are opt-in. Unmigrated routes continue to use Tailwind's defaults. */
+[data-theme='internal'] {
+  color-scheme: dark;
+  --zd-font-sans: 'Plus Jakarta Sans';
+  --zd-canvas: 15 16 18;
+  --zd-panel: 22 24 28;
+  --zd-subpanel: 30 32 38;
+  --zd-raised: 36 39 45;
+  --zd-recessed: 18 19 22;
+  --zd-border-subtle: 40 42 51;
+  --zd-border-prominent: 59 63 77;
+  --zd-text: 241 243 247;
+  --zd-text-secondary: 160 166 181;
+  --zd-text-muted: 136 144 160;
+  --zd-action: 245 158 11;
+  --zd-action-hover: 217 119 6;
+  --zd-action-pressed: 180 83 9;
+  --zd-action-highlight: 251 191 36;
+  --zd-action-soft: 251 191 36;
+  --zd-secondary: 120 79 15;
+  --zd-secondary-light: 251 191 36;
+  --zd-on-action: 15 16 18;
+  --zd-amber-action: 245 158 11;
+  --zd-amber-hover: 217 119 6;
+  --zd-amber-pressed: 180 83 9;
+  --zd-on-amber-action: 15 16 18;
+  --zd-focus: 245 158 11;
+  --zd-danger: 239 68 68;
+}
+
+/* Prepared for the Customer Portal migration; applied only by an explicit scope. */
+[data-theme='customer'] {
+  color-scheme: light;
+  --zd-font-sans: 'Plus Jakarta Sans';
+  --zd-canvas: 246 242 234;
+  --zd-panel: 255 253 248;
+  --zd-subpanel: 250 246 238;
+  --zd-raised: 239 232 219;
+  --zd-recessed: 250 247 241;
+  --zd-border-subtle: 218 207 190;
+  --zd-border-prominent: 188 170 145;
+  --zd-text: 42 38 33;
+  --zd-text-secondary: 94 84 72;
+  --zd-text-muted: 111 100 86;
+  --zd-action: 154 81 8;
+  --zd-action-hover: 128 65 5;
+  --zd-action-pressed: 105 52 4;
+  --zd-action-highlight: 181 103 19;
+  --zd-action-soft: 154 81 8;
+  --zd-secondary: 154 81 8;
+  --zd-secondary-light: 154 81 8;
+  --zd-on-action: 255 253 248;
+  --zd-amber-action: 154 81 8;
+  --zd-amber-hover: 128 65 5;
+  --zd-amber-pressed: 105 52 4;
+  --zd-on-amber-action: 255 253 248;
+  --zd-focus: 154 81 8;
+  --zd-danger: 181 48 42;
+}
+
+[data-theme] {
+  color: rgb(var(--zd-text));
+  font-family: var(--zd-font-sans), system-ui, sans-serif;
+}
+
+[data-theme] :focus-visible {
+  outline: 2px solid rgb(var(--zd-focus));
+  outline-offset: 2px;
+}
+
+[data-theme] .theme-dialog-border {
+  border-color: rgb(var(--zd-border-subtle));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme] *, [data-theme] *::before, [data-theme] *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 :root {
   color-scheme: dark;
   --bg-canvas: #0B0F19;

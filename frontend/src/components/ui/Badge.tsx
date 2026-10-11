@@ -43,12 +43,12 @@ const variantStyles: Record<BadgeVariant, { container: string; dot: string }> = 
     dot: 'bg-workflow-n8n-orange',
   },
   primary: {
-    container: 'text-[#C3C0FF] bg-primary-container/12 border-primary-container/25',
-    dot: 'bg-[#C3C0FF]',
+    container: 'text-primary-soft bg-primary-container/12 border-primary-container/25',
+    dot: 'bg-primary-soft',
   },
   admin: {
-    container: 'bg-[#8B5CF6]/15 text-[#C4B5FD] border-[#8B5CF6]/30',
-    dot: 'bg-[#8B5CF6]',
+    container: 'bg-secondary/15 text-secondary-light border-secondary/30',
+    dot: 'bg-secondary',
   },
   agent: {
     container: 'bg-surface-subpanel text-text-secondary border-border-subtle',

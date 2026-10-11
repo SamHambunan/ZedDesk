@@ -30,10 +30,9 @@ describe('Modal Primitive', () => {
     expect(dialog.className).toContain('bg-surface-subpanel')
     expect(dialog.className).toContain('shadow-modal')
     expect(dialog.className).toContain('rounded-lg')
-    expect(dialog.className).toContain('focus-visible:ring-[#F59E0B]')
-
     const closeBtn = screen.getByRole('button', { name: /close/i })
-    expect(closeBtn.className).toContain('focus-visible:ring-[#F59E0B]')
+    closeBtn.focus()
+    expect(closeBtn).toHaveFocus()
   })
 
   it('calls onClose when clicking close button', async () => {

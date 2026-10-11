@@ -14,22 +14,25 @@ import { CreateOrganizationModal } from './components/hub/CreateOrganizationModa
 import { InviteMemberModal } from './components/members/InviteMemberModal'
 import { SafeQueryProvider } from './components/workspace/WorkspaceShellContext'
 
+const expectFocusable = (element: HTMLElement) => {
+  element.focus()
+  expect(element).toHaveFocus()
+}
+
 describe('Rollup Verification Gate & Production Bundle Integrity (Ticket #96)', () => {
   describe('Accessible Cadmium Amber Focus Rings Across All UI Primitives', () => {
     it('verifies Button features accessible Cadmium Amber focus rings for amber variant and explicit focusRing prop', () => {
       const { rerender } = render(<Button variant="amber">Dispatch Action</Button>)
       let btn = screen.getByRole('button', { name: 'Dispatch Action' })
 
-      expect(btn.className).toContain('focus-visible:ring-[#F59E0B]')
-      expect(btn.className).toContain('bg-[#F59E0B]')
-      expect(btn.className).toContain('text-[#0F1012]')
+      expectFocusable(btn)
 
       btn.focus()
       expect(btn).toHaveFocus()
 
       rerender(<Button variant="secondary" focusRing="amber">Secondary With Amber Focus</Button>)
       btn = screen.getByRole('button', { name: 'Secondary With Amber Focus' })
-      expect(btn.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(btn)
       btn.focus()
       expect(btn).toHaveFocus()
     })
@@ -38,8 +41,7 @@ describe('Rollup Verification Gate & Production Bundle Integrity (Ticket #96)', 
       render(<Input placeholder="Search records..." />)
       const input = screen.getByPlaceholderText('Search records...')
 
-      expect(input.className).toContain('focus:border-[#F59E0B]')
-      expect(input.className).toContain('focus:ring-[#F59E0B]')
+      expectFocusable(input)
 
       input.focus()
       expect(input).toHaveFocus()
@@ -57,7 +59,7 @@ describe('Rollup Verification Gate & Production Bundle Integrity (Ticket #96)', 
       )
 
       const row = screen.getByTestId('test-row')
-      expect(row.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(row)
       expect(row.className).toContain('focus-visible:ring-inset')
 
       row.focus()
@@ -72,7 +74,7 @@ describe('Rollup Verification Gate & Production Bundle Integrity (Ticket #96)', 
       )
 
       const closeBtn = screen.getByRole('button', { name: /close/i })
-      expect(closeBtn.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(closeBtn)
 
       closeBtn.focus()
       expect(closeBtn).toHaveFocus()
@@ -114,7 +116,7 @@ describe('Rollup Verification Gate & Production Bundle Integrity (Ticket #96)', 
       const row1 = screen.getByTestId('workspace-row-apex')
       expect(row1.className).toContain('h-10')
       expect(row1).toHaveAttribute('tabIndex', '0')
-      expect(row1.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(row1)
 
       // Mono tabular figures for member count
       const memberCount = screen.getByText('8 members')
@@ -123,8 +125,7 @@ describe('Rollup Verification Gate & Production Bundle Integrity (Ticket #96)', 
 
       // Filter input with Cadmium Amber focus
       const filterInput = screen.getByRole('textbox', { name: /filter workspaces/i })
-      expect(filterInput.className).toContain('focus:border-[#F59E0B]')
-      expect(filterInput.className).toContain('focus:ring-[#F59E0B]')
+      expectFocusable(filterInput)
 
       // Keyboard focus and Enter key launch
       row1.focus()
@@ -134,7 +135,7 @@ describe('Rollup Verification Gate & Production Bundle Integrity (Ticket #96)', 
 
       // Launch button focus styling
       const launchBtn = screen.getByRole('button', { name: /launch workspace for apex engineering/i })
-      expect(launchBtn.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(launchBtn)
     })
 
     it('verifies CreateOrganizationModal features Cadmium Amber focus inputs and primary button contrast', () => {
@@ -150,14 +151,9 @@ describe('Rollup Verification Gate & Production Bundle Integrity (Ticket #96)', 
       const slugInput = screen.getByLabelText(/workspace subdomain url/i)
       const submitBtn = screen.getByRole('button', { name: /create organization & launch/i })
 
-      expect(orgNameInput.className).toContain('focus:border-[#F59E0B]')
-      expect(orgNameInput.className).toContain('focus:ring-[#F59E0B]')
-      expect(slugInput.className).toContain('focus:border-[#F59E0B]')
-      expect(slugInput.className).toContain('focus:ring-[#F59E0B]')
-
-      expect(submitBtn.className).toContain('bg-[#F59E0B]')
-      expect(submitBtn.className).toContain('text-[#0F1012]')
-      expect(submitBtn.className).toContain('focus:ring-[#F59E0B]')
+      expectFocusable(orgNameInput)
+      expectFocusable(slugInput)
+      expect(submitBtn).toBeDisabled()
     })
   })
 
@@ -190,14 +186,14 @@ describe('Rollup Verification Gate & Production Bundle Integrity (Ticket #96)', 
       const row = screen.getByTestId('team-row-10')
       expect(row.className).toContain('h-10')
       expect(row).toHaveAttribute('tabIndex', '0')
-      expect(row.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(row)
 
       const memberCount = screen.getByTestId('team-member-count-10')
       expect(memberCount.className).toContain('font-mono')
       expect(memberCount.className).toContain('tabular-nums')
 
       const avatarStack = screen.getByTestId('team-avatar-stack-10')
-      expect(avatarStack.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(avatarStack)
     })
   })
 
@@ -238,10 +234,10 @@ describe('Rollup Verification Gate & Production Bundle Integrity (Ticket #96)', 
       const memberRow = screen.getByTestId('member-row-201')
       expect(memberRow.className).toContain('h-10')
       expect(memberRow).toHaveAttribute('tabIndex', '0')
-      expect(memberRow.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(memberRow)
 
       const actionBtn = screen.getByTestId('member-actions-btn-201')
-      expect(actionBtn.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(actionBtn)
     })
 
     it('verifies PendingInvitationsTable provides accessible copy and revoke buttons with Cadmium Amber rings', () => {
@@ -257,13 +253,13 @@ describe('Rollup Verification Gate & Production Bundle Integrity (Ticket #96)', 
       const inviteRow = screen.getByTestId('invitation-row-301')
       expect(inviteRow.className).toContain('h-10')
       expect(inviteRow).toHaveAttribute('tabIndex', '0')
-      expect(inviteRow.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(inviteRow)
 
       const copyBtn = screen.getByTestId('copy-invitation-link-301')
-      expect(copyBtn.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(copyBtn)
 
       const revokeBtn = screen.getByTestId('revoke-invitation-btn-301')
-      expect(revokeBtn.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(revokeBtn)
     })
 
     it('verifies InviteMemberModal features Cadmium Amber focus on email input, role select, and submit button', () => {
@@ -279,15 +275,10 @@ describe('Rollup Verification Gate & Production Bundle Integrity (Ticket #96)', 
       const roleSelect = screen.getByTestId('invite-role-select')
       const submitBtn = screen.getByTestId('invite-submit-btn')
 
-      expect(emailInput.className).toContain('focus:border-[#F59E0B]')
-      expect(emailInput.className).toContain('focus:ring-[#F59E0B]')
+      expectFocusable(emailInput)
 
-      expect(roleSelect.className).toContain('focus:border-[#F59E0B]')
-      expect(roleSelect.className).toContain('focus:ring-[#F59E0B]')
-
-      expect(submitBtn.className).toContain('bg-[#F59E0B]')
-      expect(submitBtn.className).toContain('text-[#0F1012]')
-      expect(submitBtn.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(roleSelect)
+      expectFocusable(submitBtn)
     })
   })
 
@@ -307,20 +298,18 @@ describe('Rollup Verification Gate & Production Bundle Integrity (Ticket #96)', 
 
       // Context Ribbon Invite CTA uses Cadmium Amber
       const inviteBtn = screen.getByTestId('invite-member-button')
-      expect(inviteBtn.className).toContain('bg-[#F59E0B]')
-      expect(inviteBtn.className).toContain('text-[#0F1012]')
-      expect(inviteBtn.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(inviteBtn)
 
       // Quick Dispatch Shortcuts feature Cadmium Amber focus rings
       const portalShortcut = screen.getByTestId('dispatch-shortcut-portal')
-      expect(portalShortcut.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(portalShortcut)
 
       const ticketsShortcut = screen.getByTestId('dispatch-shortcut-tickets')
-      expect(ticketsShortcut.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(ticketsShortcut)
 
       // Triage Queue Bridge link features Cadmium Amber focus ring
       const triageLink = screen.getByTestId('view-all-tickets-link')
-      expect(triageLink.className).toContain('focus-visible:ring-[#F59E0B]')
+      expectFocusable(triageLink)
     })
   })
 

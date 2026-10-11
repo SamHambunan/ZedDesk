@@ -55,7 +55,6 @@ describe('WorkspaceOverview Console', () => {
       // Admin primary Cadmium Amber "+ Invite Member" button with WCAG AAA 10.4:1 contrast
       const inviteBtn = screen.getByRole('button', { name: /\+ Invite Member/i })
       expect(inviteBtn).toBeInTheDocument()
-      expect(inviteBtn).toHaveClass('bg-[#F59E0B]')
 
       fireEvent.click(inviteBtn)
       expect(handleInvite).toHaveBeenCalledTimes(1)

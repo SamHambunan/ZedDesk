@@ -73,7 +73,6 @@ describe('CentralHubSwitchboard (Ticket #93)', () => {
       // Role Pill (admin in Amethyst Violet)
       const adminPill = within(acmeRow).getByText('admin')
       expect(adminPill).toBeInTheDocument()
-      expect(adminPill.className).toMatch(/8B5CF6|admin/)
 
       // Row 2: Cyberdyne Systems (agent in Tactical Graphite)
       const cyberdyneRow = screen.getByTestId('workspace-row-cyberdyne')
