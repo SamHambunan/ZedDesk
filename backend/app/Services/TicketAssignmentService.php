@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AssignmentField;
 use App\Enums\TicketStatus;
 use App\Events\TicketAssigned;
 use App\Events\TicketChanged;
@@ -31,12 +32,10 @@ class TicketAssignmentService
      */
     public function assign(
         Ticket $ticket,
-        Team|int|string|null $team = null,
-        OrganizationMember|int|string|null $member = null,
+        Team|int|string|AssignmentField|null $team = null,
+        OrganizationMember|int|string|AssignmentField|null $member = null,
         OrganizationMember|int|string|null $assignedBy = null,
-        ?int $expectedRevision = null,
-        bool $teamProvided = true,
-        bool $memberProvided = true
+        ?int $expectedRevision = null
     ): TicketAssignment {
         $teamModel = match (true) {
             $team instanceof Team => $team,
@@ -69,13 +68,13 @@ class TicketAssignmentService
             throw new DomainException('Cross-organization assignment author is rejected.');
         }
 
-        return DB::transaction(function () use ($ticket, $teamModel, $memberModel, $assignedByModel, $expectedRevision, $teamProvided, $memberProvided) {
+        return DB::transaction(function () use ($ticket, $team, $member, $teamModel, $memberModel, $assignedByModel, $expectedRevision) {
             $current = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
             $this->assertCurrentRevision($current, $expectedRevision);
             $this->assertOpen($current, 'Assignment updates are rejected.');
 
-            $teamId = $teamProvided ? $teamModel?->id : $current->assigned_team_id;
-            $memberId = $memberProvided ? $memberModel?->id : $current->assigned_member_id;
+            $teamId = $team === AssignmentField::UNCHANGED ? $current->assigned_team_id : $teamModel?->id;
+            $memberId = $member === AssignmentField::UNCHANGED ? $current->assigned_member_id : $memberModel?->id;
             if ($teamId !== null && $memberId !== null
                 && ! Team::withoutGlobalScopes()->findOrFail($teamId)->hasMember(
                     OrganizationMember::withoutGlobalScopes()->findOrFail($memberId))) {

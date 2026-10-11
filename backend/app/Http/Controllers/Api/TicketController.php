@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Context\OrganizationContext;
+use App\Enums\AssignmentField;
 use App\Enums\TicketMessageType;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
@@ -466,20 +467,15 @@ class TicketController extends Controller
             'expected_assignment_revision' => ['sometimes', 'required', 'integer', 'min:1'],
         ]);
 
-        $teamProvided = $request->exists('team_id');
-        $memberProvided = $request->exists('member_id');
-
         $currentMember = $this->resolveCurrentMember($request, $ticket->organization_id);
 
         try {
             $assignment = $assignmentService->assign(
                 ticket: $ticket,
-                team: $teamProvided ? $validated['team_id'] : null,
-                member: $memberProvided ? $validated['member_id'] : null,
+                team: $request->exists('team_id') ? $validated['team_id'] : AssignmentField::UNCHANGED,
+                member: $request->exists('member_id') ? $validated['member_id'] : AssignmentField::UNCHANGED,
                 assignedBy: $currentMember,
-                expectedRevision: isset($validated['expected_assignment_revision']) ? (int) $validated['expected_assignment_revision'] : null,
-                teamProvided: $teamProvided,
-                memberProvided: $memberProvided
+                expectedRevision: isset($validated['expected_assignment_revision']) ? (int) $validated['expected_assignment_revision'] : null
             );
         } catch (AssignmentConflictException $e) {
             return response()->json(['message' => $e->getMessage(), 'current' => $e->current], 409);
