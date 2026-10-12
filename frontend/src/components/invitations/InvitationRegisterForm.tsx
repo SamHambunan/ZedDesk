@@ -204,7 +204,7 @@ export const InvitationRegisterForm: React.FC<InvitationRegisterFormProps> = ({
           type="button"
           data-testid="toggle-existing-user"
           onClick={onToggleExistingUser}
-          className="font-label-regular text-label-regular text-text-secondary hover:text-accent-glow transition-colors text-xs cursor-pointer focus:outline-none"
+          className="font-label-regular text-label-regular text-text-secondary hover:text-primary-container transition-colors text-xs cursor-pointer focus:outline-none"
         >
           {invitationsContentData.alreadyHaveAccount}
         </button>

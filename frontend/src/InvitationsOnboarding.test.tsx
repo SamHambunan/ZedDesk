@@ -349,4 +349,37 @@ describe('Segmented Invitation Onboarding View (/invitations/:token)', () => {
     fireEvent.click(returnBtn)
     expect(window.location.href).toBe('http://localhost:5173')
   })
+
+  it('scopes invitation acceptance and error views to internal graphite-and-amber theme without legacy indigo styling', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/invitations/valid-invite-token')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            invitation: {
+              email: 'candidate@initech.corp',
+              role: 'agent',
+              organization_name: 'Initech Systems',
+              organization_slug: 'initech',
+              expires_at: new Date(Date.now() + 86400000).toISOString(),
+              inviter_name: 'Bill Lumbergh',
+            },
+          }),
+        } as Response)
+      }
+      return Promise.reject(new Error(`Unhandled URL: ${url}`))
+    })
+
+    render(<App pathname="/invitations/valid-invite-token" />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('public-invitation-view')).toBeInTheDocument()
+    })
+
+    const view = screen.getByTestId('public-invitation-view')
+    expect(view).toHaveAttribute('data-theme', 'internal')
+    expect(view.innerHTML).not.toContain('text-accent-glow')
+    expect(view.innerHTML).not.toContain('bg-accent-glow')
+  })
 })

@@ -41,18 +41,24 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
 
   return (
     <div
+      data-theme="internal"
       data-testid="public-invitation-view"
-      className={`bg-canvas-base text-text-primary min-h-screen flex flex-col items-center justify-center p-4 md:p-6 font-body-default ${className}`}
+      className={`bg-canvas-base text-text-primary min-h-screen flex flex-col items-center justify-center p-4 md:p-6 font-body-default antialiased selection:bg-primary-container/30 selection:text-on-primary ${className}`}
     >
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        precedence="default"
+      />
       {/* Minimal Header */}
       <header className="mb-8 flex items-center gap-3">
-        <div className="w-8 h-8 bg-primary-container rounded-lg flex items-center justify-center shadow-keylight-primary">
-          <LayoutGrid className="w-4 h-4 text-white" />
+        <div className="w-8 h-8 bg-surface-panel border border-border-subtle rounded-lg flex items-center justify-center shadow-keylight">
+          <LayoutGrid className="w-4 h-4 text-primary-container" />
         </div>
         <span className="font-headline-sm text-headline-sm text-text-primary font-semibold">
           {invitationsContentData.brandName}
         </span>
-        <span className="px-2 py-0.5 rounded-full bg-accent-glow/20 border border-accent-glow/30 text-primary font-label-caps text-label-caps font-semibold">
+        <span className="px-2 py-0.5 rounded-full bg-primary-container/20 border border-primary-container/40 text-primary-container font-label-caps text-label-caps font-semibold">
           {invitationsContentData.aiBadge}
         </span>
       </header>

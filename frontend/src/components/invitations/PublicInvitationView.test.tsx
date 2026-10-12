@@ -72,4 +72,25 @@ describe('PublicInvitationView Component', () => {
     expect(screen.getByTestId('invitation-acceptance-card')).toBeInTheDocument()
     expect(screen.getByTestId('invitation-org-name')).toHaveTextContent('Acme Corporation')
   })
+
+  it('renders invitation entry, acceptance, and error states within internal graphite-and-amber theme scope', () => {
+    const { rerender } = render(
+      <PublicInvitationView
+        invitation={mockInvitation}
+      />
+    )
+
+    const view = screen.getByTestId('public-invitation-view')
+    expect(view).toHaveAttribute('data-theme', 'internal')
+    expect(view).toHaveClass('bg-canvas-base')
+
+    rerender(
+      <PublicInvitationView
+        invitation={null}
+        error="This invitation has expired or been revoked."
+      />
+    )
+    expect(screen.getByTestId('public-invitation-view')).toHaveAttribute('data-theme', 'internal')
+    expect(screen.getByTestId('invitation-error-card')).toBeInTheDocument()
+  })
 })

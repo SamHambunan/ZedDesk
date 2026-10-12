@@ -480,7 +480,15 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
 
   // Authenticated Central Hub View
   return (
-    <div className={`min-h-screen bg-[#0F1012] text-[#F1F3F7] flex flex-col antialiased selection:bg-[#F59E0B]/30 selection:text-white ${className}`}>
+    <div
+      data-theme="internal"
+      className={`min-h-screen bg-canvas-base text-text-primary flex flex-col antialiased selection:bg-primary-container/30 selection:text-on-primary ${className}`}
+    >
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        precedence="default"
+      />
       {/* Central Hub Top Navigation */}
       <CentralHubHeader healthStatus={healthStatus} />
 

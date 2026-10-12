@@ -34,12 +34,12 @@ export const OrganizationCard: React.FC<OrganizationCardProps> = ({
   return (
     <div
       data-testid={`org-card-${organization.slug}`}
-      className={`bg-surface-subpanel border border-border-prominent rounded-xl p-5 shadow-keylight flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:border-accent-glow/50 transition-colors ${className}`}
+      className={`bg-surface-subpanel border border-border-prominent rounded-xl p-5 shadow-keylight flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:border-primary-container/50 transition-colors ${className}`}
     >
       <div className="flex items-center gap-4">
         {/* Org Avatar Box */}
         <div className="w-12 h-12 rounded-lg bg-surface-panel border border-border-subtle flex items-center justify-center shrink-0">
-          <span className="font-headline-md text-headline-md text-accent-glow font-semibold select-none">
+          <span className="font-headline-md text-headline-md text-primary-container font-semibold select-none">
             {initial}
           </span>
         </div>
@@ -85,7 +85,7 @@ export const OrganizationCard: React.FC<OrganizationCardProps> = ({
           type="button"
           onClick={handleLaunchClick}
           aria-label={`Launch Workspace for ${organization.name}`}
-          className="bg-primary-container text-white font-body-default text-body-default px-4 py-2 rounded shadow-keylight-primary hover:bg-primary-dark transition-colors flex items-center gap-2 h-9 cursor-pointer active:scale-[0.98]"
+          className="bg-primary-container text-on-primary font-body-default text-body-default px-4 py-2 rounded shadow-keylight-primary hover:bg-primary-dark transition-colors flex items-center gap-2 h-9 cursor-pointer active:scale-[0.98]"
         >
           <span>{hubContentData.organizations.launchWorkspace}</span>
           <ArrowRight className="w-4 h-4" />

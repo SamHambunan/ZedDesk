@@ -162,6 +162,36 @@ describe('CentralHubView (Seam 2)', () => {
     })
   })
 
+  it('renders authenticated Central Hub within internal graphite-and-amber theme scope', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.endsWith('/api/health')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ status: 'ok', services: { database: 'connected', redis: 'connected' } }),
+        } as Response)
+      }
+      if (url.endsWith('/api/organizations')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { id: 101, name: 'Acme Support', slug: 'acme', role: 'admin', agents_count: 14 },
+          ],
+        } as Response)
+      }
+      return Promise.reject(new Error(`Unhandled URL: ${url}`))
+    })
+
+    const { container } = renderView('persisted-token', { id: 99, name: 'Existing User', email: 'existing@example.com' })
+
+    await waitFor(() => {
+      expect(screen.getByText('Existing User')).toBeInTheDocument()
+    })
+
+    const themedRoot = container.querySelector('[data-theme="internal"]')
+    expect(themedRoot).toBeInTheDocument()
+    expect(themedRoot).toHaveClass('bg-canvas-base')
+  })
+
   it('submits login credentials to POST /api/login, handles success, and transitions to authenticated hub', async () => {
     const user = userEvent.setup()
 

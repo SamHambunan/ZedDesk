@@ -114,7 +114,7 @@ export const CentralHubSwitchboard: React.FC<CentralHubSwitchboardProps> = ({
         <div className="flex items-center gap-3">
           <div className="text-xs text-text-secondary font-mono">
             <span>Workspaces: </span>
-            <span className="text-text-primary font-semibold">{filteredOrgs.length}</span>
+            <span className="text-text-primary font-semibold tabular-nums">{filteredOrgs.length}</span>
           </div>
           <Button
             type="button"
@@ -184,7 +184,7 @@ export const CentralHubSwitchboard: React.FC<CentralHubSwitchboardProps> = ({
 
                     {/* Subdomain Slug Badge */}
                     <Table.Cell>
-                      <span className="px-2 py-0.5 rounded bg-surface-subpanel border border-border-subtle text-[11px] font-mono text-text-secondary">
+                      <span className="px-2 py-0.5 rounded bg-surface-subpanel border border-border-subtle text-[11px] font-mono text-text-secondary tabular-nums">
                         {org.slug}.zeddesk.app
                       </span>
                     </Table.Cell>
@@ -212,7 +212,7 @@ export const CentralHubSwitchboard: React.FC<CentralHubSwitchboardProps> = ({
                           e.stopPropagation()
                           onLaunch(org)
                         }}
-                        className="px-2.5 py-1 rounded bg-surface-subpanel hover:bg-surface-panel border border-border-subtle text-xs font-semibold text-text-primary hover:text-primary-container transition-all flex items-center gap-1 ml-auto cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
+                        className="px-2.5 py-1 rounded bg-surface-subpanel hover:bg-surface-panel border border-border-subtle text-xs font-semibold text-text-primary hover:text-primary-container transition-all flex items-center gap-1 ml-auto cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
                       >
                         <span>Launch Workspace →</span>
                         <ArrowRight className="w-3.5 h-3.5" />
