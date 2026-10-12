@@ -13,13 +13,13 @@ import { Table } from './components/ui/Table'
 import { CreateOrganizationModal } from './components/hub/CreateOrganizationModal'
 import { InviteMemberModal } from './components/members/InviteMemberModal'
 import { SafeQueryProvider } from './components/workspace/WorkspaceShellContext'
+import { TicketCockpit } from './components/tickets/TicketCockpit'
 import {
-  TicketCockpit,
   INITIAL_MOCK_TICKETS,
   MOCK_TEAMS,
   MOCK_MEMBERS,
   MOCK_TAGS_POOL,
-} from './components/tickets'
+} from './components/tickets/mockData'
 
 const expectFocusable = (element: HTMLElement) => {
   element.focus()

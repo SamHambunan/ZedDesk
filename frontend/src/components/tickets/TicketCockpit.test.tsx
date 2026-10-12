@@ -596,6 +596,7 @@ describe('TicketCockpit Compound Component Baseline', () => {
     const card1 = screen.getByTestId('ticket-row-ticket-1')
     expect(card1).toHaveAttribute('tabIndex', '0')
     expect(card1).toHaveAttribute('role', 'button')
+    expect(card1).toHaveAttribute('aria-pressed', 'true')
     expect(card1.className).toContain('border-amber-action')
     expect(card1.className).toContain('bg-surface-container-high')
 
@@ -603,6 +604,7 @@ describe('TicketCockpit Compound Component Baseline', () => {
     const card2 = screen.getByTestId('ticket-row-ticket-2')
     expect(card2).toHaveAttribute('tabIndex', '0')
     expect(card2).toHaveAttribute('role', 'button')
+    expect(card2).toHaveAttribute('aria-pressed', 'false')
     expect(card2.className).toContain('border-transparent')
     expect(card2.className).not.toContain('border-amber-action')
 
@@ -612,6 +614,7 @@ describe('TicketCockpit Compound Component Baseline', () => {
     await user.keyboard('{Enter}')
 
     // Active ticket should now be ticket-2
+    expect(card2).toHaveAttribute('aria-pressed', 'true')
     expect(card2.className).toContain('border-amber-action')
     expect(screen.getByTestId('detail-subject')).toHaveTextContent(INITIAL_MOCK_TICKETS[1].subject)
 

@@ -1182,6 +1182,7 @@ export const TicketCockpitQueueCard: React.FC<TicketCockpitQueueCardProps> = ({
     <div
       role="button"
       tabIndex={0}
+      aria-pressed={isSelected}
       data-testid={`ticket-row-${ticket.id}`}
       onClick={() => actions.selectTicket(ticket.id)}
       onKeyDown={handleKeyDown}
