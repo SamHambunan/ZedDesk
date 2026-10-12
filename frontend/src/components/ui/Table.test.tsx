@@ -71,4 +71,18 @@ describe('Table Primitive', () => {
     expect(screen.getByTestId('compound-row')).toHaveClass('h-10')
     expect(screen.getByText('Bob Agent')).toBeInTheDocument()
   })
+
+  it('applies custom containerClassName to outer container', () => {
+    render(
+      <Table.Root containerClassName="shadow-keylight custom-container">
+        <Table.Body>
+          <Table.Row>
+            <Table.Cell>Test</Table.Cell>
+          </Table.Row>
+        </Table.Body>
+      </Table.Root>
+    )
+    const table = screen.getByRole('table')
+    expect(table.parentElement).toHaveClass('shadow-keylight', 'custom-container')
+  })
 })

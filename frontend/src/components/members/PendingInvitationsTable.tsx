@@ -94,11 +94,8 @@ export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = (
           {membersContentData.pendingSection.emptyMessage}
         </div>
       ) : (
-        <div
-          data-testid="invitations-list"
-          className="bg-surface-panel rounded-lg border border-border-subtle overflow-hidden shadow-keylight flex flex-col"
-        >
-          <Table className="border-0 rounded-none bg-transparent">
+        <div data-testid="invitations-list">
+          <Table containerClassName="shadow-keylight">
             <TableHeader>
               <TableRow className="bg-surface-subpanel/50 h-10 border-b border-border-subtle">
                 <TableHead className="w-[24%] min-w-[180px] text-label-caps font-label-caps text-text-muted uppercase">

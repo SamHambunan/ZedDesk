@@ -57,9 +57,9 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
   return (
     <div
       data-testid="members-roster-table"
-      className={`bg-surface-panel rounded-lg border border-border-subtle overflow-hidden shadow-keylight flex flex-col ${className}`}
+      className={className}
     >
-      <Table.Root className="border-0 rounded-none bg-transparent">
+      <Table.Root containerClassName="shadow-keylight">
         <Table.Header>
           <Table.Row className="bg-surface-subpanel/50 h-10 border-b border-border-subtle">
             <Table.Head className="w-[30%] min-w-[200px] text-label-caps font-label-caps text-text-muted uppercase">
@@ -127,7 +127,7 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
                       {userEmail && (
                         <span
                           data-testid={`member-email-${member.id}`}
-                          className="text-[10px] font-mono-data text-text-muted truncate block"
+                          className="text-[10px] text-text-muted truncate block"
                         >
                           {userEmail}
                         </span>

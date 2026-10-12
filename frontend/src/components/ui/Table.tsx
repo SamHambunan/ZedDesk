@@ -1,9 +1,18 @@
 import React, { forwardRef } from 'react'
 import { cn } from '../../lib/utils'
 
-export const TableRoot = forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto rounded-lg border border-border-subtle bg-surface-panel">
+export interface TableRootProps extends React.HTMLAttributes<HTMLTableElement> {
+  containerClassName?: string
+}
+
+export const TableRoot = forwardRef<HTMLTableElement, TableRootProps>(
+  ({ className, containerClassName, ...props }, ref) => (
+    <div
+      className={cn(
+        'relative w-full overflow-auto rounded-lg border border-border-subtle bg-surface-panel',
+        containerClassName
+      )}
+    >
       <table
         ref={ref}
         className={cn('w-full caption-bottom text-xs text-on-surface border-collapse', className)}
