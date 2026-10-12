@@ -166,7 +166,7 @@ describe('Stage 2 Rollup Verification Gate (Ticket #107)', () => {
       // Unassigned tab button should have active styling
       const unassignedBtn = screen.getByTestId('preset-btn-unassigned')
       expect(unassignedBtn).toBeInTheDocument()
-      expect(unassignedBtn.className).toContain('border-[#F59E0B]')
+      expect(unassignedBtn.className).toContain('border-amber-action')
     })
 
     it('hydrates and selects targeted ticket in detail pane when initialTicketNumber is passed', () => {

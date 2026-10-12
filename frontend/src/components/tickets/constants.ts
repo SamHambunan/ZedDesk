@@ -65,11 +65,11 @@ export function getPriorityBadge(priority: string): { label: string; class: stri
     case 'urgent':
       return { label: 'P0 Urgent', class: 'bg-rose-500/15 text-rose-400 border-rose-500/30' }
     case 'high':
-      return { label: 'P1 High', class: 'bg-[#F59E0B]/15 text-[#F59E0B] border-[#F59E0B]/30' }
+      return { label: 'P1 High', class: 'bg-amber-action/15 text-amber-action border-amber-action/30' }
     case 'medium':
       return { label: 'Medium', class: 'bg-blue-500/15 text-blue-400 border-blue-500/30' }
     default:
-      return { label: 'Low', class: 'bg-[#16181D] text-[#8C90A0] border-[#282A33]' }
+      return { label: 'Low', class: 'bg-surface-container text-text-muted border-border-subtle' }
   }
 }
 
@@ -80,13 +80,13 @@ export function getStatusBadge(status: string): { label: string; class: string }
     case 'open':
       return { label: 'open', class: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' }
     case 'pending':
-      return { label: 'pending', class: 'bg-[#F59E0B]/15 text-[#F59E0B] border-[#F59E0B]/30' }
+      return { label: 'pending', class: 'bg-amber-action/15 text-amber-action border-amber-action/30' }
     case 'resolved':
-      return { label: 'resolved', class: 'bg-[#16181D] text-[#8C90A0] border-[#282A33]' }
+      return { label: 'resolved', class: 'bg-surface-container text-text-muted border-border-subtle' }
     case 'closed':
-      return { label: 'closed', class: 'bg-[#16181D] text-[#8C90A0] border-[#282A33]' }
+      return { label: 'closed', class: 'bg-surface-container text-text-muted border-border-subtle' }
     default:
-      return { label: status, class: 'bg-[#16181D] text-[#8C90A0] border-[#282A33]' }
+      return { label: status, class: 'bg-surface-container text-text-muted border-border-subtle' }
   }
 }
 

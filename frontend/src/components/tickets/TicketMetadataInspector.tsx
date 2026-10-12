@@ -48,7 +48,7 @@ export const InspectorCustomerCard: React.FC<InspectorCustomerCardProps> = ({
   return (
     <div
       data-testid="customer-profile-card"
-      className={`p-3 bg-[#121316] rounded-lg border border-[#282A33] space-y-2.5 ${className}`}
+      className={`p-3 bg-surface-container-low rounded-lg border border-border-subtle space-y-2.5 ${className}`}
     >
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-mono text-text-muted uppercase tracking-wider flex items-center gap-1.5">
@@ -119,9 +119,9 @@ export const InspectorClaimCta: React.FC<InspectorClaimCtaProps> = ({
 
   return (
     <div
-      className={`p-3 rounded-lg bg-[#F59E0B]/10 border border-[#F59E0B]/30 flex flex-col gap-2 ${className}`}
+      className={`p-3 rounded-lg bg-amber-action/10 border border-amber-action/30 flex flex-col gap-2 ${className}`}
     >
-      <div className="flex items-center gap-1.5 text-[#F59E0B] font-medium text-xs">
+      <div className="flex items-center gap-1.5 text-amber-action font-medium text-xs">
         <Sparkles className="w-3.5 h-3.5" />
         <span>Unassigned Ticket</span>
       </div>
@@ -133,7 +133,7 @@ export const InspectorClaimCta: React.FC<InspectorClaimCtaProps> = ({
         type="button"
         data-testid="claim-ticket-btn"
         onClick={handleClaim}
-        className="w-full h-8 bg-[#F59E0B] hover:bg-[#D97706] text-[#0F1012] font-semibold rounded text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-keylight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
+        className="w-full h-8 bg-amber-action hover:bg-amber-hover text-on-amber-action font-semibold rounded text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-keylight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
       >
         <CheckCircle2 className="w-3.5 h-3.5" />
         <span>Claim Ticket</span>
@@ -187,7 +187,7 @@ export const InspectorLifecycle: React.FC<InspectorLifecycleProps> = ({
   }
 
   return (
-    <div className={`space-y-3 bg-[#121316] p-3 rounded-lg border border-[#282A33] ${className}`}>
+    <div className={`space-y-3 bg-surface-container-low p-3 rounded-lg border border-border-subtle ${className}`}>
       <div className="text-[11px] font-mono text-text-muted uppercase tracking-wider">
         Lifecycle & Urgency
       </div>
@@ -202,7 +202,7 @@ export const InspectorLifecycle: React.FC<InspectorLifecycleProps> = ({
             data-testid="inspector-status-select"
             value={ticket.status}
             onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
-            className="w-full h-8 px-2.5 bg-[#141518] border border-[#282A33] rounded text-xs font-mono text-text-primary focus:outline-none focus:border-[#F59E0B]"
+            className="w-full h-8 px-2.5 bg-surface-panel border border-border-subtle rounded text-xs font-mono text-text-primary focus:outline-none focus:border-amber-action focus-visible:ring-1 focus-visible:ring-focus-amber cursor-pointer"
           >
             <option value="new">new (Awaiting triage)</option>
             <option value="open">open (In progress)</option>
@@ -221,7 +221,7 @@ export const InspectorLifecycle: React.FC<InspectorLifecycleProps> = ({
             data-testid="inspector-priority-select"
             value={ticket.priority}
             onChange={(e) => handlePriorityChange(e.target.value as TicketPriority)}
-            className="w-full h-8 px-2.5 bg-[#141518] border border-[#282A33] rounded text-xs font-mono text-text-primary focus:outline-none focus:border-[#F59E0B]"
+            className="w-full h-8 px-2.5 bg-surface-panel border border-border-subtle rounded text-xs font-mono text-text-primary focus:outline-none focus:border-amber-action focus-visible:ring-1 focus-visible:ring-focus-amber cursor-pointer"
           >
             <option value="urgent">P0 Urgent</option>
             <option value="high">P1 High</option>
@@ -316,9 +316,9 @@ export const InspectorAssignment: React.FC<InspectorAssignmentProps> = ({
   }
 
   return (
-    <div className={`space-y-3 bg-[#121316] p-3 rounded-lg border border-[#282A33] ${className}`}>
+    <div className={`space-y-3 bg-surface-container-low p-3 rounded-lg border border-border-subtle ${className}`}>
       <div className="text-[11px] font-mono text-text-muted uppercase tracking-wider flex items-center gap-1.5">
-        <Users2 className="w-3.5 h-3.5 text-[#F59E0B]" />
+        <Users2 className="w-3.5 h-3.5 text-amber-action" />
         <span>Assignment</span>
       </div>
 
@@ -332,7 +332,7 @@ export const InspectorAssignment: React.FC<InspectorAssignmentProps> = ({
             data-testid="inspector-team-select"
             value={ticket.assigned_team_id ?? ''}
             onChange={(e) => handleTeamChange(e.target.value)}
-            className="w-full h-8 px-2.5 bg-[#141518] border border-[#282A33] rounded text-xs font-mono text-text-primary focus:outline-none focus:border-[#F59E0B]"
+            className="w-full h-8 px-2.5 bg-surface-panel border border-border-subtle rounded text-xs font-mono text-text-primary focus:outline-none focus:border-amber-action focus-visible:ring-1 focus-visible:ring-focus-amber cursor-pointer"
           >
             <option value="">(No team assigned)</option>
             {teams.map((t) => (
@@ -352,7 +352,7 @@ export const InspectorAssignment: React.FC<InspectorAssignmentProps> = ({
             data-testid="inspector-member-select"
             value={ticket.assigned_member_id ?? ''}
             onChange={(e) => handleMemberChange(e.target.value)}
-            className="w-full h-8 px-2.5 bg-[#141518] border border-[#282A33] rounded text-xs font-mono text-text-primary focus:outline-none focus:border-[#F59E0B]"
+            className="w-full h-8 px-2.5 bg-surface-panel border border-border-subtle rounded text-xs font-mono text-text-primary focus:outline-none focus:border-amber-action focus-visible:ring-1 focus-visible:ring-focus-amber cursor-pointer"
           >
             <option value="">(Unassigned)</option>
             {eligibleMembers.map((m) => (
@@ -482,11 +482,11 @@ export const InspectorTags: React.FC<InspectorTagsProps> = ({
   return (
     <div
       data-testid="inline-tag-manager"
-      className={`space-y-2 bg-[#121316] p-3 rounded-lg border border-[#282A33] relative ${className}`}
+      className={`space-y-2 bg-surface-container-low p-3 rounded-lg border border-border-subtle relative ${className}`}
     >
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-mono text-text-muted uppercase tracking-wider flex items-center gap-1.5">
-          <TagIcon className="w-3.5 h-3.5 text-[#F59E0B]" />
+          <TagIcon className="w-3.5 h-3.5 text-amber-action" />
           <span>Tags ({ticket.tags?.length || 0})</span>
         </span>
 
@@ -497,7 +497,7 @@ export const InspectorTags: React.FC<InspectorTagsProps> = ({
             setIsTagPopoverOpen((prev) => !prev)
             setHighlightedTagIndex(0)
           }}
-          className="text-[11px] text-[#F59E0B] hover:text-[#D97706] font-mono flex items-center gap-1 transition-colors cursor-pointer"
+          className="text-[11px] text-amber-action hover:text-amber-hover font-mono flex items-center gap-1 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber rounded"
         >
           <Plus className="w-3 h-3" />
           <span>Add</span>
@@ -511,7 +511,7 @@ export const InspectorTags: React.FC<InspectorTagsProps> = ({
             <span
               key={tag.id}
               data-testid={`tag-chip-${tag.slug}`}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-mono bg-[#16181D] border border-[#282A33] text-text-secondary group"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-mono bg-surface-container border border-border-subtle text-text-secondary group"
             >
               <span>{tag.name}</span>
               <button
@@ -524,7 +524,7 @@ export const InspectorTags: React.FC<InspectorTagsProps> = ({
                     if (err instanceof Error) onError?.(err)
                   }
                 }}
-                className="hover:text-sentiment-negative text-text-muted transition-colors rounded p-0.5 cursor-pointer"
+                className="hover:text-sentiment-negative text-text-muted transition-colors rounded p-0.5 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber"
                 title={`Remove tag ${tag.name}`}
               >
                 <X className="w-2.5 h-2.5" />
@@ -540,7 +540,7 @@ export const InspectorTags: React.FC<InspectorTagsProps> = ({
       {isTagPopoverOpen ? (
         <div
           data-testid="tag-autocomplete-popover"
-          className="absolute left-0 right-0 top-full mt-1 z-30 p-2.5 bg-[#0F1012] border border-[#F59E0B]/30 rounded-lg shadow-2xl space-y-2 animate-in fade-in duration-100"
+          className="absolute left-0 right-0 top-full mt-1 z-30 p-2.5 bg-surface-canvas border border-amber-action/30 rounded-lg shadow-2xl space-y-2 animate-in fade-in duration-100"
         >
           <form onSubmit={handleCreateAndAddTag} className="flex gap-1.5">
             <input
@@ -554,12 +554,12 @@ export const InspectorTags: React.FC<InspectorTagsProps> = ({
               }}
               onKeyDown={handleTagInputKeyDown}
               placeholder="Search or new tag..."
-              className="flex-1 h-7 px-2 bg-[#121316] border border-[#282A33] rounded text-[11px] text-text-primary focus:outline-none focus:border-[#F59E0B]"
+              className="flex-1 h-7 px-2 bg-surface-container-low border border-border-subtle rounded text-[11px] text-text-primary focus:outline-none focus:border-amber-action focus-visible:ring-1 focus-visible:ring-focus-amber"
             />
             <button
               type="submit"
               data-testid="submit-tag-btn"
-              className="h-7 px-2.5 bg-[#F59E0B] hover:bg-[#D97706] text-[#0F1012] font-semibold text-[11px] rounded cursor-pointer"
+              className="h-7 px-2.5 bg-amber-action hover:bg-amber-hover text-on-amber-action font-semibold text-[11px] rounded cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber"
             >
               Attach
             </button>
@@ -576,10 +576,10 @@ export const InspectorTags: React.FC<InspectorTagsProps> = ({
                   aria-selected={isHighlighted}
                   onMouseEnter={() => setHighlightedTagIndex(idx)}
                   onClick={() => handleAddTagFromPool(tag)}
-                  className={`w-full text-left px-2 py-1 rounded text-[11px] font-mono flex items-center justify-between transition-colors cursor-pointer ${
+                  className={`w-full text-left px-2 py-1 rounded text-[11px] font-mono flex items-center justify-between transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber ${
                     isHighlighted
-                      ? 'bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30'
-                      : 'text-text-secondary hover:bg-[#16181D]'
+                      ? 'bg-amber-action/20 text-amber-action border border-amber-action/30'
+                      : 'text-text-secondary hover:bg-surface-container'
                   }`}
                 >
                   <span>{tag.name}</span>
@@ -619,13 +619,13 @@ export const InspectorAuditLog: React.FC<InspectorAuditLogProps> = ({
   return (
     <div
       data-testid="assignment-history-section"
-      className={`space-y-2 bg-[#121316] p-3 rounded-lg border border-[#282A33] ${className}`}
+      className={`space-y-2 bg-surface-container-low p-3 rounded-lg border border-border-subtle ${className}`}
     >
       <button
         type="button"
         data-testid="toggle-assignment-history"
         onClick={() => setIsAuditExpanded((prev) => !prev)}
-        className="w-full flex items-center justify-between text-[11px] font-mono text-text-muted uppercase tracking-wider cursor-pointer hover:text-text-secondary transition-colors"
+        className="w-full flex items-center justify-between text-[11px] font-mono text-text-muted uppercase tracking-wider cursor-pointer hover:text-text-secondary transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber rounded"
       >
         <span className="flex items-center gap-1.5">
           <History className="w-3.5 h-3.5 text-text-muted" />
@@ -718,7 +718,7 @@ export const InspectorDestructive: React.FC<InspectorDestructiveProps> = ({
 
   return (
     <>
-      <div className={`pt-2 border-t border-[#282A33] space-y-2 ${className}`}>
+      <div className={`pt-2 border-t border-border-subtle space-y-2 ${className}`}>
         <button
           type="button"
           data-testid="admin-delete-ticket-btn"
@@ -753,7 +753,7 @@ export const InspectorDestructive: React.FC<InspectorDestructiveProps> = ({
         }
         description={
           <>
-            Are you sure you want to soft-delete Ticket <span className="font-mono text-white">#{ticket.ticket_number}</span>? This action can be reversed by an administrator, but the ticket will be removed from all active triage queues.
+            Are you sure you want to soft-delete Ticket <span className="font-mono text-text-primary">#{ticket.ticket_number}</span>? This action can be reversed by an administrator, but the ticket will be removed from all active triage queues.
           </>
         }
       >
@@ -832,9 +832,9 @@ export const TicketMetadataInspector: React.FC<TicketMetadataInspectorProps> = (
       className={`space-y-5 text-text-primary text-xs ${className}`}
     >
       {/* Ticket Attributes Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-[#282A33]">
+      <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
         <span className="text-[11px] font-mono uppercase tracking-wider text-text-muted flex items-center gap-1.5">
-          <Shield className="w-3.5 h-3.5 text-[#F59E0B]" />
+          <Shield className="w-3.5 h-3.5 text-amber-action" />
           <span>Ticket Attributes</span>
         </span>
         <Badge variant={userRole === 'admin' ? 'admin' : 'agent'} className="font-mono text-[10px] uppercase">

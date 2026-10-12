@@ -34,6 +34,7 @@ export const TicketQueueView: React.FC<TicketQueueViewProps> = ({
 }) => {
   return (
     <div
+      data-theme="internal"
       data-testid="tickets-queue-view"
       className="w-full h-full flex flex-col relative select-text"
     >
