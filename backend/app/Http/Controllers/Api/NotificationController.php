@@ -41,22 +41,18 @@ class NotificationController extends Controller
         }
 
         if ($isRecent) {
-            $perPage = min(100, max(1, (int) $request->integer('per_page', 5)));
-            $query->orderByDesc('latest_activity_at')
-                ->orderByDesc('created_at')
-                ->orderByDesc('id');
-        } elseif ($isUnread) {
-            $perPage = min(100, max(1, (int) $request->integer('per_page', 20)));
-            $query->orderByDesc('latest_activity_at')
-                ->orderByDesc('created_at')
-                ->orderByDesc('id');
+            $perPage = 5;
         } else {
             $perPage = min(100, max(1, (int) $request->integer('per_page', 20)));
-            $query->orderByRaw('read_at IS NULL DESC')
-                ->orderByDesc('latest_activity_at')
-                ->orderByDesc('created_at')
-                ->orderByDesc('id');
         }
+
+        if (! $isRecent && ! $isUnread) {
+            $query->orderByRaw('read_at IS NULL DESC');
+        }
+
+        $query->orderByDesc('latest_activity_at')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
 
         $paginator = $query->paginate($perPage);
 
@@ -98,7 +94,18 @@ class NotificationController extends Controller
             $freshItem = $item->fresh();
             $freshItem->load(['ticket.customer']);
 
-            return response()->json(['data' => $this->formatNotificationRow($freshItem)]);
+            $actorMemberId = $freshItem->latest_activity_metadata['actor_member_id'] ?? null;
+            $actorMembers = null;
+            if ($actorMemberId !== null) {
+                $actorMembers = OrganizationMember::withoutGlobalScopes()
+                    ->where('organization_id', OrganizationContext::getCurrentId())
+                    ->where('id', $actorMemberId)
+                    ->with('user')
+                    ->get()
+                    ->keyBy('id');
+            }
+
+            return response()->json(['data' => $this->formatNotificationRow($freshItem, $actorMembers)]);
         });
     }
 
@@ -131,22 +138,15 @@ class NotificationController extends Controller
             $actorMemberId = $notification->latest_activity_metadata['actor_member_id'] ?? null;
             if ($actorMemberId !== null) {
                 $member = $actorMembers?->get($actorMemberId);
-                if (! $member) {
-                    $member = OrganizationMember::withoutGlobalScopes()
-                        ->where('organization_id', OrganizationContext::getCurrentId())
-                        ->with('user')
-                        ->find($actorMemberId);
-                }
-
                 if ($member) {
                     $actor = [
                         'id' => (int) $member->id,
-                        'name' => (string) ($member->user?->name ?? 'Staff'),
+                        'name' => (string) ($member->user?->name ?? 'Agent'),
                         'email' => $member->user?->email,
                         'type' => 'member',
                     ];
                 }
-            } elseif ($ticket->customer !== null) {
+            } elseif (in_array($notification->activity_type, ['customer_public_reply', 'ticket_created'], true) && $ticket->customer !== null) {
                 $actor = [
                     'id' => (int) $ticket->customer->id,
                     'name' => (string) $ticket->customer->name,
@@ -156,7 +156,8 @@ class NotificationController extends Controller
             }
         }
 
-        $time = $notification->latest_activity_at?->toISOString() ?? (string) $notification->latest_activity_at;
+        $time = $notification->latest_activity_at?->toISOString()
+            ?? $notification->created_at?->toISOString();
 
         return [
             'id' => (string) $notification->id,

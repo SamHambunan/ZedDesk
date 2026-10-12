@@ -101,6 +101,10 @@ test('recent mode returns the true five newest Notifications by latest activity 
     $aliasResponse = $this->getJson('http://acme.localhost/api/notifications?recent=1')->assertOk();
     expect($aliasResponse->json('data'))->toHaveCount(5)
         ->and($aliasResponse->json('data.0.id'))->toBe($items[7]->id);
+
+    // Verify recent mode strictly returns 5 items even if a larger per_page is requested
+    $perPageOverride = $this->getJson('http://acme.localhost/api/notifications?mode=recent&per_page=50')->assertOk();
+    expect($perPageOverride->json('data'))->toHaveCount(5);
 });
 
 test('unread filter paginates only unread Notifications with accurate totals', function () {
@@ -197,6 +201,22 @@ test('authorized rows provide Ticket Number, subject, activity, actor when avail
             'updated_at' => $customerTime,
         ]);
 
+    // 3. Notification for system assignment without member actor (actor should be null, not customer)
+    $thirdTicket = displayReadyTicket($organization, 'System Reassignment');
+    $systemTime = Carbon::parse('2026-10-12 12:20:00 UTC');
+    Notification::where('recipient_member_id', $agent->id)
+        ->where('ticket_id', $thirdTicket->id)
+        ->update([
+            'activity_type' => 'assignment_changed',
+            'latest_activity_metadata' => [
+                'to_member_id' => $agent->id,
+                'actor_member_id' => null,
+            ],
+            'latest_activity_at' => $systemTime,
+            'created_at' => $systemTime,
+            'updated_at' => $systemTime,
+        ]);
+
     $response = $this->getJson('http://acme.localhost/api/notifications')->assertOk();
     $data = $response->json('data');
 
@@ -223,6 +243,14 @@ test('authorized rows provide Ticket Number, subject, activity, actor when avail
         ->and($assignmentRow['actor']['name'])->toBe('Staff Reassigner')
         ->and($assignmentRow['actor']['email'])->toBe('staff.reassigner@acme.test')
         ->and($assignmentRow['time'])->not->toBeNull();
+
+    // Third row is assignment_changed without actor member (actor must be null, not falsely customer)
+    $systemRow = $data[2];
+    expect($systemRow['ticket_number'])->toBe($thirdTicket->ticket_number)
+        ->and($systemRow['subject'])->toBe('System Reassignment')
+        ->and($systemRow['activity'])->toBe('assignment_changed')
+        ->and($systemRow['actor'])->toBeNull()
+        ->and($systemRow['time'])->not->toBeNull();
 });
 
 test('safe unavailable fallbacks apply when Ticket is deleted or actor is unavailable', function () {
@@ -375,4 +403,42 @@ test('existing mark-read unread-count and mark-all-read contracts remain compati
     $this->getJson('http://acme.localhost/api/notifications/unread-count')
         ->assertOk()
         ->assertJsonPath('unread_count', 0);
+});
+
+test('members within the same Organization cannot view or mark read each other notifications', function () {
+    $organization = Organization::create(['name' => 'Acme', 'slug' => 'acme']);
+    $agentOne = displayReadyMember($organization, 'Agent One');
+    $agentTwo = displayReadyMember($organization, 'Agent Two');
+
+    $ticket = displayReadyTicket($organization, 'Shared Org Ticket');
+
+    $notificationOne = Notification::where('recipient_member_id', $agentOne->id)
+        ->where('ticket_id', $ticket->id)
+        ->firstOrFail();
+
+    $notificationTwo = Notification::where('recipient_member_id', $agentTwo->id)
+        ->where('ticket_id', $ticket->id)
+        ->firstOrFail();
+
+    // Agent One sees only their notification
+    Sanctum::actingAs($agentOne->user);
+    $feedOne = $this->getJson('http://acme.localhost/api/notifications')->assertOk();
+    expect($feedOne->json('data'))->toHaveCount(1)
+        ->and($feedOne->json('data.0.id'))->toBe($notificationOne->id)
+        ->and($feedOne->json('data.0.recipient_member_id'))->toBe($agentOne->id);
+
+    // Agent One cannot mark read Agent Two's notification (returns 404 in their inbox)
+    $this->postJson("http://acme.localhost/api/notifications/{$notificationTwo->id}/mark-read")
+        ->assertNotFound();
+
+    // Agent Two sees only their notification
+    Sanctum::actingAs($agentTwo->user);
+    $feedTwo = $this->getJson('http://acme.localhost/api/notifications')->assertOk();
+    expect($feedTwo->json('data'))->toHaveCount(1)
+        ->and($feedTwo->json('data.0.id'))->toBe($notificationTwo->id)
+        ->and($feedTwo->json('data.0.recipient_member_id'))->toBe($agentTwo->id);
+
+    // Agent Two cannot mark read Agent One's notification
+    $this->postJson("http://acme.localhost/api/notifications/{$notificationOne->id}/mark-read")
+        ->assertNotFound();
 });
