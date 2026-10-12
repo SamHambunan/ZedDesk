@@ -21,6 +21,14 @@ export interface PublicInvitationViewProps {
   readonly className?: string
 }
 
+const INTERNAL_THEME_FONT_LINK = (
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    precedence="default"
+  />
+)
+
 export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
   invitation,
   isLoading = false,
@@ -45,11 +53,7 @@ export const PublicInvitationView: React.FC<PublicInvitationViewProps> = ({
       data-testid="public-invitation-view"
       className={`bg-canvas-base text-text-primary min-h-screen flex flex-col items-center justify-center p-4 md:p-6 font-body-default antialiased selection:bg-primary-container/30 selection:text-on-primary ${className}`}
     >
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
-        precedence="default"
-      />
+      {INTERNAL_THEME_FONT_LINK}
       {/* Minimal Header */}
       <header className="mb-8 flex items-center gap-3">
         <div className="w-8 h-8 bg-surface-panel border border-border-subtle rounded-lg flex items-center justify-center shadow-keylight">

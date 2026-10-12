@@ -143,7 +143,7 @@ export const InvitationCardLockedEmail: React.FC<InvitationCardLockedEmailProps>
         <Lock className="w-4 h-4 text-text-muted shrink-0" />
         <span
           data-testid="invitation-email"
-          className="font-mono-data text-mono-data text-text-secondary truncate text-xs tabular-nums"
+          className="font-mono-data text-mono-data text-text-secondary truncate text-xs"
         >
           {email}
         </span>
