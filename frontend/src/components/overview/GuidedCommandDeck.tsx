@@ -26,15 +26,15 @@ export const GuidedCommandDeck: React.FC<GuidedCommandDeckProps> = ({
   return (
     <div
       data-testid="guided-command-deck"
-      className="bg-surface-subpanel/90 border border-accent-glow/30 rounded-xl p-5 shadow-luminous-indigo/10 space-y-5 relative overflow-hidden"
+      className="bg-surface-subpanel/90 border border-border-subtle rounded-lg p-5 shadow-keylight space-y-5 relative overflow-hidden"
     >
       {/* Background glow effect */}
-      <div className="absolute top-0 right-0 w-72 h-72 bg-accent-glow/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 right-0 w-72 h-72 bg-primary-container/5 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-subtle pb-4">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-accent-glow/15 flex items-center justify-center text-accent-glow">
+          <div className="w-8 h-8 rounded-lg bg-primary-container/15 flex items-center justify-center text-primary-container">
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
@@ -65,7 +65,7 @@ export const GuidedCommandDeck: React.FC<GuidedCommandDeckProps> = ({
         >
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono-data text-accent-glow font-semibold tracking-wider uppercase">
+              <span className="text-[11px] font-mono-data text-primary-container font-semibold tracking-wider uppercase">
                 Step 01
               </span>
               {step1Complete ? (
@@ -85,7 +85,7 @@ export const GuidedCommandDeck: React.FC<GuidedCommandDeckProps> = ({
           <div>
             {step1Complete ? (
               <div className="text-xs font-mono-data text-sentiment-positive flex items-center gap-1">
-                <span>{teamsCount} Routing Lanes Active</span>
+                <span><span className="tabular-nums">{teamsCount}</span> Routing Lanes Active</span>
               </div>
             ) : (
               <Button
@@ -114,7 +114,7 @@ export const GuidedCommandDeck: React.FC<GuidedCommandDeckProps> = ({
         >
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono-data text-accent-glow font-semibold tracking-wider uppercase">
+              <span className="text-[11px] font-mono-data text-primary-container font-semibold tracking-wider uppercase">
                 Step 02
               </span>
               {step2Complete ? (
@@ -134,7 +134,7 @@ export const GuidedCommandDeck: React.FC<GuidedCommandDeckProps> = ({
           <div>
             {step2Complete ? (
               <div className="text-xs font-mono-data text-sentiment-positive flex items-center gap-1">
-                <span>{membersCount} Dispatch Agents Onboarded</span>
+                <span><span className="tabular-nums">{membersCount}</span> Dispatch Agents Onboarded</span>
               </div>
             ) : (
               <Button
@@ -163,7 +163,7 @@ export const GuidedCommandDeck: React.FC<GuidedCommandDeckProps> = ({
         >
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono-data text-accent-glow font-semibold tracking-wider uppercase">
+              <span className="text-[11px] font-mono-data text-primary-container font-semibold tracking-wider uppercase">
                 Step 03
               </span>
               {step3Complete ? (
@@ -183,7 +183,7 @@ export const GuidedCommandDeck: React.FC<GuidedCommandDeckProps> = ({
           <div>
             {step3Complete ? (
               <div className="text-xs font-mono-data text-sentiment-positive flex items-center gap-1">
-                <span>{ticketsCount} Intake Inquiries Active</span>
+                <span><span className="tabular-nums">{ticketsCount}</span> Intake Inquiries Active</span>
               </div>
             ) : (
               <Button

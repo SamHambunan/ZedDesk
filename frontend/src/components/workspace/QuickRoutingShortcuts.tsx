@@ -24,11 +24,11 @@ export const QuickRoutingShortcuts: React.FC<QuickRoutingShortcutsProps> = ({
   const getTeamIcon = (iconType?: WorkspaceShortcutTeam['iconType']) => {
     switch (iconType) {
       case 'tier1':
-        return <Headset className="w-[18px] h-[18px] text-accent-glow" />
+        return <Headset className="w-[18px] h-[18px] text-primary-container" />
       case 'billing':
         return <Receipt className="w-[18px] h-[18px] text-sentiment-warning" />
       default:
-        return <Users className="w-[18px] h-[18px] text-accent-glow" />
+        return <Users className="w-[18px] h-[18px] text-primary-container" />
     }
   }
 
@@ -51,7 +51,7 @@ export const QuickRoutingShortcuts: React.FC<QuickRoutingShortcutsProps> = ({
                 onTeamClick?.(team.id)
               }
             }}
-            className="block bg-surface-subpanel rounded-xl border border-border-subtle shadow-keylight p-4 hover:border-accent-glow/50 transition-colors group cursor-pointer text-left"
+            className="block bg-surface-subpanel rounded-lg border border-border-subtle shadow-keylight p-4 hover:border-border-prominent transition-colors group cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
           >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -62,7 +62,7 @@ export const QuickRoutingShortcuts: React.FC<QuickRoutingShortcutsProps> = ({
               </div>
               <ArrowRight className="w-4 h-4 text-text-muted group-hover:text-text-primary transition-colors shrink-0" />
             </div>
-            <p className="text-body-compact font-body-compact text-text-secondary">
+            <p className="text-body-compact font-body-compact text-text-secondary tabular-nums">
               {team.activeAgentsCount} active agents • {team.openTicketsCount} tickets open
             </p>
           </div>
@@ -79,7 +79,7 @@ export const QuickRoutingShortcuts: React.FC<QuickRoutingShortcutsProps> = ({
                 onPendingInvitationsClick?.()
               }
             }}
-            className="block bg-surface-container-high rounded-xl border border-border-subtle p-4 border-dashed hover:border-text-secondary transition-colors group mt-1 cursor-pointer text-left"
+            className="block bg-surface-container-high rounded-lg border border-border-subtle p-4 border-dashed hover:border-text-secondary transition-colors group mt-1 cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

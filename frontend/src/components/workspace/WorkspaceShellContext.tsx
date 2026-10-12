@@ -1,10 +1,10 @@
-import React, { createContext, useContext } from 'react'
+import React, { createContext, use } from 'react'
 import { QueryClientContext, QueryClientProvider } from '@tanstack/react-query'
 import { queryClient as defaultQueryClient } from '../../lib/query-client'
 import type { WorkspaceOrganization } from './WorkspaceHeader'
 
 export function SafeQueryProvider({ children }: { children: React.ReactNode }) {
-  const client = useContext(QueryClientContext)
+  const client = use(QueryClientContext)
   if (client) {
     return <>{children}</>
   }
@@ -50,7 +50,7 @@ export interface WorkspaceShellContextValue {
 export const WorkspaceShellContext = createContext<WorkspaceShellContextValue | null>(null)
 
 export function useWorkspaceShell(): WorkspaceShellContextValue {
-  const ctx = useContext(WorkspaceShellContext)
+  const ctx = use(WorkspaceShellContext)
   if (!ctx) {
     throw new Error('useWorkspaceShell must be used within a WorkspaceShell.Provider')
   }

@@ -13,8 +13,8 @@ export const QuickDispatchShortcuts: React.FC<QuickDispatchShortcutsProps> = ({ 
       subtitle: '/members',
       description: 'Directory & Admin Roles',
       icon: Users,
-      color: 'text-blue-400',
-      bgColor: 'bg-blue-500/10',
+      color: 'text-text-secondary',
+      bgColor: 'bg-surface-container',
       route: 'members',
     },
     {
@@ -23,8 +23,8 @@ export const QuickDispatchShortcuts: React.FC<QuickDispatchShortcutsProps> = ({ 
       subtitle: '/teams',
       description: 'Capacity & Assignments',
       icon: Network,
-      color: 'text-[#F59E0B]',
-      bgColor: 'bg-[#F59E0B]/10',
+      color: 'text-primary-container',
+      bgColor: 'bg-primary-container/10',
       route: 'teams',
     },
     {
@@ -43,8 +43,8 @@ export const QuickDispatchShortcuts: React.FC<QuickDispatchShortcutsProps> = ({ 
       subtitle: '/tickets',
       description: 'Stage 2 Ingestion Ledger',
       icon: Inbox,
-      color: 'text-accent-glow',
-      bgColor: 'bg-accent-glow/10',
+      color: 'text-primary-container',
+      bgColor: 'bg-primary-container/10',
       route: 'tickets',
     },
   ]
@@ -52,7 +52,7 @@ export const QuickDispatchShortcuts: React.FC<QuickDispatchShortcutsProps> = ({ 
   return (
     <div
       data-testid="quick-dispatch-shortcuts"
-      className="bg-surface-subpanel/80 border border-border-subtle rounded-xl p-5 shadow-sm space-y-4"
+      className="bg-surface-panel border border-border-subtle rounded-lg p-5 shadow-keylight space-y-4"
     >
       <div className="flex items-center justify-between border-b border-border-subtle pb-3">
         <h2 className="text-headline-sm font-semibold text-text-primary">
@@ -73,7 +73,7 @@ export const QuickDispatchShortcuts: React.FC<QuickDispatchShortcutsProps> = ({ 
               type="button"
               data-testid={`dispatch-shortcut-${item.id}`}
               onClick={() => onNavigate?.(item.route)}
-              className="bg-surface-panel/60 border border-border-subtle/80 hover:border-accent-glow/50 rounded-lg p-3.5 text-left transition-all group cursor-pointer flex flex-col justify-between gap-2.5 hover:bg-surface-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
+              className="bg-surface-subpanel/60 border border-border-subtle hover:border-primary-container/50 rounded-lg p-3.5 text-left transition-all group cursor-pointer flex flex-col justify-between gap-2.5 hover:bg-surface-subpanel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
             >
               <div className="flex items-center justify-between">
                 <div
@@ -81,11 +81,11 @@ export const QuickDispatchShortcuts: React.FC<QuickDispatchShortcutsProps> = ({ 
                 >
                   <Icon className="w-4 h-4" />
                 </div>
-                <ArrowUpRight className="w-3.5 h-3.5 text-text-muted group-hover:text-accent-glow transition-colors" />
+                <ArrowUpRight className="w-3.5 h-3.5 text-text-muted group-hover:text-primary-container transition-colors" />
               </div>
 
               <div>
-                <div className="text-body-default font-medium text-text-primary group-hover:text-white transition-colors">
+                <div className="text-body-default font-medium text-text-primary group-hover:text-primary-container transition-colors">
                   {item.title}
                 </div>
                 <div className="text-[11px] font-mono-data text-text-muted mt-0.5 truncate">

@@ -76,12 +76,12 @@ export const TriageQueueBridge: React.FC<TriageQueueBridgeProps> = ({
   return (
     <div
       data-testid="stage2-triage-queue-bridge"
-      className="bg-surface-subpanel/80 border border-border-subtle rounded-xl p-5 shadow-sm space-y-4"
+      className="bg-surface-panel border border-border-subtle rounded-lg p-5 shadow-keylight space-y-4"
     >
       {/* Header and Direct Link */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-subtle pb-3">
         <div className="flex items-center gap-2">
-          <GitPullRequest className="w-4 h-4 text-[#F59E0B]" />
+          <GitPullRequest className="w-4 h-4 text-primary-container" />
           <h2 className="text-headline-sm font-semibold text-text-primary">
             Stage 2 Triage Queue Bridge
           </h2>
@@ -91,7 +91,7 @@ export const TriageQueueBridge: React.FC<TriageQueueBridgeProps> = ({
           type="button"
           data-testid="view-all-tickets-link"
           onClick={onViewAllTickets}
-          className="text-xs font-label-regular text-accent-glow hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B] rounded px-1"
+          className="text-xs font-label-regular text-primary-container hover:text-amber-hover transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber rounded px-1"
         >
           <span>View Full Triage Queue</span>
           <ArrowRight className="w-3.5 h-3.5" />
@@ -161,10 +161,10 @@ export const TriageQueueBridge: React.FC<TriageQueueBridgeProps> = ({
               <div
                 key={ticket.id}
                 data-testid={`preview-ticket-${ticket.id}`}
-                className="bg-surface-panel/60 border border-border-subtle/80 hover:border-border-prominent rounded-lg p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors"
+                className="bg-surface-subpanel/60 border border-border-subtle hover:border-border-prominent rounded-lg p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors"
               >
                 <div className="flex items-start gap-3 min-w-0 flex-1">
-                  <span className="font-mono-data text-xs text-text-muted shrink-0 pt-0.5">
+                  <span className="font-mono-data text-xs text-text-muted shrink-0 pt-0.5 tabular-nums">
                     #{ticket.ticket_number}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -194,7 +194,7 @@ export const TriageQueueBridge: React.FC<TriageQueueBridgeProps> = ({
                     data-testid={`claim-button-${ticket.id}`}
                     disabled={isClaiming}
                     onClick={() => handleClaim(ticket.id)}
-                    leftIcon={<UserCheck className="w-3.5 h-3.5 text-accent-glow" />}
+                    leftIcon={<UserCheck className="w-3.5 h-3.5 text-primary-container" />}
                   >
                     {isClaiming ? 'Routing...' : 'Claim & Route'}
                   </Button>

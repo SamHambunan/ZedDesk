@@ -38,11 +38,11 @@ export const TeamCapacityLanes: React.FC<TeamCapacityLanesProps> = ({ teams, onT
   return (
     <div
       data-testid="team-capacity-lanes"
-      className="bg-surface-subpanel/80 border border-border-subtle rounded-xl p-5 shadow-sm space-y-4"
+      className="bg-surface-panel border border-border-subtle rounded-lg p-5 shadow-keylight space-y-4"
     >
       <div className="flex items-center justify-between border-b border-border-subtle pb-3">
         <div className="flex items-center gap-2">
-          <Network className="w-4 h-4 text-accent-glow" />
+          <Network className="w-4 h-4 text-primary-container" />
           <h2 className="text-headline-sm font-semibold text-text-primary">
             Team Capacity & Routing Lanes
           </h2>
@@ -63,20 +63,28 @@ export const TeamCapacityLanes: React.FC<TeamCapacityLanesProps> = ({ teams, onT
           return (
             <div
               key={team.id}
+              role="button"
+              tabIndex={0}
               data-testid={`team-capacity-row-${team.id}`}
               onClick={() => onTeamClick?.(team.id)}
-              className="bg-surface-panel/60 border border-border-subtle/80 hover:border-border-prominent rounded-lg p-4 transition-colors group cursor-pointer"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onTeamClick?.(team.id)
+                }
+              }}
+              className="bg-surface-subpanel/60 border border-border-subtle hover:border-border-prominent rounded-lg p-4 transition-colors group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
             >
               {/* Team Header Row */}
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
                 <div className="flex items-center gap-3">
-                  <span className="text-title-md font-semibold text-text-primary group-hover:text-accent-glow transition-colors">
+                  <span className="text-title-md font-semibold text-text-primary group-hover:text-primary-container transition-colors">
                     {team.name}
                   </span>
                   <span
                     className={`text-[11px] font-mono-data px-2 py-0.5 rounded border ${colors.badgeClass}`}
                   >
-                    {capacity}% Load
+                    <span className="tabular-nums">{capacity}</span>% Load
                   </span>
                 </div>
 

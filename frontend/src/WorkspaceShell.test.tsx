@@ -53,15 +53,18 @@ describe('Tenant Subdomain Workspace Shell', () => {
     render(<App hostname="acme.localhost" />)
 
     await waitFor(() => {
+      expect(screen.getByTestId('workspace-shell')).toHaveAttribute('data-theme', 'internal')
       expect(screen.getByTestId('workspace-org-name')).toHaveTextContent('Acme Corporation')
       expect(screen.getByTestId('workspace-slug')).toHaveTextContent('acme')
       expect(screen.getByTestId('workspace-user-name')).toHaveTextContent('Alice Admin')
       expect(screen.getByTestId('workspace-user-email')).toHaveTextContent('admin@acme.test')
       expect(screen.getByTestId('workspace-user-role')).toHaveTextContent(/admin/i)
+      expect(screen.getByTestId('notifications-bell-btn')).toBeInTheDocument()
     })
 
-    // Role-aware navigation: Admin sees administrative sections
+    // Role-aware navigation: Admin sees administrative sections with accessible amber focus
     expect(screen.getByTestId('nav-tickets')).toBeInTheDocument()
+    expect(screen.getByTestId('nav-tickets')).toHaveClass('focus-visible:ring-focus-amber')
     expect(screen.getByTestId('nav-teams')).toBeInTheDocument()
     expect(screen.getByTestId('nav-admin-section')).toBeInTheDocument()
     expect(screen.getByTestId('nav-org-settings')).toBeInTheDocument()

@@ -17,19 +17,24 @@ export const ShiftRoster: React.FC<ShiftRosterProps> = ({ agents }) => {
   return (
     <div
       data-testid="on-duty-shift-roster"
-      className="bg-surface-subpanel/80 border border-border-subtle rounded-xl p-5 shadow-sm space-y-4"
+      className="bg-surface-panel border border-border-subtle rounded-lg p-5 shadow-keylight space-y-4"
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border-subtle pb-3">
-        <div className="flex items-center gap-2">
-          <Radio className="w-4 h-4 text-sentiment-positive animate-pulse" />
-          <h2 className="text-headline-sm font-semibold text-text-primary">
-            On-Duty Shift Roster
-          </h2>
+      <div className="flex flex-col gap-1 border-b border-border-subtle pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Radio className="w-4 h-4 text-sentiment-positive animate-pulse" />
+            <h2 className="text-headline-sm font-semibold text-text-primary">
+              On-Duty Shift Roster
+            </h2>
+          </div>
+          <span className="text-xs font-mono-data text-sentiment-positive">
+            Live Dispatch
+          </span>
         </div>
-        <span className="text-xs font-mono-data text-sentiment-positive">
-          Live Dispatch
-        </span>
+        <p className="text-[11px] font-mono-data text-text-muted">
+          Active shift assignments and queue dispatch load (duty status, distinct from connected presence).
+        </p>
       </div>
 
       {/* Agents Roster List */}
@@ -49,7 +54,7 @@ export const ShiftRoster: React.FC<ShiftRosterProps> = ({ agents }) => {
               <div
                 key={agent.id}
                 data-testid={`shift-agent-${agent.id}`}
-                className="bg-surface-panel/60 border border-border-subtle/80 hover:border-border-prominent rounded-lg p-3.5 flex items-center justify-between gap-3 transition-colors"
+                className="bg-surface-subpanel/60 border border-border-subtle hover:border-border-prominent rounded-lg p-3.5 flex items-center justify-between gap-3 transition-colors"
               >
                 {/* Agent Profile & Lanes */}
                 <div className="flex items-center gap-3 min-w-0">
@@ -64,7 +69,8 @@ export const ShiftRoster: React.FC<ShiftRosterProps> = ({ agents }) => {
                     <span
                       data-testid={`agent-status-dot-${agent.id}`}
                       className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface-panel ${statusDotClass}`}
-                      title={agent.status}
+                      title={`On-duty status: ${agent.status}`}
+                      aria-label={`On-duty status: ${agent.status}`}
                     />
                   </div>
 

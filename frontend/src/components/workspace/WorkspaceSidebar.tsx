@@ -1,4 +1,4 @@
-import React, { useContext } from 'react'
+import React, { use } from 'react'
 import {
   LayoutDashboard,
   Ticket,
@@ -36,7 +36,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   onNavigate: propOnNavigate,
   className = '',
 }) => {
-  const shellContext = useContext(WorkspaceShellContext)
+  const shellContext = use(WorkspaceShellContext)
 
   const organizationName = propOrgName ?? shellContext?.organization?.name ?? ''
   const organizationSlug = propOrgSlug ?? shellContext?.organization?.slug ?? ''
@@ -49,9 +49,9 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   const isAdmin = (role || '').toLowerCase() === 'admin'
 
   const navItemClass = (isActive: boolean) =>
-    `flex items-center gap-3 px-3 py-2 rounded-r transition-colors text-body-default font-body-default w-full text-left cursor-pointer border-l-2 ${
+    `flex items-center gap-3 px-3 py-2 rounded-r transition-colors text-body-default font-body-default w-full text-left cursor-pointer border-l-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber ${
       isActive
-        ? 'bg-surface-subpanel text-text-primary border-sentiment-warning border-[#F59E0B] font-medium'
+        ? 'bg-surface-subpanel text-text-primary border-[#F59E0B] font-medium'
         : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-subpanel/50'
     }`
 
@@ -255,7 +255,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           data-testid="sidebar-collapse-btn"
           onClick={onToggleCollapse}
           title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="flex items-center gap-3 px-3 py-2 rounded text-text-secondary hover:text-text-primary hover:bg-surface-subpanel transition-colors text-body-default font-body-default w-full text-left cursor-pointer"
+          className="flex items-center gap-3 px-3 py-2 rounded text-text-secondary hover:text-text-primary hover:bg-surface-subpanel transition-colors text-body-default font-body-default w-full text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
         >
           {isCollapsed ? (
             <PanelLeftOpen className="w-[18px] h-[18px] mx-auto shrink-0" />

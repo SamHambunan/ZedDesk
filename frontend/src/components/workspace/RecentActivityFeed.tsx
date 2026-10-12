@@ -20,7 +20,7 @@ export const RecentActivityFeed: React.FC<RecentActivityFeedProps> = ({
       case 'person':
         return <UserPlus className="w-3 h-3 text-text-secondary" />
       case 'group':
-        return <Users className="w-3 h-3 text-accent-glow" />
+        return <Users className="w-3 h-3 text-primary-container" />
       case 'report':
         return <CheckCircle2 className="w-3 h-3 text-sentiment-positive" />
       default:
@@ -31,7 +31,7 @@ export const RecentActivityFeed: React.FC<RecentActivityFeedProps> = ({
   return (
     <div
       data-testid={testId}
-      className={`bg-surface-subpanel rounded-xl border border-border-subtle shadow-keylight p-6 flex flex-col h-[400px] ${className}`}
+      className={`bg-surface-subpanel rounded-lg border border-border-subtle shadow-keylight p-6 flex flex-col h-[400px] ${className}`}
     >
       <h2 className="text-title-md font-title-md text-text-primary mb-4 font-semibold">
         {title}
@@ -63,7 +63,7 @@ export const RecentActivityFeed: React.FC<RecentActivityFeedProps> = ({
                   {item.highlight && (
                     <>
                       {' '}
-                      <span className="text-accent-glow font-mono-data text-[12px] bg-accent-glow/10 px-1 py-0.5 rounded">
+                      <span className="text-primary-container font-mono-data text-[12px] bg-primary-container/10 px-1 py-0.5 rounded">
                         {item.highlight}
                       </span>
                     </>
