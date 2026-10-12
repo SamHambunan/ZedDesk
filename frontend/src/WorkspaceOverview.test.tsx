@@ -47,6 +47,9 @@ describe('WorkspaceOverview Console', () => {
       expect(screen.getByTestId('context-ribbon-org-name')).toHaveTextContent('Acme Operations Corp')
       expect(screen.getByTestId('context-ribbon-subdomain')).toHaveTextContent('acme.zeddesk.app')
 
+      // Workspace Overview has internal theme scoped
+      expect(screen.getByTestId('workspace-overview')).toHaveAttribute('data-theme', 'internal')
+
       // Throughput metrics: "3 Ingestion Lanes Active • 4 Agents On-Duty • 99.4% SLA"
       expect(screen.getByTestId('context-ribbon-throughput')).toHaveTextContent(
         '3 Ingestion Lanes Active • 4 Agents On-Duty • 99.4% SLA'
@@ -364,12 +367,17 @@ describe('WorkspaceOverview Console', () => {
       expect(loadAgent2).toHaveTextContent('12')
       expect(loadAgent2).toHaveClass('tabular-nums')
 
-      // Live status dots: active emerald, triage amber
+      // Live status dots: active emerald, triage amber (duty dispatch distinct from presence)
       const statusDot1 = screen.getByTestId('agent-status-dot-1')
       expect(statusDot1).toHaveClass('bg-sentiment-positive')
+      expect(statusDot1).toHaveAttribute('title', 'On-duty status: active')
 
       const statusDot2 = screen.getByTestId('agent-status-dot-2')
       expect(statusDot2).toHaveClass('bg-sentiment-warning')
+      expect(statusDot2).toHaveAttribute('title', 'On-duty status: triage')
+
+      // Explicit roster caption clarifying duty status semantics
+      expect(screen.getByText(/duty status, distinct from connected presence/i)).toBeInTheDocument()
     })
   })
 

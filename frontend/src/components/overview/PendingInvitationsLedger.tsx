@@ -59,12 +59,12 @@ export const PendingInvitationsLedger: React.FC<PendingInvitationsLedgerProps> =
   return (
     <div
       data-testid="pending-invitations-ledger"
-      className="bg-surface-subpanel/80 border border-border-subtle rounded-xl p-5 shadow-sm space-y-4"
+      className="bg-surface-panel border border-border-subtle rounded-lg p-5 shadow-keylight space-y-4"
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border-subtle pb-3">
         <div className="flex items-center gap-2">
-          <Mail className="w-4 h-4 text-accent-glow" />
+          <Mail className="w-4 h-4 text-primary-container" />
           <h2 className="text-headline-sm font-semibold text-text-primary">
             Pending Invitations Ledger
           </h2>
@@ -77,7 +77,7 @@ export const PendingInvitationsLedger: React.FC<PendingInvitationsLedgerProps> =
           data-testid="issue-new-invitation-btn"
           onClick={onIssueNewInvitation}
           leftIcon={<Plus className="w-3.5 h-3.5" />}
-          className="text-accent-glow hover:text-white"
+          className="text-primary-container hover:text-amber-hover"
         >
           + Issue New Invitation
         </Button>
@@ -99,7 +99,7 @@ export const PendingInvitationsLedger: React.FC<PendingInvitationsLedgerProps> =
               <div
                 key={inv.id}
                 data-testid={`pending-invite-${inv.id}`}
-                className="bg-surface-panel/60 border border-border-subtle/80 hover:border-border-prominent rounded-lg p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors"
+                className="bg-surface-subpanel/60 border border-border-subtle hover:border-border-prominent rounded-lg p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -110,8 +110,8 @@ export const PendingInvitationsLedger: React.FC<PendingInvitationsLedgerProps> =
                       data-testid={`invitation-role-${inv.id}`}
                       className={`text-[10px] font-mono-data uppercase px-2 py-0.5 rounded border shrink-0 ${
                         isAdmin
-                          ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
-                          : 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                          ? 'bg-primary-container/20 text-primary-container border-primary-container/40'
+                          : 'bg-surface-container text-text-secondary border-border-subtle'
                       }`}
                     >
                       {inv.role}
@@ -129,9 +129,9 @@ export const PendingInvitationsLedger: React.FC<PendingInvitationsLedgerProps> =
                     type="button"
                     data-testid={`copy-invite-${inv.id}`}
                     onClick={() => handleCopyLink(inv)}
-                    className="h-8 px-2.5 bg-surface-container hover:bg-surface-container-high border border-border-prominent text-text-secondary hover:text-text-primary rounded text-xs font-mono-data transition-all flex items-center gap-1 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
+                    className="h-8 px-2.5 bg-surface-container hover:bg-surface-container-high border border-border-prominent text-text-secondary hover:text-text-primary rounded text-xs font-mono-data transition-all flex items-center gap-1 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
                   >
-                    <Copy className="w-3.5 h-3.5 text-accent-glow" />
+                    <Copy className="w-3.5 h-3.5 text-primary-container" />
                     <span>{isCopied ? 'Copied' : 'Copy Link'}</span>
                   </button>
 
@@ -142,7 +142,7 @@ export const PendingInvitationsLedger: React.FC<PendingInvitationsLedgerProps> =
                     onClick={() => handleRevoke(inv.id)}
                     title="Revoke invitation"
                     aria-label={`Revoke invitation for ${inv.email}`}
-                    className="h-8 w-8 bg-surface-container hover:bg-sentiment-critical/20 border border-border-prominent hover:border-sentiment-critical/30 text-text-muted hover:text-sentiment-critical rounded transition-all flex items-center justify-center cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
+                    className="h-8 w-8 bg-surface-container hover:bg-sentiment-critical/20 border border-border-prominent hover:border-sentiment-critical/30 text-text-muted hover:text-sentiment-critical rounded transition-all flex items-center justify-center cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

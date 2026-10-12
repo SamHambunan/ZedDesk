@@ -26,7 +26,7 @@ export const ContextRibbon: React.FC<ContextRibbonProps> = ({
   return (
     <div
       data-testid="context-ribbon"
-      className="bg-surface-subpanel/80 border border-border-subtle rounded-xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm"
+      className="bg-surface-panel border border-border-subtle rounded-lg p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-keylight"
     >
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2.5">
@@ -38,7 +38,7 @@ export const ContextRibbon: React.FC<ContextRibbonProps> = ({
           </h1>
           <span
             data-testid="context-ribbon-subdomain"
-            className="inline-flex items-center gap-1 font-mono-data text-xs px-2.5 py-0.5 rounded-full bg-surface-container border border-border-prominent text-text-secondary"
+            className="inline-flex items-center gap-1 font-mono-data text-xs px-2.5 py-0.5 rounded-full bg-surface-container border border-border-subtle text-text-secondary"
           >
             <ShieldCheck className="w-3 h-3 text-sentiment-positive" />
             {formattedSubdomain}
@@ -50,15 +50,15 @@ export const ContextRibbon: React.FC<ContextRibbonProps> = ({
           className="text-xs font-mono-data text-text-secondary flex flex-wrap items-center gap-1.5"
         >
           <span className="text-sentiment-positive font-medium">
-            {lanesCount} Ingestion Lanes Active
+            <span className="tabular-nums">{lanesCount}</span> Ingestion Lanes Active
           </span>
           <span className="text-text-muted">{' • '}</span>
           <span className="text-sentiment-positive font-medium">
-            {agentsOnDutyCount} Agents On-Duty
+            <span className="tabular-nums">{agentsOnDutyCount}</span> Agents On-Duty
           </span>
           <span className="text-text-muted">{' • '}</span>
           <span className="text-sentiment-positive font-medium">
-            {slaTarget} SLA
+            <span className="tabular-nums">{slaTarget}</span> SLA
           </span>
         </div>
       </div>

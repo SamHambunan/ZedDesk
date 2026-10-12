@@ -1,4 +1,4 @@
-import React, { useState, useContext, useRef, useEffect } from 'react'
+import React, { useState, use, useRef, useEffect } from 'react'
 import {
   Sparkles,
   Search,
@@ -16,6 +16,7 @@ import { getCentralHubUrl, getOrganizationUrl, getApiBaseUrl } from '../../utils
 import { clearAuthToken } from '../../lib/api-client'
 import { workspaceContentData } from '../../data/mockData'
 import { Badge } from '../ui/Badge'
+import { Button } from '../ui/Button'
 import {
   WorkspaceShellContext,
   SafeQueryProvider,
@@ -63,7 +64,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
   onNewOrganizationClick: propOnNewOrgClick,
   className = '',
 }) => {
-  const shellContext = useContext(WorkspaceShellContext)
+  const shellContext = use(WorkspaceShellContext)
 
   const organizationName = propOrgName ?? shellContext?.organization?.name ?? ''
   const organizationSlug = propOrgSlug ?? shellContext?.organization?.slug ?? ''
@@ -190,16 +191,16 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
   return (
     <header
       role="banner"
-      className={`bg-surface-panel/90 backdrop-blur-xl border-b border-border-subtle h-[64px] flex items-center justify-between px-4 md:px-6 fixed top-0 left-0 right-0 z-50 transition-all duration-200 ${className}`}
+      className={`bg-surface-panel/90 backdrop-blur-xl border-b border-border-subtle h-[64px] flex items-center justify-between px-4 md:px-6 fixed top-0 left-0 right-0 z-50 transition-all duration-200 select-none ${className}`}
     >
       {/* Left: ZedDesk Branding & Global Command Search */}
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-2">
-          <span className="font-headline-sm text-headline-sm font-bold text-primary dark:text-primary tracking-tight">
+          <span className="font-headline-sm text-headline-sm font-bold text-text-primary tracking-tight">
             {workspaceContentData.brand.name}
           </span>
-          <div className="bg-secondary/20 border border-secondary/40 text-secondary-light rounded-full px-2 py-0.5 text-[10px] font-mono font-semibold flex items-center gap-1">
-            <Sparkles className="w-2.5 h-2.5 text-accent-glow" />
+          <div className="bg-primary-container/20 border border-primary-container/40 text-primary-container rounded-full px-2 py-0.5 text-[10px] font-mono font-semibold flex items-center gap-1">
+            <Sparkles className="w-2.5 h-2.5 text-primary-container" />
             <span>{workspaceContentData.brand.badge}</span>
           </div>
         </div>
@@ -213,7 +214,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
             value={searchQuery}
             onChange={handleSearchChange}
             placeholder={workspaceContentData.brand.searchPlaceholder}
-            className="h-[32px] w-[220px] lg:w-[260px] bg-surface-container-low border border-transparent rounded pl-9 pr-10 text-body-compact text-text-primary focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] focus:outline-none transition-colors placeholder:text-text-muted"
+            className="h-[32px] w-[220px] lg:w-[260px] bg-surface-container-low border border-transparent rounded pl-9 pr-10 text-body-compact text-text-primary focus:border-primary-container focus:ring-1 focus:ring-primary-container focus:outline-none transition-colors placeholder:text-text-muted"
           />
           <span className="absolute right-2 text-[10px] font-mono-data text-text-muted bg-surface-subpanel px-1.5 py-0.5 rounded border border-border-subtle">
             {workspaceContentData.brand.searchShortcut}
@@ -224,14 +225,16 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
       {/* Right: Copilot Trigger, In-Header Tenant Switcher, User Avatar */}
       <div className="flex items-center gap-3 md:gap-4">
         {/* Luminous AI Copilot Button */}
-        <button
+        <Button
           type="button"
+          variant="secondary"
+          size="compact"
           onClick={onCopilotClick}
-          className="h-[32px] px-3 bg-gradient-to-r from-accent-indigo-glow to-primary-container rounded border border-primary-dark text-label-regular font-label-regular text-white flex items-center gap-1.5 hover:opacity-90 transition-opacity shadow-keylight cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
+          className="border-primary-container/40 text-primary-container hover:bg-surface-subpanel shadow-keylight cursor-pointer font-label-regular text-label-regular"
+          leftIcon={<Sparkles className="w-3.5 h-3.5 animate-pulse text-primary-container" />}
         >
-          <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-          <span>{workspaceContentData.brand.copilotLabel}</span>
-        </button>
+          {workspaceContentData.brand.copilotLabel}
+        </Button>
 
         {/* Interactive In-Header Tenant Switcher */}
         <div className="relative" ref={switcherRef}>
@@ -245,7 +248,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
               setShowProfileMenu(false)
             }}
             title={`Switch tenant (${organizationSlug})`}
-            className="h-[32px] px-3 bg-surface-container-low hover:bg-surface-subpanel rounded border border-border-subtle text-label-regular font-label-regular text-text-secondary flex items-center gap-1.5 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
+            className="h-[32px] px-3 bg-surface-container-low hover:bg-surface-subpanel rounded border border-border-subtle text-label-regular font-label-regular text-text-secondary flex items-center gap-1.5 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
           >
             <span
               data-testid="workspace-org-name"
@@ -271,7 +274,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
 
               {isLoadingOrgs ? (
                 <div className="flex items-center justify-center py-4 text-text-muted text-body-compact gap-2">
-                  <div className="w-3.5 h-3.5 border-2 border-accent-glow border-t-transparent rounded-full animate-spin" />
+                  <div className="w-3.5 h-3.5 border-2 border-primary-container border-t-transparent rounded-full animate-spin" />
                   <span>Loading organizations...</span>
                 </div>
               ) : (
@@ -287,7 +290,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
                         type="button"
                         data-testid={`tenant-option-${org.slug}`}
                         onClick={() => handleSelectOrg(org)}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded text-left text-body-compact transition-colors cursor-pointer ${
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded text-left text-body-compact transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber ${
                           isActive
                             ? 'bg-surface-subpanel text-text-primary font-medium'
                             : 'text-text-secondary hover:text-text-primary hover:bg-surface-container-high'
@@ -312,7 +315,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
                           {isActive && (
                             <Check
                               data-testid={`active-org-check-${org.slug}`}
-                              className="w-4 h-4 text-sentiment-warning shrink-0"
+                              className="w-4 h-4 text-primary-container shrink-0"
                             />
                           )}
                         </div>
@@ -334,16 +337,16 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
                     setIsSwitcherOpen(false)
                     onNewOrganizationClick?.()
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded text-left text-body-compact text-accent-glow hover:bg-surface-container-high transition-colors cursor-pointer"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded text-left text-body-compact text-primary-container hover:bg-surface-container-high transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
                 >
-                  <Plus className="w-4 h-4 text-accent-glow" />
+                  <Plus className="w-4 h-4 text-primary-container" />
                   <span className="font-medium">+ New Organization</span>
                 </button>
 
                 <a
                   href={getCentralHubUrl()}
                   data-testid="central-hub-link"
-                  className="w-full flex items-center justify-between px-3 py-2 rounded text-left text-body-compact text-text-secondary hover:text-text-primary hover:bg-surface-container-high transition-colors"
+                  className="w-full flex items-center justify-between px-3 py-2 rounded text-left text-body-compact text-text-secondary hover:text-text-primary hover:bg-surface-container-high transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
                 >
                   <div className="flex items-center gap-2">
                     <Layers className="w-4 h-4 text-text-muted" />
@@ -363,7 +366,8 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
         <button
           type="button"
           aria-label="Notifications"
-          className="text-text-secondary hover:text-text-primary hover:bg-surface-subpanel p-1.5 rounded transition-colors hidden sm:flex items-center justify-center cursor-pointer"
+          data-testid="notifications-bell-btn"
+          className="text-text-secondary hover:text-text-primary hover:bg-surface-subpanel p-1.5 rounded transition-colors hidden sm:flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
         >
           <Bell className="w-4 h-4" />
         </button>
@@ -392,7 +396,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
               data-testid="workspace-user-role"
               className={`inline-flex px-2 py-0.5 rounded text-[11px] font-mono font-semibold uppercase tracking-wider ${
                 isAdmin
-                  ? 'bg-primary-container/20 text-accent-glow border border-primary-container/40'
+                  ? 'bg-primary-container/20 text-primary-container border border-primary-container/40'
                   : 'bg-sentiment-positive/10 text-sentiment-positive border border-sentiment-positive/30'
               }`}
             >
@@ -408,7 +412,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
               setIsSwitcherOpen(false)
             }}
             aria-label="User profile menu"
-            className="relative w-8 h-8 rounded-full overflow-visible border border-border-subtle hover:border-accent-glow transition-colors focus:outline-none cursor-pointer"
+            className="relative w-8 h-8 rounded-full overflow-visible border border-border-subtle hover:border-primary-container transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber cursor-pointer"
           >
             <img
               src={user?.avatarUrl || workspaceContentData.profile.defaultAvatarUrl}
@@ -427,14 +431,14 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
             <div
               data-testid="user-profile-menu"
               role="menu"
-              className="absolute right-0 top-11 w-56 bg-surface-subpanel border border-border-prominent rounded-lg shadow-elevation-3 py-1.5 z-50 animate-in fade-in duration-100"
+              className="absolute right-0 top-11 w-56 bg-surface-panel border border-border-prominent rounded-lg shadow-modal py-1.5 z-50 animate-in fade-in duration-100"
             >
               {user && (
                 <div className="px-3 py-2 border-b border-border-subtle">
                   <p className="text-body-compact font-medium text-text-primary">{user.name}</p>
                   <p className="text-[11px] text-text-muted truncate">{user.email}</p>
                   {roleLabel && (
-                    <p className="text-[10px] text-accent-glow uppercase font-mono mt-1 font-semibold">
+                    <p className="text-[10px] text-primary-container uppercase font-mono mt-1 font-semibold">
                       {roleLabel}
                     </p>
                   )}
@@ -443,7 +447,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
 
               <a
                 href={getCentralHubUrl()}
-                className="flex items-center justify-between px-3 py-2 text-body-compact text-text-secondary hover:text-text-primary hover:bg-surface-container-high transition-colors"
+                className="flex items-center justify-between px-3 py-2 text-body-compact text-text-secondary hover:text-text-primary hover:bg-surface-container-high transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
               >
                 <span>Central Hub</span>
                 <ExternalLink className="w-3.5 h-3.5 text-text-muted" />
@@ -453,7 +457,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
                 type="button"
                 data-testid="workspace-logout-btn"
                 onClick={handleSignOut}
-                className="w-full text-left flex items-center gap-2 px-3 py-2 text-body-compact text-sentiment-critical hover:bg-surface-container-high transition-colors cursor-pointer"
+                className="w-full text-left flex items-center gap-2 px-3 py-2 text-body-compact text-sentiment-critical hover:bg-surface-container-high transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span>Sign Out</span>

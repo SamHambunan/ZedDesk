@@ -30,6 +30,14 @@ function extractErrorMessage(data: unknown, fallback: string): string {
   return fallback
 }
 
+const INTERNAL_THEME_FONT_LINK = (
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    precedence="default"
+  />
+)
+
 export interface WorkspaceShellProviderProps {
   readonly subdomain?: string
   readonly token?: string | null
@@ -149,11 +157,13 @@ export const WorkspaceShellProvider: React.FC<WorkspaceShellProviderProps> = ({
   if (shouldQueryWorkspace && loadingWorkspace) {
     return (
       <div
+        data-theme="internal"
         data-testid="workspace-loading"
-        className="min-h-screen bg-canvas-base flex items-center justify-center text-text-muted font-body-default"
+        className="min-h-screen bg-canvas-base flex items-center justify-center text-text-muted font-body-default antialiased selection:bg-primary-container/30 selection:text-on-primary"
       >
+        {INTERNAL_THEME_FONT_LINK}
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-accent-glow border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-primary-container border-t-transparent rounded-full animate-spin" />
           <span>Loading workspace...</span>
         </div>
       </div>
@@ -162,7 +172,8 @@ export const WorkspaceShellProvider: React.FC<WorkspaceShellProviderProps> = ({
 
   if (shouldQueryWorkspace && isUnauthenticated) {
     return (
-      <div className="min-h-screen bg-canvas-base flex flex-col justify-center items-center p-4">
+      <div data-theme="internal" className="min-h-screen bg-canvas-base flex flex-col justify-center items-center p-4 antialiased selection:bg-primary-container/30 selection:text-on-primary">
+        {INTERNAL_THEME_FONT_LINK}
         <PerimeterErrorCard
           status={401}
           subdomain={subdomain}
@@ -176,7 +187,8 @@ export const WorkspaceShellProvider: React.FC<WorkspaceShellProviderProps> = ({
 
   if (shouldQueryWorkspace && queryError) {
     return (
-      <div className="min-h-screen bg-canvas-base flex flex-col justify-center items-center p-4">
+      <div data-theme="internal" className="min-h-screen bg-canvas-base flex flex-col justify-center items-center p-4 antialiased selection:bg-primary-container/30 selection:text-on-primary">
+        {INTERNAL_THEME_FONT_LINK}
         <PerimeterErrorCard
           status={queryError.status}
           subdomain={subdomain}
@@ -237,11 +249,15 @@ export const WorkspaceShellProvider: React.FC<WorkspaceShellProviderProps> = ({
 export const WorkspaceShellRoot: React.FC<{
   readonly children?: React.ReactNode
   readonly className?: string
-}> = ({ children, className = '' }) => {
+  readonly 'data-testid'?: string
+}> = ({ children, className = '', 'data-testid': testId = 'workspace-shell' }) => {
   return (
     <div
-      className={`min-h-screen bg-canvas-base text-text-primary font-body-default flex flex-col ${className}`}
+      data-theme="internal"
+      data-testid={testId}
+      className={`min-h-screen bg-canvas-base text-text-primary font-body-default flex flex-col antialiased selection:bg-primary-container/30 selection:text-on-primary ${className}`}
     >
+      {INTERNAL_THEME_FONT_LINK}
       {children}
     </div>
   )

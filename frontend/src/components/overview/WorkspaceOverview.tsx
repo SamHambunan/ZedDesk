@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useContext } from 'react'
+import React, { useState, useMemo, use } from 'react'
 import {
   QueryClientContext,
   QueryClientProvider,
@@ -28,7 +28,7 @@ import type {
 } from './types'
 
 const WorkspaceOverviewInner: React.FC<WorkspaceOverviewProps> = (props) => {
-  const shellContext = useContext(WorkspaceShellContext)
+  const shellContext = use(WorkspaceShellContext)
   const queryClient = useQueryClient()
 
   const effectiveOrg = props.organization ?? shellContext?.organization ?? {
@@ -333,8 +333,9 @@ const WorkspaceOverviewInner: React.FC<WorkspaceOverviewProps> = (props) => {
 
   return (
     <div
+      data-theme="internal"
       data-testid="workspace-overview"
-      className="max-w-[1600px] mx-auto space-y-6 relative z-10 w-full"
+      className="max-w-[1600px] mx-auto space-y-6 relative z-10 w-full antialiased font-body-default"
     >
       {/* Bilateral 65/35 Split-Pane Console */}
       <div className="flex flex-col lg:flex-row items-start gap-6 w-full">
@@ -428,7 +429,7 @@ const WorkspaceOverviewInner: React.FC<WorkspaceOverviewProps> = (props) => {
 }
 
 export const WorkspaceOverview: React.FC<WorkspaceOverviewProps> = (props) => {
-  const existingClient = useContext(QueryClientContext)
+  const existingClient = use(QueryClientContext)
   if (!existingClient) {
     return (
       <QueryClientProvider client={defaultQueryClient}>
