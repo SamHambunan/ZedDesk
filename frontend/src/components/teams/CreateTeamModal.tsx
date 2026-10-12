@@ -126,7 +126,7 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
           <Modal.Header>
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <Users2 className="w-5 h-5 text-accent-glow" />
+                <Users2 className="w-5 h-5 text-primary-container" />
                 <Modal.Title>Create New Team</Modal.Title>
               </div>
               <Modal.Description>
