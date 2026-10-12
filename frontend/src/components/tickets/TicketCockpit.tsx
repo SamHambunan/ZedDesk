@@ -917,8 +917,9 @@ export const TicketCockpitFrame: React.FC<TicketCockpitFrameProps> = ({
 }) => {
   return (
     <div
+      data-theme="internal"
       data-testid="ticket-cockpit-frame"
-      className={`flex-1 flex flex-col lg:flex-row h-[calc(100vh-64px)] overflow-hidden bg-[#0F1012] text-text-primary -m-4 md:-m-8 border-t border-[#282A33] ${className}`}
+      className={`flex-1 flex flex-col lg:flex-row h-[calc(100vh-64px)] overflow-hidden bg-surface-canvas text-text-primary -m-4 md:-m-8 border-t border-border-subtle ${className}`}
     >
       {children}
     </div>
@@ -938,7 +939,7 @@ export const TicketCockpitSubRail: React.FC<TicketCockpitSubRailProps> = ({
     <nav
       aria-label="Ticket Queue Presets"
       data-testid="ticket-cockpit-subrail"
-      className={`w-full lg:w-[200px] shrink-0 bg-[#141518] border-r border-[#282A33] flex flex-col p-3 z-10 ${
+      className={`w-full lg:w-[200px] shrink-0 bg-surface-panel border-r border-border-subtle flex flex-col p-3 z-10 ${
         state.mobilePane === 'detail' ? 'hidden lg:flex' : 'flex'
       } ${className}`}
     >
@@ -961,20 +962,20 @@ export const TicketCockpitSubRail: React.FC<TicketCockpitSubRailProps> = ({
                 type="button"
                 data-testid={`preset-btn-${def.id}`}
                 onClick={() => actions.setActivePreset(def.id)}
-                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber ${
                   isActive
-                    ? 'bg-[#16181D] text-white shadow-keylight border-l-2 border-[#F59E0B]'
+                    ? 'bg-surface-container text-white shadow-keylight border-l-2 border-amber-action'
                     : 'text-text-secondary hover:text-white hover:bg-white/5'
                 }`}
               >
                 <div className="flex items-center gap-2 truncate">
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#F59E0B]' : 'text-text-muted'}`} />
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-amber-action' : 'text-text-muted'}`} />
                   <span className="truncate">{def.label}</span>
                 </div>
                 <span
                   data-testid={`preset-count-${def.id}`}
                   className={`font-mono tabular-nums text-[11px] px-1.5 py-0.2 rounded ${
-                    isActive ? 'bg-[#F59E0B]/20 text-[#F59E0B]' : 'text-text-muted'
+                    isActive ? 'bg-amber-action/20 text-amber-action' : 'text-text-muted'
                   }`}
                 >
                   {count}
@@ -986,7 +987,7 @@ export const TicketCockpitSubRail: React.FC<TicketCockpitSubRailProps> = ({
       </ul>
 
       {/* Active Preset Summary */}
-      <div className="mt-auto pt-3 border-t border-[#282A33] px-2 text-[11px] font-mono text-text-muted">
+      <div className="mt-auto pt-3 border-t border-border-subtle px-2 text-[11px] font-mono text-text-muted">
         <div className="text-white/80 font-medium">Split-Cockpit</div>
         <div className="text-[10px] text-text-muted">Active queue: {state.presetCounts[state.activePreset]}</div>
       </div>
@@ -1036,12 +1037,12 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
     <section
       aria-label="Ticket Queue List"
       data-testid="ticket-cockpit-queue"
-      className={`w-full lg:w-[380px] shrink-0 bg-[#0F1012] border-r border-[#282A33] flex flex-col ${
+      className={`w-full lg:w-[380px] shrink-0 bg-surface-canvas border-r border-border-subtle flex flex-col ${
         state.mobilePane === 'detail' ? 'hidden lg:flex' : 'flex'
       } ${className}`}
     >
       {/* Search Header & Compound Filter Bar */}
-      <div className="p-3 border-b border-[#282A33] bg-[#141518]/80 backdrop-blur-sm space-y-2">
+      <div className="p-3 border-b border-border-subtle bg-surface-panel/80 backdrop-blur-sm space-y-2">
         <div className="relative">
           <Search className="w-3.5 h-3.5 text-text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
           <input
@@ -1051,7 +1052,7 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
             value={state.searchQuery}
             onChange={(e) => actions.setSearchQuery(e.target.value)}
             placeholder="Search queue... (/)"
-            className="w-full h-8 pl-8 pr-3 bg-[#121316] border border-[#282A33] rounded-lg text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B]"
+            className="w-full h-8 pl-8 pr-3 bg-surface-container-low border border-border-subtle rounded-lg text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-amber-action focus:ring-1 focus:ring-focus-amber"
           />
         </div>
 
@@ -1063,7 +1064,7 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
             aria-label="Filter by Status"
             value={filters.status}
             onChange={(e) => actions.setFilters({ status: e.target.value as TicketStatus | 'all' })}
-            className="h-7 px-1.5 bg-[#121316] border border-[#282A33] rounded text-text-secondary focus:text-text-primary focus:border-[#F59E0B] focus:outline-none text-[11px] font-mono cursor-pointer truncate"
+            className="h-7 px-1.5 bg-surface-container-low border border-border-subtle rounded text-text-secondary focus:text-text-primary focus:border-amber-action focus:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber text-[11px] font-mono cursor-pointer truncate"
           >
             <option value="all">Status: All</option>
             <option value="new">New</option>
@@ -1079,7 +1080,7 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
             aria-label="Filter by Priority"
             value={filters.priority}
             onChange={(e) => actions.setFilters({ priority: e.target.value as TicketPriority | 'all' })}
-            className="h-7 px-1.5 bg-[#121316] border border-[#282A33] rounded text-text-secondary focus:text-text-primary focus:border-[#F59E0B] focus:outline-none text-[11px] font-mono cursor-pointer truncate"
+            className="h-7 px-1.5 bg-surface-container-low border border-border-subtle rounded text-text-secondary focus:text-text-primary focus:border-amber-action focus:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber text-[11px] font-mono cursor-pointer truncate"
           >
             <option value="all">Priority: All</option>
             <option value="urgent">P0 Urgent</option>
@@ -1094,7 +1095,7 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
             aria-label="Filter by Team"
             value={filters.teamId}
             onChange={(e) => actions.setFilters({ teamId: e.target.value === 'all' ? 'all' : Number(e.target.value) })}
-            className="h-7 px-1.5 bg-[#121316] border border-[#282A33] rounded text-text-secondary focus:text-text-primary focus:border-[#F59E0B] focus:outline-none text-[11px] font-mono cursor-pointer truncate"
+            className="h-7 px-1.5 bg-surface-container-low border border-border-subtle rounded text-text-secondary focus:text-text-primary focus:border-amber-action focus:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber text-[11px] font-mono cursor-pointer truncate"
           >
             <option value="all">Team: All</option>
             {state.teams.map((team) => (
@@ -1110,7 +1111,7 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
             aria-label="Filter by Tag"
             value={filters.tagId}
             onChange={(e) => actions.setFilters({ tagId: e.target.value === 'all' ? 'all' : Number(e.target.value) })}
-            className="h-7 px-1.5 bg-[#121316] border border-[#282A33] rounded text-text-secondary focus:text-text-primary focus:border-[#F59E0B] focus:outline-none text-[11px] font-mono cursor-pointer truncate"
+            className="h-7 px-1.5 bg-surface-container-low border border-border-subtle rounded text-text-secondary focus:text-text-primary focus:border-amber-action focus:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber text-[11px] font-mono cursor-pointer truncate"
           >
             <option value="all">Tag: All</option>
             {state.allTags.map((tag) => (
@@ -1129,7 +1130,7 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
               type="button"
               data-testid="clear-filters-btn"
               onClick={() => actions.resetFilters()}
-              className="text-[#F59E0B] hover:underline cursor-pointer"
+              className="text-amber-action hover:underline cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber rounded"
             >
               Reset filters
             </button>
@@ -1138,7 +1139,7 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
       </div>
 
       {/* Tickets List */}
-      <div className="flex-1 overflow-y-auto divide-y divide-[#282A33]">
+      <div className="flex-1 overflow-y-auto divide-y divide-border-subtle">
         {children ?? (
           state.filteredTickets.length === 0 ? (
             <div className="p-8 text-center text-text-muted text-xs font-mono">
@@ -1170,13 +1171,24 @@ export const TicketCockpitQueueCard: React.FC<TicketCockpitQueueCardProps> = ({
   const priorityInfo = getPriorityBadge(ticket.priority)
   const statusInfo = getStatusBadge(ticket.status)
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      actions.selectTicket(ticket.id)
+    }
+  }
+
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-pressed={isSelected}
       data-testid={`ticket-row-${ticket.id}`}
       onClick={() => actions.selectTicket(ticket.id)}
-      className={`p-3 cursor-pointer transition-all border-l-2 select-none ${
+      onKeyDown={handleKeyDown}
+      className={`p-3 cursor-pointer transition-all border-l-2 select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber focus-visible:ring-inset ${
         isSelected
-          ? 'bg-[#1E2026] border-[#F59E0B] shadow-keylight'
+          ? 'bg-surface-container-high border-amber-action shadow-keylight'
           : 'border-transparent hover:bg-white/[0.03]'
       } ${className}`}
     >
@@ -1273,21 +1285,21 @@ export const TicketCockpitDetail: React.FC<TicketCockpitDetailProps> = ({
     <section
       aria-label="Ticket Detail and Conversation"
       data-testid="ticket-cockpit-detail"
-      className={`flex-1 min-w-0 flex flex-col overflow-hidden bg-[#0F1012] border-r border-[#282A33] ${
+      className={`flex-1 min-w-0 flex flex-col overflow-hidden bg-surface-canvas border-r border-border-subtle ${
         state.mobilePane === 'queue' ? 'hidden lg:flex' : 'flex'
       } ${className}`}
     >
       {activeTicket ? (
         <div className="flex-1 flex flex-col h-full overflow-hidden">
           {/* Header */}
-          <div className="p-4 border-b border-[#282A33] bg-[#141518] flex items-center justify-between gap-3">
+          <div className="p-4 border-b border-border-subtle bg-surface-panel flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               {/* Responsive Mobile Back Breadcrumb (< 1024px) */}
               <button
                 type="button"
                 data-testid="detail-back-breadcrumb"
                 onClick={() => actions.setMobilePane('queue')}
-                className="lg:hidden flex items-center gap-1.5 px-2 py-1 rounded bg-[#16181D] border border-[#282A33] hover:border-[#3B3F4D] text-[#F59E0B] text-xs font-mono transition-colors"
+                className="lg:hidden flex items-center gap-1.5 px-2 py-1 rounded bg-surface-container border border-border-subtle hover:border-border-prominent text-amber-action text-xs font-mono transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber"
                 title="Back to queue"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
@@ -1296,7 +1308,7 @@ export const TicketCockpitDetail: React.FC<TicketCockpitDetailProps> = ({
 
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm font-bold text-[#F59E0B]">
+                  <span className="font-mono text-sm font-bold text-amber-action">
                     #{activeTicket.ticket_number}
                   </span>
                   <h2
@@ -1326,7 +1338,7 @@ export const TicketCockpitDetail: React.FC<TicketCockpitDetailProps> = ({
                     navigator.clipboard?.writeText(window.location.href)
                   }
                 }}
-                className="p-1.5 rounded bg-[#121316] border border-[#282A33] hover:border-[#3B3F4D] text-text-muted hover:text-white transition-colors"
+                className="p-1.5 rounded bg-surface-container-low border border-border-subtle hover:border-border-prominent text-text-muted hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber"
               >
                 <Share2 className="w-3.5 h-3.5" />
               </button>
@@ -1344,7 +1356,7 @@ export const TicketCockpitDetail: React.FC<TicketCockpitDetailProps> = ({
               </div>
 
               {/* Docked Segmented Composer at bottom */}
-              <div className="p-4 border-t border-[#282A33] bg-[#141518]/90 backdrop-blur-sm">
+              <div className="p-4 border-t border-border-subtle bg-surface-panel/90 backdrop-blur-sm">
                 <TicketComposer
                   currentStatus={activeTicket.status}
                   onSubmit={(payload) => actions.submitComposer(activeTicket.id, payload)}
@@ -1378,7 +1390,7 @@ const TicketCockpitInspectorComponent: React.FC<TicketCockpitInspectorProps> = (
     <aside
       aria-label="Ticket Metadata Inspector"
       data-testid="ticket-cockpit-inspector"
-      className={`w-full lg:w-[300px] shrink-0 bg-[#0F1012] p-4 overflow-y-auto space-y-5 border-l border-[#282A33] hidden lg:block ${className}`}
+      className={`w-full lg:w-[300px] shrink-0 bg-surface-canvas p-4 overflow-y-auto space-y-5 border-l border-border-subtle hidden lg:block ${className}`}
     >
       {children ?? (
         activeTicket ? (

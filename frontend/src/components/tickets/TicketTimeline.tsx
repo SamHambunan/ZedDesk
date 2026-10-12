@@ -42,9 +42,9 @@ function AttachmentChip({ attachment }: { readonly attachment: TicketAttachment 
   return (
     <div
       key={attachment.id}
-      className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded bg-surface-subpanel/80 border border-[#282A33] hover:border-[#3B3F4D] transition-colors text-xs text-text-secondary group"
+      className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded bg-surface-subpanel/80 border border-border-subtle hover:border-border-prominent transition-colors text-xs text-text-secondary group"
     >
-      <FileText className="w-3.5 h-3.5 text-[#F59E0B] shrink-0" />
+      <FileText className="w-3.5 h-3.5 text-amber-action shrink-0" />
       <span className="font-mono text-text-primary text-[11px] max-w-[200px] truncate">
         {attachment.file_name}
       </span>
@@ -58,7 +58,7 @@ function AttachmentChip({ attachment }: { readonly attachment: TicketAttachment 
         rel="noopener noreferrer"
         data-testid={`attachment-download-link-${attachment.id}`}
         title={`Download ${attachment.file_name}`}
-        className="p-1 text-text-muted hover:text-[#F59E0B] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#F59E0B] rounded"
+        className="p-1 text-text-muted hover:text-amber-action transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber rounded"
       >
         <Download className="w-3 h-3" />
       </a>
@@ -85,7 +85,7 @@ function MessageBodyAndAttachments({
       {attachments && attachments.length > 0 && (
         <div className="mt-3 pt-3 border-t border-white/5 space-y-2">
           <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono">
-            <Paperclip className="w-3.5 h-3.5 text-[#F59E0B]" />
+            <Paperclip className="w-3.5 h-3.5 text-amber-action" />
             <span>Attachments ({attachments.length})</span>
           </div>
 
@@ -115,7 +115,7 @@ export const PublicReplyItem: React.FC<TicketTimelineItemProps> = React.memo(({
   return (
     <article
       data-testid={`timeline-message-${message.id}`}
-      className={`rounded-lg transition-colors p-4 bg-[#121316] border border-[#282A33] shadow-keylight ${className}`}
+      className={`rounded-lg transition-colors p-4 bg-surface-container-low border border-border-subtle shadow-keylight ${className}`}
     >
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-white/5">
@@ -178,12 +178,12 @@ export const InternalNoteItem: React.FC<TicketTimelineItemProps> = React.memo(({
   return (
     <article
       data-testid={`timeline-message-${message.id}`}
-      className={`rounded-lg transition-colors p-4 bg-[#F59E0B]/5 border border-[#F59E0B]/25 shadow-keylight ${className}`}
+      className={`rounded-lg transition-colors p-4 bg-amber-action/5 border border-amber-action/25 shadow-keylight ${className}`}
     >
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-white/5">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30">
+          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 bg-amber-action/20 text-amber-action border border-amber-action/30">
             <Lock className="w-3.5 h-3.5" />
           </div>
 
@@ -199,7 +199,7 @@ export const InternalNoteItem: React.FC<TicketTimelineItemProps> = React.memo(({
 
               <span
                 data-testid="internal-note-badge"
-                className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30 font-medium"
+                className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-amber-action/15 text-amber-action border border-amber-action/30 font-medium"
               >
                 <Lock className="w-3 h-3" />
                 <span>Staff only — hidden from customer</span>

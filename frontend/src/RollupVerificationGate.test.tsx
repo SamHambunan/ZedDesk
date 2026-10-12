@@ -13,6 +13,13 @@ import { Table } from './components/ui/Table'
 import { CreateOrganizationModal } from './components/hub/CreateOrganizationModal'
 import { InviteMemberModal } from './components/members/InviteMemberModal'
 import { SafeQueryProvider } from './components/workspace/WorkspaceShellContext'
+import { TicketCockpit } from './components/tickets/TicketCockpit'
+import {
+  INITIAL_MOCK_TICKETS,
+  MOCK_TEAMS,
+  MOCK_MEMBERS,
+  MOCK_TAGS_POOL,
+} from './components/tickets/mockData'
 
 const expectFocusable = (element: HTMLElement) => {
   element.focus()
@@ -310,6 +317,68 @@ describe('Rollup Verification Gate & Production Bundle Integrity (Ticket #96)', 
       // Triage Queue Bridge link features Cadmium Amber focus ring
       const triageLink = screen.getByTestId('view-all-tickets-link')
       expectFocusable(triageLink)
+    })
+  })
+
+  describe('Cross-View Verification: Ticket Cockpit (/tickets)', () => {
+    it('verifies Ticket Cockpit renders dense 4-pane layout with data-theme="internal" and Cadmium Amber selection & focus tokens', async () => {
+      window.history.pushState({}, '', '/')
+      const user = userEvent.setup()
+
+      render(
+        <SafeQueryProvider>
+          <TicketCockpit.Provider
+            tickets={INITIAL_MOCK_TICKETS}
+            teams={MOCK_TEAMS}
+            members={MOCK_MEMBERS}
+            allTags={MOCK_TAGS_POOL}
+            userRole="agent"
+          >
+            <TicketCockpit.Frame>
+              <TicketCockpit.SubRail />
+              <TicketCockpit.Queue />
+              <TicketCockpit.Detail />
+              <TicketCockpit.Inspector />
+            </TicketCockpit.Frame>
+          </TicketCockpit.Provider>
+        </SafeQueryProvider>
+      )
+
+      // 1. Frame has data-theme="internal" scoping
+      const frame = screen.getByTestId('ticket-cockpit-frame')
+      expect(frame).toHaveAttribute('data-theme', 'internal')
+
+      // 2. All 4 dense panes render
+      expect(screen.getByTestId('ticket-cockpit-subrail')).toBeInTheDocument()
+      expect(screen.getByTestId('ticket-cockpit-queue')).toBeInTheDocument()
+      expect(screen.getByTestId('ticket-cockpit-detail')).toBeInTheDocument()
+      expect(screen.getByTestId('ticket-cockpit-inspector')).toBeInTheDocument()
+
+      // 3. Subrail presets feature Cadmium Amber focus rings
+      const allOpenPreset = screen.getByTestId('preset-btn-all_open')
+      expectFocusable(allOpenPreset)
+
+      // 4. Queue search input features focus ring
+      const searchInput = screen.getByTestId('queue-search-input')
+      expectFocusable(searchInput)
+
+      // 5. Active ticket row features amber selection border and container high background
+      const activeCard = screen.getByTestId('ticket-row-ticket-1')
+      expect(activeCard).toHaveAttribute('tabIndex', '0')
+      expect(activeCard).toHaveAttribute('role', 'button')
+      expect(activeCard.className).toContain('border-amber-action')
+      expect(activeCard.className).toContain('bg-surface-container-high')
+      expect(activeCard.className).toContain('focus-visible:ring-focus-amber')
+      expectFocusable(activeCard)
+
+      // 6. Keyboard navigation selects another ticket
+      const nextCard = screen.getByTestId('ticket-row-ticket-2')
+      expect(nextCard).toHaveAttribute('tabIndex', '0')
+      expect(nextCard.className).not.toContain('border-amber-action')
+      nextCard.focus()
+      await user.keyboard('{Enter}')
+      expect(nextCard.className).toContain('border-amber-action')
+      expect(screen.getByTestId('detail-subject')).toHaveTextContent(INITIAL_MOCK_TICKETS[1].subject)
     })
   })
 

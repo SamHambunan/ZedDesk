@@ -289,8 +289,8 @@ export const ComposerFrame: React.FC<ComposerFrameProps> = ({
   return (
     <div
       data-testid={testId}
-      className={`bg-[#141518] border border-[#282A33] rounded-xl shadow-card overflow-hidden transition-all ${
-        isInternalNote ? 'ring-1 ring-[#F59E0B]/30' : ''
+      className={`bg-surface-panel border border-border-subtle rounded-xl shadow-card overflow-hidden transition-all ${
+        isInternalNote ? 'ring-1 ring-amber-action/30' : ''
       } ${className}`}
     >
       {children}
@@ -309,15 +309,15 @@ export const ComposerHeader: React.FC<ComposerHeaderProps> = ({
   const isInternalNote = state.tab === 'internal_note'
 
   return (
-    <div className={`flex items-center justify-between border-b border-[#282A33] px-3 pt-2 bg-[#0F1012]/60 ${className}`}>
+    <div className={`flex items-center justify-between border-b border-border-subtle px-3 pt-2 bg-surface-canvas/60 ${className}`}>
       <div className="flex items-center gap-1">
         <button
           type="button"
           data-testid="composer-tab-public"
           onClick={() => actions.setTab('public_reply')}
-          className={`px-3 py-1.5 text-xs font-medium rounded-t-md transition-all flex items-center gap-1.5 border-b-2 cursor-pointer ${
+          className={`px-3 py-1.5 text-xs font-medium rounded-t-md transition-all flex items-center gap-1.5 border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber ${
             state.tab === 'public_reply'
-              ? 'text-[#F59E0B] border-[#F59E0B] bg-[#141518]'
+              ? 'text-amber-action border-amber-action bg-surface-panel'
               : 'text-text-secondary border-transparent hover:text-text-primary'
           }`}
         >
@@ -329,9 +329,9 @@ export const ComposerHeader: React.FC<ComposerHeaderProps> = ({
           type="button"
           data-testid="composer-tab-internal"
           onClick={() => actions.setTab('internal_note')}
-          className={`px-3 py-1.5 text-xs font-medium rounded-t-md transition-all flex items-center gap-1.5 border-b-2 cursor-pointer ${
+          className={`px-3 py-1.5 text-xs font-medium rounded-t-md transition-all flex items-center gap-1.5 border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber ${
             state.tab === 'internal_note'
-              ? 'text-[#F59E0B] border-[#F59E0B] bg-[#141518]'
+              ? 'text-amber-action border-amber-action bg-surface-panel'
               : 'text-text-secondary border-transparent hover:text-text-primary'
           }`}
         >
@@ -341,7 +341,7 @@ export const ComposerHeader: React.FC<ComposerHeaderProps> = ({
       </div>
 
       {isInternalNote && (
-        <div className="text-[11px] font-mono text-[#F59E0B] flex items-center gap-1 px-2 py-0.5 rounded bg-[#F59E0B]/10 border border-[#F59E0B]/20">
+        <div className="text-[11px] font-mono text-amber-action flex items-center gap-1 px-2 py-0.5 rounded bg-amber-action/10 border border-amber-action/20">
           <Lock className="w-3 h-3" />
           <span>Hidden from customer</span>
         </div>
@@ -377,10 +377,10 @@ export const ComposerInput: React.FC<ComposerInputProps> = ({
         onChange={(e) => actions.setBody(e.target.value)}
         rows={rows}
         placeholder={placeholder ?? defaultPlaceholder}
-        className={`w-full bg-[#121316] border rounded-lg p-3 text-body-default text-text-primary placeholder:text-text-muted focus:outline-none transition-colors resize-y min-h-[96px] ${
+        className={`w-full bg-surface-container-low border rounded-lg p-3 text-body-default text-text-primary placeholder:text-text-muted focus:outline-none transition-colors resize-y min-h-[96px] ${
           isInternalNote
-            ? 'border-[#F59E0B]/30 focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B]'
-            : 'border-[#282A33] focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B]'
+            ? 'border-amber-action/30 focus:border-amber-action focus:ring-1 focus:ring-focus-amber'
+            : 'border-border-subtle focus:border-amber-action focus:ring-1 focus:ring-focus-amber'
         } ${className}`}
       />
       <ComposerAttachments />
@@ -421,7 +421,7 @@ export const ComposerAttachments: React.FC<ComposerAttachmentsProps> = ({
           {state.stagedFiles.map((file) => (
             <div
               key={file.id}
-              className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-[#16181D] border border-[#282A33] text-xs text-text-primary"
+              className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-surface-container border border-border-subtle text-xs text-text-primary"
             >
               <FileCheck className="w-3.5 h-3.5 text-sentiment-positive" />
               <span className="font-mono text-[11px] max-w-[160px] truncate">{file.file_name}</span>
@@ -431,7 +431,7 @@ export const ComposerAttachments: React.FC<ComposerAttachmentsProps> = ({
               <button
                 type="button"
                 onClick={() => actions.removeFile(file.id)}
-                className="p-0.5 hover:text-sentiment-negative text-text-muted transition-colors rounded cursor-pointer"
+                className="p-0.5 hover:text-sentiment-negative text-text-muted transition-colors rounded cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber"
                 title="Remove attachment"
               >
                 <X className="w-3 h-3" />
@@ -464,15 +464,15 @@ export const ComposerFooter: React.FC<ComposerFooterProps> = ({
   const { meta } = useComposer()
 
   return (
-    <div className={`flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 bg-[#0F1012]/60 border-t border-[#282A33] ${className}`}>
+    <div className={`flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 bg-surface-canvas/60 border-t border-border-subtle ${className}`}>
       <div className="flex items-center gap-3">
         <button
           type="button"
           data-testid="composer-attach-btn"
           onClick={() => meta.fileInputRef.current?.click()}
-          className="h-8 px-2.5 bg-[#121316] hover:bg-[#16181D] border border-[#282A33] rounded text-xs text-text-secondary hover:text-text-primary transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#F59E0B]"
+          className="h-8 px-2.5 bg-surface-container-low hover:bg-surface-container border border-border-subtle rounded text-xs text-text-secondary hover:text-text-primary transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber"
         >
-          <Paperclip className="w-3.5 h-3.5 text-[#F59E0B]" />
+          <Paperclip className="w-3.5 h-3.5 text-amber-action" />
           <span>Attach</span>
         </button>
 
@@ -502,7 +502,7 @@ export const ComposerStatusSelector: React.FC<ComposerStatusSelectorProps> = ({
         data-testid="composer-next-status"
         value={state.nextStatus}
         onChange={(e) => actions.setNextStatus(e.target.value as TicketStatus)}
-        className="h-8 px-2 bg-[#121316] border border-[#282A33] rounded text-xs font-mono text-text-primary focus:outline-none focus:border-[#F59E0B] cursor-pointer"
+        className="h-8 px-2 bg-surface-container-low border border-border-subtle rounded text-xs font-mono text-text-primary focus:outline-none focus:border-amber-action focus-visible:ring-1 focus-visible:ring-focus-amber cursor-pointer"
       >
         <option value="pending">Pending (Awaiting Customer)</option>
         <option value="open">Open (In Progress)</option>
@@ -533,10 +533,10 @@ export const ComposerSubmit: React.FC<ComposerSubmitProps> = ({
       data-testid="composer-submit-btn"
       disabled={isDisabled}
       onClick={() => actions.submit(isInternal ? 'internal_note' : 'public_reply')}
-      className={`h-8 px-4 text-xs font-semibold rounded shadow-keylight transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B] ${
+      className={`h-8 px-4 text-xs font-semibold rounded shadow-keylight transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber ${
         isInternal
-          ? 'bg-[#F59E0B]/20 hover:bg-[#F59E0B]/30 text-[#F59E0B] border border-[#F59E0B]/40'
-          : 'bg-[#F59E0B] hover:bg-[#D97706] text-[#0F1012] font-semibold'
+          ? 'bg-amber-action/20 hover:bg-amber-action/30 text-amber-action border border-amber-action/40'
+          : 'bg-amber-action hover:bg-amber-hover text-on-amber-action font-semibold'
       } ${className}`}
     >
       {isInternal ? (
@@ -571,9 +571,9 @@ export const PublicReplyComposer: React.FC<{ readonly className?: string }> = ({
 }) => {
   return (
     <ComposerFrame className={className}>
-      <div className="flex items-center justify-between border-b border-[#282A33] px-3 pt-2 bg-[#0F1012]/60">
+      <div className="flex items-center justify-between border-b border-border-subtle px-3 pt-2 bg-surface-canvas/60">
         <div className="flex items-center gap-1.5 text-xs font-medium text-text-primary">
-          <Send className="w-3.5 h-3.5 text-[#F59E0B]" />
+          <Send className="w-3.5 h-3.5 text-amber-action" />
           <span>Public Reply</span>
         </div>
       </div>
@@ -593,13 +593,13 @@ export const InternalNoteComposer: React.FC<{ readonly className?: string }> = (
   className = '',
 }) => {
   return (
-    <ComposerFrame className={`ring-1 ring-[#F59E0B]/30 ${className}`}>
-      <div className="flex items-center justify-between border-b border-[#282A33] px-3 pt-2 bg-[#0F1012]/60">
-        <div className="flex items-center gap-1.5 text-xs font-medium text-[#F59E0B]">
+    <ComposerFrame className={`ring-1 ring-amber-action/30 ${className}`}>
+      <div className="flex items-center justify-between border-b border-border-subtle px-3 pt-2 bg-surface-canvas/60">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-amber-action">
           <Lock className="w-3.5 h-3.5" />
           <span>Internal Note</span>
         </div>
-        <div className="text-[11px] font-mono text-[#F59E0B] flex items-center gap-1 px-2 py-0.5 rounded bg-[#F59E0B]/10 border border-[#F59E0B]/20">
+        <div className="text-[11px] font-mono text-amber-action flex items-center gap-1 px-2 py-0.5 rounded bg-amber-action/10 border border-amber-action/20">
           <Lock className="w-3 h-3" />
           <span>Hidden from customer</span>
         </div>

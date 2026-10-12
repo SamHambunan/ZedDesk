@@ -74,8 +74,8 @@ describe('Ticket Detail Timeline & Explicit Items (Issue #104)', () => {
     const item = screen.getByTestId('timeline-message-msg-1')
     expect(item).toBeInTheDocument()
     // Graphite tone background & border
-    expect(item.className).toContain('bg-[#121316]')
-    expect(item.className).toContain('border-[#282A33]')
+    expect(item.className).toContain('bg-surface-container-low')
+    expect(item.className).toContain('border-border-subtle')
     expect(screen.getByText('Alice Johnson')).toBeInTheDocument()
     expect(screen.getByText(/We are experiencing intermittent SSO failures/)).toBeInTheDocument()
     // Should NOT have staff-only badge
@@ -88,8 +88,8 @@ describe('Ticket Detail Timeline & Explicit Items (Issue #104)', () => {
     const item = screen.getByTestId('timeline-message-msg-2')
     expect(item).toBeInTheDocument()
     // Caution-amber styling
-    expect(item.className).toContain('bg-[#F59E0B]/5')
-    expect(item.className).toContain('border-[#F59E0B]/25')
+    expect(item.className).toContain('bg-amber-action/5')
+    expect(item.className).toContain('border-amber-action/25')
     expect(screen.getByText('Devon Vance')).toBeInTheDocument()
     expect(screen.getByText('Senior SRE')).toBeInTheDocument()
 
@@ -267,7 +267,7 @@ describe('Compound Composer Architecture (Issue #104)', () => {
 
     // Caution styling / ring
     const composer = screen.getByTestId('ticket-composer')
-    expect(composer.className).toContain('ring-[#F59E0B]/30')
+    expect(composer.className).toContain('ring-amber-action/30')
 
     // Staff warning
     expect(screen.getByText('Hidden from customer')).toBeInTheDocument()

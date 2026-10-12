@@ -1,12 +1,16 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { TicketCockpit } from './TicketCockpit'
 import { useTicketCockpit, DEFAULT_COMPOUND_FILTERS } from './TicketCockpitContext'
 import { TicketQueueView } from './TicketQueueView'
 import { INITIAL_MOCK_TICKETS, MOCK_TEAMS, MOCK_MEMBERS, MOCK_TAGS_POOL } from './mockData'
 
 describe('TicketCockpit Compound Component Baseline', () => {
+  beforeEach(() => {
+    window.history.pushState({}, '', '/')
+  })
+
   it('exposes generic TicketCockpitContextValue with state, actions, and meta via use()', () => {
     function TestConsumer() {
       const { state, actions, meta } = useTicketCockpit()
@@ -68,8 +72,9 @@ describe('TicketCockpit Compound Component Baseline', () => {
       </TicketCockpit.Provider>
     )
 
-    // Verify all 4 panels render in the DOM
+    // Verify all 4 panels render in the DOM with data-theme="internal"
     expect(screen.getByTestId('ticket-cockpit-frame')).toBeInTheDocument()
+    expect(screen.getByTestId('ticket-cockpit-frame')).toHaveAttribute('data-theme', 'internal')
     expect(screen.getByTestId('ticket-cockpit-subrail')).toBeInTheDocument()
     expect(screen.getByTestId('ticket-cockpit-queue')).toBeInTheDocument()
     expect(screen.getByTestId('ticket-cockpit-detail')).toBeInTheDocument()
@@ -568,6 +573,58 @@ describe('TicketCockpit Compound Component Baseline', () => {
     expect(screen.getByTestId('detail-subject')).toHaveTextContent(INITIAL_MOCK_TICKETS[5].subject)
     // Queue should show ticket-1006
     expect(screen.getByTestId('ticket-row-ticket-1006')).toBeInTheDocument()
+  })
+
+  it('supports keyboard navigation on queue cards and applies cadmium amber selection & focus tokens', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <TicketCockpit.Provider
+        tickets={INITIAL_MOCK_TICKETS}
+        teams={MOCK_TEAMS}
+        members={MOCK_MEMBERS}
+        allTags={MOCK_TAGS_POOL}
+      >
+        <TicketCockpit.Frame>
+          <TicketCockpit.Queue />
+          <TicketCockpit.Detail />
+        </TicketCockpit.Frame>
+      </TicketCockpit.Provider>
+    )
+
+    // Initial state: ticket-1 is active
+    const card1 = screen.getByTestId('ticket-row-ticket-1')
+    expect(card1).toHaveAttribute('tabIndex', '0')
+    expect(card1).toHaveAttribute('role', 'button')
+    expect(card1).toHaveAttribute('aria-pressed', 'true')
+    expect(card1.className).toContain('border-amber-action')
+    expect(card1.className).toContain('bg-surface-container-high')
+
+    // ticket-2 is inactive
+    const card2 = screen.getByTestId('ticket-row-ticket-2')
+    expect(card2).toHaveAttribute('tabIndex', '0')
+    expect(card2).toHaveAttribute('role', 'button')
+    expect(card2).toHaveAttribute('aria-pressed', 'false')
+    expect(card2.className).toContain('border-transparent')
+    expect(card2.className).not.toContain('border-amber-action')
+
+    // Navigate to card2 via keyboard (focus and Enter)
+    card2.focus()
+    expect(card2).toHaveFocus()
+    await user.keyboard('{Enter}')
+
+    // Active ticket should now be ticket-2
+    expect(card2).toHaveAttribute('aria-pressed', 'true')
+    expect(card2.className).toContain('border-amber-action')
+    expect(screen.getByTestId('detail-subject')).toHaveTextContent(INITIAL_MOCK_TICKETS[1].subject)
+
+    // Select ticket-3 with Space key
+    const card3 = screen.getByTestId('ticket-row-ticket-3')
+    card3.focus()
+    expect(card3).toHaveFocus()
+    await user.keyboard(' ')
+    expect(card3.className).toContain('border-amber-action')
+    expect(screen.getByTestId('detail-subject')).toHaveTextContent(INITIAL_MOCK_TICKETS[2].subject)
   })
 
   it('throws an informative error if useTicketCockpit is consumed outside Provider', () => {
