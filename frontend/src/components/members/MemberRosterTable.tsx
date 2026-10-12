@@ -33,7 +33,7 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
     return (
       <div
         data-testid="members-loading"
-        className={`h-40 flex items-center justify-center bg-surface-subpanel rounded border border-border-subtle text-text-muted text-body-compact ${className}`}
+        className={`h-40 flex items-center justify-center bg-surface-panel rounded-lg border border-border-subtle text-text-muted text-body-compact shadow-keylight ${className}`}
       >
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded-full border-2 border-primary-container border-t-transparent animate-spin" />
@@ -47,7 +47,7 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
     return (
       <div
         data-testid="members-empty"
-        className={`h-40 flex items-center justify-center bg-surface-subpanel rounded border border-border-subtle text-text-muted text-body-compact ${className}`}
+        className={`h-40 flex items-center justify-center bg-surface-panel rounded-lg border border-border-subtle text-text-muted text-body-compact shadow-keylight ${className}`}
       >
         {emptyMessage}
       </div>
@@ -57,11 +57,11 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
   return (
     <div
       data-testid="members-roster-table"
-      className={`bg-surface-subpanel rounded border border-border-subtle overflow-hidden shadow-keylight flex flex-col ${className}`}
+      className={className}
     >
-      <Table.Root>
+      <Table.Root containerClassName="shadow-keylight">
         <Table.Header>
-          <Table.Row className="bg-surface-panel h-10 border-b border-border-subtle">
+          <Table.Row className="bg-surface-subpanel/50 h-10 border-b border-border-subtle">
             <Table.Head className="w-[30%] min-w-[200px] text-label-caps font-label-caps text-text-muted uppercase">
               {membersContentData.columns.member}
             </Table.Head>
@@ -99,12 +99,12 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
                 key={member.id}
                 tabIndex={0}
                 data-testid={`member-row-${member.id}`}
-                className="h-10 border-b border-border-subtle hover:bg-surface-container-high/60 transition-colors group cursor-default"
+                className="h-10 border-b border-border-subtle hover:bg-surface-subpanel/40 transition-colors group cursor-default focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus-amber"
               >
                 {/* Member Info */}
                 <Table.Cell className="py-1">
                   <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="w-6 h-6 rounded-full bg-surface-container-highest border border-border-subtle flex-shrink-0 overflow-hidden flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full bg-surface-subpanel border border-border-subtle flex-shrink-0 overflow-hidden flex items-center justify-center">
                       {member.user?.avatar_url ? (
                         <img
                           src={member.user.avatar_url}
@@ -153,7 +153,7 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
                       member.teams.map((teamName) => (
                         <span
                           key={teamName}
-                          className="px-1.5 py-0.5 rounded bg-surface-container-highest text-text-secondary font-label-regular text-[10px] whitespace-nowrap border border-border-subtle"
+                          className="px-1.5 py-0.5 rounded bg-surface-subpanel text-text-secondary font-label-regular text-[10px] whitespace-nowrap border border-border-subtle"
                         >
                           {teamName}
                         </span>
@@ -173,7 +173,7 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
                 >
                   <span
                     data-testid={`member-joined-${member.id}`}
-                    className="tabular-nums"
+                    className="tabular-nums font-mono"
                   >
                     {joined}
                   </span>
@@ -206,7 +206,7 @@ export const MemberRosterTable: React.FC<MemberRosterTableProps> = ({
                       aria-label={`Actions for ${userName}`}
                       data-testid={`member-actions-btn-${member.id}`}
                       onClick={() => onActionClick?.(member)}
-                      className="text-text-muted hover:text-text-primary p-1 rounded hover:bg-surface-container-high transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B] cursor-pointer"
+                      className="text-text-muted hover:text-text-primary p-1 rounded hover:bg-surface-subpanel transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber cursor-pointer"
                     >
                       <MoreVertical className="w-4 h-4" />
                     </button>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
@@ -29,13 +29,15 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
   const [role, setRole] = useState<'agent' | 'admin'>('agent')
   const [clientError, setClientError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen)
     if (isOpen) {
       setEmail('')
       setRole('agent')
       setClientError(null)
     }
-  }, [isOpen])
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -77,7 +79,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
         <Modal.Header>
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-accent-glow" />
+              <UserPlus className="w-5 h-5 text-primary-container" />
               <Modal.Title>Invite Organization Member</Modal.Title>
             </div>
             <Modal.Description>
@@ -146,7 +148,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
               data-testid="invite-role-select"
               value={role}
               onChange={(e) => setRole(e.target.value as 'agent' | 'admin')}
-              className="w-full h-9 px-3 bg-surface-panel border border-border-subtle rounded text-text-primary text-xs focus:outline-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] cursor-pointer"
+              className="w-full h-9 px-3 bg-surface-panel border border-border-subtle rounded text-text-primary text-xs focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber cursor-pointer"
             >
               <option value="agent">Agent (Triage & support queues)</option>
               <option value="admin">Admin (Full administrative privileges)</option>

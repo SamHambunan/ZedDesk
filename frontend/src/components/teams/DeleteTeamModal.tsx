@@ -63,16 +63,16 @@ export const DeleteTeamModal: React.FC<DeleteTeamModalProps> = ({
         {hasMembers ? (
           <div
             data-testid="delete-team-members-warning"
-            className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-300 text-xs flex flex-col gap-2"
+            className="p-4 bg-sentiment-warning/10 border border-sentiment-warning/30 rounded-lg text-sentiment-warning text-xs flex flex-col gap-2"
           >
-            <div className="flex items-center gap-2 font-semibold text-amber-200">
+            <div className="flex items-center gap-2 font-semibold text-sentiment-warning">
               <AlertTriangle className="w-4 h-4 shrink-0" />
               <span>Cannot delete team with active members</span>
             </div>
             <p className="leading-relaxed">
-              This team currently has <span className="font-semibold">{memberCount} active member{memberCount === 1 ? '' : 's'}</span>. Please remove or reassign all members before deleting this team.
+              This team currently has <span className="font-mono tabular-nums font-semibold">{memberCount}</span> active member{memberCount === 1 ? '' : 's'}. Please remove or reassign all members before deleting this team.
             </p>
-            <div className="mt-2 pt-2 border-t border-amber-500/20 flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+            <div className="mt-2 pt-2 border-t border-sentiment-warning/20 flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
               {team.members?.map((m) => (
                 <span
                   key={m.id}

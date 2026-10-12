@@ -252,7 +252,11 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
   }
 
   return (
-    <div data-testid="teams-view" className={`flex flex-col gap-6 ${className}`}>
+    <div
+      data-theme="internal"
+      data-testid="teams-view"
+      className={`flex flex-col gap-6 ${className}`}
+    >
       {/* View Header */}
       <div className="flex items-center justify-between flex-wrap gap-4 pb-5 border-b border-border-subtle">
         <div className="flex flex-col gap-1.5">
@@ -267,7 +271,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
               data-testid="teams-stats"
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-subpanel border border-border-subtle text-xs text-text-secondary select-none"
             >
-              <Users2 className="w-3.5 h-3.5 text-accent-glow" />
+              <Users2 className="w-3.5 h-3.5 text-primary-container" />
               <span>Teams:</span>
               <span className="font-mono tabular-nums font-semibold text-text-primary font-['JetBrains_Mono',monospace]">
                 {displayTeams.length}
@@ -364,7 +368,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-2 border-accent-glow border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-primary-container border-t-transparent rounded-full animate-spin" />
             <span className="text-body-default text-text-secondary">Loading teams...</span>
           </div>
         </div>
@@ -375,7 +379,7 @@ export const TeamsView: React.FC<TeamsViewProps> = ({
       ) : displayTeams.length === 0 ? (
         <div
           data-testid="no-teams-message"
-          className="flex flex-col items-center justify-center py-16 text-text-muted"
+          className="flex flex-col items-center justify-center py-16 text-text-muted bg-surface-panel border border-border-subtle rounded-lg shadow-keylight"
         >
           <p className="text-body-default">No teams configured in this organization.</p>
         </div>

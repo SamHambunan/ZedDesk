@@ -130,7 +130,7 @@ const AssignMemberModalInner: React.FC<AssignMemberModalProps> = ({
           <Modal.Header>
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-accent-glow" />
+                <UserPlus className="w-5 h-5 text-primary-container" />
                 <Modal.Title data-testid="assign-member-title">
                   Assign Member{team?.name ? ` to ${team.name}` : ''}
                 </Modal.Title>
@@ -178,7 +178,7 @@ const AssignMemberModalInner: React.FC<AssignMemberModalProps> = ({
                   data-testid="assign-member-select"
                   value={selectedId}
                   onChange={(e) => handleSelectChange(e.target.value)}
-                  className="w-full h-10 px-3 text-body-compact font-body-compact bg-surface-subpanel border border-border-prominent rounded text-text-primary focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] focus:outline-none transition-colors"
+                  className="w-full h-10 px-3 text-body-compact font-body-compact bg-surface-subpanel border border-border-prominent rounded text-text-primary focus:border-focus-amber focus:ring-1 focus:ring-focus-amber focus:outline-none transition-colors"
                 >
                   <option value="">Select an organization member...</option>
                   {eligibleMembers.map((m) => (
@@ -227,7 +227,7 @@ const AssignMemberModalInner: React.FC<AssignMemberModalProps> = ({
         data-testid={`add-member-select-${effectiveTeamId}`}
         value={selectedId}
         onChange={(e) => handleSelectChange(e.target.value)}
-        className="flex-1 min-w-[14rem] h-9 px-3 text-body-compact font-body-compact bg-surface-subpanel border border-border-prominent rounded text-text-primary focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] focus:outline-none transition-colors"
+        className="flex-1 min-w-[14rem] h-9 px-3 text-body-compact font-body-compact bg-surface-subpanel border border-border-prominent rounded text-text-primary focus:border-focus-amber focus:ring-1 focus:ring-focus-amber focus:outline-none transition-colors"
       >
         <option value="">
           {effectiveLoadingMembers ? 'Loading members...' : 'Select Organization Member to add...'}
@@ -238,15 +238,18 @@ const AssignMemberModalInner: React.FC<AssignMemberModalProps> = ({
           </option>
         ))}
       </select>
-      <button
+      <Button
         type="button"
+        variant="amber"
+        size="compact"
         data-testid={`add-member-btn-${effectiveTeamId}`}
         onClick={() => onAddMember?.(effectiveTeamId)}
         disabled={!selectedId || isAdding}
-        className="h-9 px-4 text-label-regular font-label-regular bg-primary-container hover:bg-primary-dark text-white rounded shadow-keylight-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+        isLoading={isAdding}
+        className="h-9 px-4 shrink-0 font-semibold"
       >
         {isAdding ? 'Adding...' : 'Add Member'}
-      </button>
+      </Button>
     </div>
   )
 }

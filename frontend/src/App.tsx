@@ -2,6 +2,7 @@ import { useEffect, useState, useContext, useMemo } from 'react'
 import { QueryClientContext, QueryClientProvider } from '@tanstack/react-query'
 import { queryClient as defaultQueryClient } from './lib/query-client'
 import { CentralHubView } from './components/hub'
+import { Button } from './components/ui/Button'
 import { WorkspaceShell, type WorkspaceShellUser } from './components/workspace'
 import { WorkspaceOverview } from './components/overview/WorkspaceOverview'
 import { TeamsView, TeamManagementView } from './components/teams'
@@ -1068,13 +1069,14 @@ function AppInner({
                 <p className="text-body-default text-text-secondary mb-6">
                   Team management is restricted to Administrators.
                 </p>
-                <button
+                <Button
                   type="button"
+                  variant="amber"
+                  size="compact"
                   onClick={() => setWorkspaceView('teams')}
-                  className="h-9 px-5 text-label-regular font-label-regular bg-primary-container hover:bg-primary-dark text-white rounded shadow-keylight-primary transition-colors"
                 >
                   View Teams
-                </button>
+                </Button>
               </div>
             )}
 

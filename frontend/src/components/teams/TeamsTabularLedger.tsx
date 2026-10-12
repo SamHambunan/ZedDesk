@@ -16,11 +16,11 @@ export interface TeamsTabularLedgerProps {
 }
 
 const AVATAR_BG_COLORS = [
-  'bg-amber-500/20 text-amber-300 border-amber-500/40',
-  'bg-sky-500/20 text-sky-300 border-sky-500/40',
-  'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-  'bg-purple-500/20 text-purple-300 border-purple-500/40',
-  'bg-rose-500/20 text-rose-300 border-rose-500/40',
+  'bg-primary-container/20 text-primary-container border-primary-container/30',
+  'bg-secondary/20 text-secondary-light border-secondary/30',
+  'bg-sentiment-positive/20 text-sentiment-positive border-sentiment-positive/30',
+  'bg-sentiment-warning/20 text-sentiment-warning border-sentiment-warning/30',
+  'bg-surface-subpanel text-text-secondary border-border-subtle',
 ]
 
 export const TeamsTabularLedger: React.FC<TeamsTabularLedgerProps> = ({
@@ -36,9 +36,9 @@ export const TeamsTabularLedger: React.FC<TeamsTabularLedgerProps> = ({
   return (
     <div
       data-testid="teams-tabular-ledger"
-      className={`bg-surface-panel border border-border-subtle rounded-lg shadow-keylight overflow-hidden ${className}`}
+      className={className}
     >
-      <Table.Root>
+      <Table.Root containerClassName="shadow-keylight">
         <Table.Header>
           <Table.Row className="bg-surface-subpanel/50 h-10 border-b border-border-subtle">
             <Table.Head className="w-[28%] text-left text-xs font-semibold text-text-secondary">
@@ -78,7 +78,7 @@ export const TeamsTabularLedger: React.FC<TeamsTabularLedgerProps> = ({
                   key={team.id}
                   tabIndex={0}
                   data-testid={`team-row-${team.id}`}
-                  className="h-10 border-b border-border-subtle transition-colors hover:bg-surface-subpanel/40"
+                  className="h-10 border-b border-border-subtle transition-colors hover:bg-surface-subpanel/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus-amber"
                 >
                   {/* Column 1: Team Name */}
                   <Table.Cell>
@@ -107,7 +107,7 @@ export const TeamsTabularLedger: React.FC<TeamsTabularLedgerProps> = ({
                       data-testid={`team-avatar-stack-${team.id}`}
                       onClick={() => onInspectTeam?.(team)}
                       aria-label={`Inspect members of ${team.name}`}
-                      className="flex items-center -space-x-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B] rounded py-0.5 group cursor-pointer"
+                      className="flex items-center -space-x-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber rounded py-0.5 group cursor-pointer"
                     >
                       {memberCount === 0 ? (
                         <span className="text-[11px] text-text-muted italic group-hover:text-text-secondary">

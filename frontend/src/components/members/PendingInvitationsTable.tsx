@@ -70,7 +70,7 @@ export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = (
         <Badge
           variant="warning"
           data-testid="pending-invitations-count-badge"
-          className="uppercase"
+          className="uppercase font-mono tabular-nums"
         >
           {invitations.length} {membersContentData.pendingSection.badgeSuffix}
         </Badge>
@@ -79,7 +79,7 @@ export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = (
       {isLoading ? (
         <div
           data-testid="pending-invitations-loading"
-          className="h-28 flex items-center justify-center bg-surface-subpanel rounded border border-border-subtle text-text-muted text-body-compact"
+          className="h-28 flex items-center justify-center bg-surface-panel rounded-lg border border-border-subtle text-text-muted text-body-compact shadow-keylight"
         >
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded-full border-2 border-sentiment-warning border-t-transparent animate-spin" />
@@ -89,18 +89,15 @@ export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = (
       ) : invitations.length === 0 ? (
         <div
           data-testid="pending-invitations-empty"
-          className="h-24 flex items-center justify-center bg-surface-subpanel rounded border border-border-subtle text-text-muted text-body-compact italic"
+          className="h-24 flex items-center justify-center bg-surface-panel rounded-lg border border-border-subtle text-text-muted text-body-compact italic shadow-keylight"
         >
           {membersContentData.pendingSection.emptyMessage}
         </div>
       ) : (
-        <div
-          data-testid="invitations-list"
-          className="bg-surface-subpanel rounded border border-border-subtle overflow-hidden shadow-keylight flex flex-col"
-        >
-          <Table>
+        <div data-testid="invitations-list">
+          <Table containerClassName="shadow-keylight">
             <TableHeader>
-              <TableRow className="bg-surface-panel h-10 border-b border-border-subtle">
+              <TableRow className="bg-surface-subpanel/50 h-10 border-b border-border-subtle">
                 <TableHead className="w-[24%] min-w-[180px] text-label-caps font-label-caps text-text-muted uppercase">
                   {membersContentData.pendingSection.columns.invitedEmail}
                 </TableHead>
@@ -139,7 +136,7 @@ export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = (
                     key={inv.id}
                     tabIndex={0}
                     data-testid={`invitation-row-${inv.id}`}
-                    className="h-10 border-b border-border-subtle hover:bg-surface-container-high/60 transition-colors group cursor-default"
+                    className="h-10 border-b border-border-subtle hover:bg-surface-subpanel/40 transition-colors group cursor-default focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus-amber"
                   >
                     {/* Invited Email & hidden token testid */}
                     <TableCell className="py-1">
@@ -199,10 +196,10 @@ export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = (
                         type="button"
                         data-testid={`copy-invitation-link-${inv.id}`}
                         onClick={() => onCopyLink?.(inv)}
-                        className={`inline-flex items-center gap-1 text-[11px] font-label-caps font-semibold uppercase tracking-wider transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B] rounded px-1 ${
+                        className={`inline-flex items-center gap-1 text-[11px] font-label-caps font-semibold uppercase tracking-wider transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber rounded px-1 ${
                           isCopied
                             ? 'text-sentiment-positive'
-                            : 'text-accent-glow hover:text-primary-fixed'
+                            : 'text-primary-container hover:text-amber-hover'
                         }`}
                       >
                         {isCopied ? (
@@ -227,7 +224,7 @@ export const PendingInvitationsTable: React.FC<PendingInvitationsTableProps> = (
                           data-testid={`revoke-invitation-btn-${inv.id}`}
                           disabled={isRevoking}
                           onClick={() => onRevoke?.(inv.id)}
-                          className="inline-flex items-center gap-1 text-sentiment-critical hover:text-red-400 font-label-caps text-[11px] uppercase tracking-wider transition-colors p-1 disabled:opacity-50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B] rounded"
+                          className="inline-flex items-center gap-1 text-sentiment-negative hover:text-sentiment-negative/80 font-label-caps text-[11px] uppercase tracking-wider transition-colors p-1 disabled:opacity-50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber rounded"
                         >
                           <Trash2 className="w-3 h-3 sm:hidden" />
                           <span className="hidden sm:inline">

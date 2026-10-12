@@ -131,6 +131,7 @@ export const MembersView: React.FC<MembersViewProps> = ({
 
   return (
     <div
+      data-theme="internal"
       data-testid="invitations-manager"
       className={`max-w-6xl mx-auto flex flex-col gap-6 pb-12 w-full ${className}`}
     >
@@ -155,9 +156,9 @@ export const MembersView: React.FC<MembersViewProps> = ({
             size="compact"
             data-testid="invite-member-btn"
             onClick={handleOpenInviteModal}
-            className="self-start gap-2 shadow-keylight-primary"
+            className="self-start gap-2 shadow-keylight-primary font-semibold"
           >
-            <Plus className="w-4 h-4 text-[#0F1012]" />
+            <Plus className="w-4 h-4 text-on-amber-action" />
             <span>{membersContentData.inviteMemberBtn}</span>
           </Button>
         )}
@@ -189,7 +190,7 @@ export const MembersView: React.FC<MembersViewProps> = ({
                 setSelectedRole(e.target.value as 'all' | 'admin' | 'agent')
               }
               aria-label="Filter by role"
-              className="bg-transparent border-none text-text-secondary hover:text-text-primary text-xs font-label-regular focus:ring-0 focus:outline-none cursor-pointer pr-4"
+              className="bg-transparent border-none text-text-secondary hover:text-text-primary text-xs font-label-regular focus:ring-1 focus:ring-focus-amber rounded focus:outline-none cursor-pointer pr-4"
             >
               <option value="all" className="bg-surface-panel text-text-primary">
                 {membersContentData.allRoles}
@@ -208,10 +209,10 @@ export const MembersView: React.FC<MembersViewProps> = ({
           data-testid="members-stats"
           className="font-mono-data text-mono-data text-text-muted tracking-tight tabular-nums hidden sm:flex items-center gap-1.5 select-none"
         >
-          <span className="text-text-primary font-semibold">{members.length}</span>{' '}
+          <span className="text-text-primary font-semibold font-mono tabular-nums">{members.length}</span>{' '}
           <span>{membersContentData.activeMembersLabel}</span>
-          <span className="mx-1">•</span>
-          <span className="text-sentiment-warning font-semibold">
+          <span className="mx-1 text-border-prominent">•</span>
+          <span className="text-sentiment-warning font-semibold font-mono tabular-nums">
             {displayedInvitations.length}
           </span>{' '}
           <span>{membersContentData.pendingInvitesLabel}</span>

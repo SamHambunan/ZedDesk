@@ -101,7 +101,7 @@ export const TeamInspectorModalHeader: React.FC<{ readonly className?: string }>
     <Modal.Header className={className}>
       <div className="space-y-1 pr-6">
         <div className="flex items-center gap-2">
-          <Users2 className="w-5 h-5 text-accent-glow shrink-0" />
+          <Users2 className="w-5 h-5 text-primary-container shrink-0" />
           <Modal.Title data-testid="inspector-modal-title">
             Team Inspector: {team.name}
           </Modal.Title>
@@ -139,7 +139,7 @@ export const TeamInspectorModalRosterSubledger: React.FC<{ readonly className?: 
     >
       <div className="flex items-center justify-between">
         <span className="text-label-caps font-label-caps text-text-muted text-[11px] uppercase tracking-wider font-semibold">
-          Assigned Team Roster ({members.length})
+          Assigned Team Roster (<span className="font-mono tabular-nums">{members.length}</span>)
         </span>
       </div>
 
@@ -163,7 +163,7 @@ export const TeamInspectorModalRosterSubledger: React.FC<{ readonly className?: 
                 className="flex items-center justify-between h-11 px-3 bg-surface-subpanel border border-border-subtle rounded hover:border-border-prominent transition-colors"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="w-7 h-7 rounded-full bg-accent-glow/20 border border-accent-glow/40 text-accent-glow text-[11px] font-semibold flex items-center justify-center shrink-0 select-none">
+                  <span className="w-7 h-7 rounded-full bg-primary-container/20 border border-primary-container/40 text-primary-container text-[11px] font-semibold flex items-center justify-center shrink-0 select-none">
                     {initials}
                   </span>
                   <div className="flex flex-col min-w-0">
@@ -304,7 +304,7 @@ export const TeamInspectorModalAssignAutocomplete: React.FC<{ readonly className
                     className="flex items-center justify-between h-10 px-3 bg-surface-subpanel border border-border-subtle rounded hover:border-border-prominent hover:bg-surface-subpanel/80 transition-colors cursor-pointer group"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-6 h-6 rounded-full bg-surface-panel border border-border-subtle text-text-secondary text-[10px] font-semibold flex items-center justify-center shrink-0 select-none group-hover:border-accent-glow/50">
+                      <span className="w-6 h-6 rounded-full bg-surface-panel border border-border-subtle text-text-secondary text-[10px] font-semibold flex items-center justify-center shrink-0 select-none group-hover:border-primary-container/50">
                         {initials}
                       </span>
                       <span className="text-xs font-medium text-text-primary truncate">

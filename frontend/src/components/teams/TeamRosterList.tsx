@@ -1,4 +1,5 @@
-﻿import React from 'react'
+import React from 'react'
+import { Badge } from '../ui/Badge'
 import type { TeamMember } from './types'
 
 export interface TeamRosterListProps {
@@ -49,15 +50,9 @@ export const TeamRosterList: React.FC<TeamRosterListProps> = ({
               <span className="text-body-compact font-body-compact text-text-secondary truncate">
                 ({member.user?.email || 'N/A'})
               </span>
-              <span
-                className={`text-label-caps font-label-caps uppercase px-2 py-0.5 rounded-full text-[10px] shrink-0 ${
-                  member.role === 'admin'
-                    ? 'bg-accent-glow/20 text-accent-glow border border-accent-glow/30'
-                    : 'bg-sentiment-positive/15 text-sentiment-positive border border-sentiment-positive/30'
-                }`}
-              >
+              <Badge variant={member.role === 'admin' ? 'admin' : 'agent'}>
                 {member.role}
-              </span>
+              </Badge>
             </div>
             {isAdmin && (
               <button
@@ -65,7 +60,7 @@ export const TeamRosterList: React.FC<TeamRosterListProps> = ({
                 data-testid={`remove-member-btn-${teamId}-${member.id}`}
                 onClick={() => onRemoveMember?.(teamId, member.id)}
                 disabled={isRemoving}
-                className="ml-3 px-2 py-1 text-[11px] font-semibold bg-sentiment-negative/10 text-sentiment-negative border border-sentiment-negative/30 rounded hover:bg-sentiment-negative/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                className="ml-3 px-2 py-1 text-[11px] font-semibold bg-sentiment-negative/10 text-sentiment-negative border border-sentiment-negative/30 rounded hover:bg-sentiment-negative/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
               >
                 {isRemoving ? 'Removing...' : 'Remove'}
               </button>

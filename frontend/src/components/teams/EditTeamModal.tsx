@@ -61,7 +61,7 @@ export const EditTeamModal: React.FC<EditTeamModalProps> = ({
         <Modal.Header>
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <Pencil className="w-5 h-5 text-accent-glow" />
+              <Pencil className="w-5 h-5 text-primary-container" />
               <Modal.Title data-testid="edit-team-modal-title">Edit Team</Modal.Title>
             </div>
             <Modal.Description>
