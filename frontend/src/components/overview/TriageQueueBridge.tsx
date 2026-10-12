@@ -81,7 +81,7 @@ export const TriageQueueBridge: React.FC<TriageQueueBridgeProps> = ({
       {/* Header and Direct Link */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-subtle pb-3">
         <div className="flex items-center gap-2">
-          <GitPullRequest className="w-4 h-4 text-primary-container text-[#F59E0B]" />
+          <GitPullRequest className="w-4 h-4 text-primary-container" />
           <h2 className="text-headline-sm font-semibold text-text-primary">
             Stage 2 Triage Queue Bridge
           </h2>

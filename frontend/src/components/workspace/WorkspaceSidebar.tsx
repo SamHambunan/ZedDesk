@@ -51,7 +51,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   const navItemClass = (isActive: boolean) =>
     `flex items-center gap-3 px-3 py-2 rounded-r transition-colors text-body-default font-body-default w-full text-left cursor-pointer border-l-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber ${
       isActive
-        ? 'bg-surface-subpanel text-text-primary border-primary-container border-[#F59E0B] font-medium'
+        ? 'bg-surface-subpanel text-text-primary border-[#F59E0B] font-medium'
         : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-subpanel/50'
     }`
 

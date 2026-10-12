@@ -63,8 +63,16 @@ export const TeamCapacityLanes: React.FC<TeamCapacityLanesProps> = ({ teams, onT
           return (
             <div
               key={team.id}
+              role="button"
+              tabIndex={0}
               data-testid={`team-capacity-row-${team.id}`}
               onClick={() => onTeamClick?.(team.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onTeamClick?.(team.id)
+                }
+              }}
               className="bg-surface-subpanel/60 border border-border-subtle hover:border-border-prominent rounded-lg p-4 transition-colors group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
             >
               {/* Team Header Row */}

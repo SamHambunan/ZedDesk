@@ -214,7 +214,7 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
             value={searchQuery}
             onChange={handleSearchChange}
             placeholder={workspaceContentData.brand.searchPlaceholder}
-            className="h-[32px] w-[220px] lg:w-[260px] bg-surface-container-low border border-transparent rounded pl-9 pr-10 text-body-compact text-text-primary focus:border-primary-container focus:ring-1 focus:ring-primary-container focus:outline-none transition-colors placeholder:text-text-muted"
+            className="h-[32px] w-[220px] lg:w-[260px] bg-surface-container-low border border-transparent rounded pl-9 pr-10 text-body-compact text-text-primary focus:border-primary-container focus:ring-1 focus:ring-focus-amber focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber transition-colors placeholder:text-text-muted"
           />
           <span className="absolute right-2 text-[10px] font-mono-data text-text-muted bg-surface-subpanel px-1.5 py-0.5 rounded border border-border-subtle">
             {workspaceContentData.brand.searchShortcut}
