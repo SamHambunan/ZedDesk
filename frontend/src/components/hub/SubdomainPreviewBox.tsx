@@ -55,7 +55,7 @@ export const SubdomainPreviewBox: React.FC<SubdomainPreviewBoxProps> = ({
     <div
       className={`bg-container-lowest border border-border-subtle rounded-lg p-3 flex flex-col gap-2 ${className}`}
     >
-      <div className="font-mono-data text-mono-data text-accent-glow break-all">
+      <div className="font-mono-data text-mono-data text-primary-container break-all">
         {displayUrl}
       </div>
       {renderStatus()}

@@ -26,8 +26,8 @@ export const CentralHubHeader: React.FC<CentralHubHeaderProps> = ({
           {hubContentData.brand.name}
         </span>
         <div className="bg-primary-container/20 border border-primary-container/40 rounded-full px-2 py-0.5 flex items-center gap-1">
-          <Sparkles className="w-3 h-3 text-accent-glow" />
-          <span className="font-label-caps text-label-caps text-accent-glow font-medium">
+          <Sparkles className="w-3 h-3 text-primary-container" />
+          <span className="font-label-caps text-label-caps text-primary-container font-medium">
             {hubContentData.brand.badge}
           </span>
         </div>

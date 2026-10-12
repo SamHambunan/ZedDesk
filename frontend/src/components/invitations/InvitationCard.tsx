@@ -81,8 +81,8 @@ export const InvitationCardHeader: React.FC<InvitationCardHeaderProps> = ({
       )}
     >
       {/* Tactile Organization Avatar */}
-      <div className="w-16 h-16 bg-surface-container-highest rounded-full border border-border-prominent flex items-center justify-center mb-4 shadow-[0_0_15px_rgba(99,102,241,0.15)]">
-        <span className="font-headline-md text-headline-md text-primary font-semibold select-none">
+      <div className="w-16 h-16 bg-surface-container-highest rounded-full border border-border-prominent flex items-center justify-center mb-4 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
+        <span className="font-headline-md text-headline-md text-primary-container font-semibold select-none">
           {orgInitials}
         </span>
       </div>
@@ -116,7 +116,7 @@ export const InvitationCardHeader: React.FC<InvitationCardHeaderProps> = ({
             'inline-flex items-center px-2 py-0.5 rounded text-label-caps font-label-caps font-semibold uppercase',
             isAdmin
               ? 'bg-purple-900/30 text-purple-300 border border-purple-700/50'
-              : 'bg-accent-glow/10 text-primary border border-accent-glow/30'
+              : 'bg-surface-container-high text-text-secondary border border-border-subtle'
           )}
         >
           {role}
@@ -173,7 +173,7 @@ export const InvitationCardSegmentedToggle: React.FC<InvitationCardSegmentedTogg
       role="tablist"
       aria-label="Invitation Account Mode"
       className={cn(
-        'grid grid-cols-2 p-1 bg-surface-canvas border border-border-subtle rounded-lg mb-5 select-none',
+        'grid grid-cols-2 p-1 bg-surface-container-lowest border border-border-subtle rounded-lg mb-5 select-none',
         className
       )}
     >

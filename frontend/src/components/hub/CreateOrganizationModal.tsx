@@ -3,6 +3,7 @@ import { Building2, Rocket, Info } from 'lucide-react'
 import { createOrgModalData } from '../../data/mockData'
 import { SubdomainPreviewBox } from './SubdomainPreviewBox'
 import { Modal } from '../ui/Modal'
+import { Button } from '../ui/Button'
 import {
   useSubdomainValidation,
   transformToSlug,
@@ -169,7 +170,7 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
               value={name}
               onChange={handleNameChange}
               placeholder={createOrgModalData.orgNamePlaceholder}
-              className="w-full h-8 bg-container-low border border-border-prominent rounded text-text-primary placeholder:text-text-muted font-body-default text-body-default px-3 focus:outline-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] transition-colors"
+              className="w-full h-8 bg-container-low border border-border-prominent rounded text-text-primary placeholder:text-text-muted font-body-default text-body-default px-3 focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber transition-colors"
               required
             />
           </div>
@@ -187,7 +188,7 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
                 value={slug}
                 onChange={handleSlugChange}
                 placeholder={createOrgModalData.subdomainPlaceholder}
-                className="flex-1 h-8 bg-container-low border border-r-0 border-border-prominent rounded-l text-text-primary placeholder:text-text-muted font-mono-data text-mono-data px-3 focus:outline-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] transition-colors z-10"
+                className="flex-1 h-8 bg-container-low border border-r-0 border-border-prominent rounded-l text-text-primary placeholder:text-text-muted font-mono-data text-mono-data px-3 focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber transition-colors z-10"
                 required
               />
               <div className="h-8 flex items-center px-3 bg-surface-container-high border border-border-prominent rounded-r border-l-0 text-text-muted font-mono-data text-mono-data select-none z-0">
@@ -223,25 +224,27 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
 
         {/* Footer */}
         <Modal.Footer className="px-6 py-4 border-t border-border-subtle flex items-center justify-end gap-3 bg-surface-subpanel rounded-b-lg">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="compact"
             onClick={onClose}
-            className="h-8 px-4 font-label-regular text-label-regular text-text-secondary hover:text-text-primary hover:bg-surface-container-high rounded transition-colors focus:outline-none focus:ring-2 focus:ring-[#F59E0B] cursor-pointer"
+            className="cursor-pointer font-label-regular text-label-regular"
           >
             {createOrgModalData.cancelButton}
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
+            variant="amber"
+            size="compact"
             disabled={isSubmitting || !isAvailable || !name.trim()}
-            className="h-8 px-4 bg-[#F59E0B] hover:bg-[#D97706] active:bg-[#B45309] text-[#0F1012] font-semibold font-label-regular text-label-regular rounded shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] disabled:opacity-50 disabled:cursor-not-allowed transition-all focus:outline-none focus:ring-2 focus:ring-[#F59E0B] focus:ring-offset-2 focus:ring-offset-surface-subpanel flex items-center gap-2 cursor-pointer"
+            rightIcon={<Rocket className="w-4 h-4" />}
+            className="cursor-pointer font-label-regular text-label-regular"
           >
-            <span>
-              {isSubmitting
-                ? createOrgModalData.submittingButton
-                : createOrgModalData.submitButton}
-            </span>
-            <Rocket className="w-4 h-4" />
-          </button>
+            {isSubmitting
+              ? createOrgModalData.submittingButton
+              : createOrgModalData.submitButton}
+          </Button>
         </Modal.Footer>
       </form>
     </Modal.Root>

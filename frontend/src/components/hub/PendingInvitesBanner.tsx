@@ -42,7 +42,7 @@ export const PendingInvitesBanner: React.FC<PendingInvitesBannerProps> = ({
       <div className="flex items-start gap-3 w-full">
         <Mail className="w-5 h-5 text-sentiment-warning mt-0.5 shrink-0" />
         <div className="flex flex-col gap-2 w-full">
-          <span className="font-title-md text-title-md text-sentiment-warning drop-shadow-[0_0_8px_rgba(245,158,11,0.3)] font-semibold">
+          <span className="font-title-md text-title-md text-sentiment-warning drop-shadow-[0_0_8px_rgba(245,158,11,0.3)] font-semibold tabular-nums">
             {count} {hubContentData.invitations.title}
           </span>
           <span className="font-body-compact text-body-compact text-text-secondary">
@@ -54,7 +54,7 @@ export const PendingInvitesBanner: React.FC<PendingInvitesBannerProps> = ({
                 type="button"
                 disabled={isAccepting}
                 onClick={() => onAccept(primaryInvite)}
-                className="text-xs font-semibold text-text-primary bg-sentiment-warning/20 border border-sentiment-warning/50 rounded px-2.5 py-1 hover:bg-sentiment-warning/30 transition-colors disabled:opacity-50 cursor-pointer"
+                className="text-xs font-semibold text-text-primary bg-sentiment-warning/20 border border-sentiment-warning/50 rounded px-2.5 py-1 hover:bg-sentiment-warning/30 transition-colors disabled:opacity-50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
               >
                 {hubContentData.invitations.accept}
               </button>
@@ -64,7 +64,7 @@ export const PendingInvitesBanner: React.FC<PendingInvitesBannerProps> = ({
                 type="button"
                 disabled={isAccepting}
                 onClick={() => onDecline(primaryInvite)}
-                className="text-xs font-medium text-text-secondary hover:text-text-primary px-2 py-1 transition-colors disabled:opacity-50 cursor-pointer"
+                className="text-xs font-medium text-text-secondary hover:text-text-primary px-2 py-1 transition-colors disabled:opacity-50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
               >
                 {hubContentData.invitations.decline}
               </button>
@@ -77,7 +77,7 @@ export const PendingInvitesBanner: React.FC<PendingInvitesBannerProps> = ({
           type="button"
           aria-label="Dismiss banner"
           onClick={onDismiss}
-          className="text-sentiment-warning/70 hover:text-sentiment-warning hover:bg-sentiment-warning/10 p-1 rounded transition-colors shrink-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-sentiment-warning"
+          className="text-sentiment-warning/70 hover:text-sentiment-warning hover:bg-sentiment-warning/10 p-1 rounded transition-colors shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber"
         >
           <X className="w-4 h-4" />
         </button>

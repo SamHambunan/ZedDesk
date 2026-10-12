@@ -47,6 +47,14 @@ function extractErrorMessage(data: unknown, fallback: string): string {
   return fallback
 }
 
+const INTERNAL_THEME_FONT_LINK = (
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    precedence="default"
+  />
+)
+
 export const CentralHubView: React.FC<CentralHubViewProps> = ({
   initialUser = null,
   initialToken = null,
@@ -426,11 +434,7 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
   if (!token || !user) {
     return (
       <div data-theme="internal" className={`min-h-screen bg-canvas-base flex flex-col justify-center items-center p-4 md:p-6 antialiased selection:bg-primary-container/30 selection:text-on-primary ${className}`}>
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
-          precedence="default"
-        />
+        {INTERNAL_THEME_FONT_LINK}
         {/* Subtle Ambient Glow */}
         <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden">
           <div className="absolute w-[600px] h-[600px] bg-primary-container/5 rounded-full blur-3xl opacity-30 mix-blend-screen" />
@@ -480,7 +484,11 @@ export const CentralHubView: React.FC<CentralHubViewProps> = ({
 
   // Authenticated Central Hub View
   return (
-    <div className={`min-h-screen bg-[#0F1012] text-[#F1F3F7] flex flex-col antialiased selection:bg-[#F59E0B]/30 selection:text-white ${className}`}>
+    <div
+      data-theme="internal"
+      className={`min-h-screen bg-canvas-base text-text-primary flex flex-col antialiased selection:bg-primary-container/30 selection:text-on-primary ${className}`}
+    >
+      {INTERNAL_THEME_FONT_LINK}
       {/* Central Hub Top Navigation */}
       <CentralHubHeader healthStatus={healthStatus} />
 
