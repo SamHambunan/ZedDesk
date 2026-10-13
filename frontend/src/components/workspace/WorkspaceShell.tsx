@@ -7,6 +7,7 @@ import { WorkspaceOverview } from '../overview/WorkspaceOverview'
 import { PerimeterErrorCard } from './PerimeterErrorCard'
 import { CreateOrganizationModal } from '../hub/CreateOrganizationModal'
 import { getApiBaseUrl, getOrganizationUrl } from '../../utils/url'
+import type { ILiveClient } from '../../lib/live-client'
 import {
   WorkspaceShellContext,
   useWorkspaceShell,
@@ -53,6 +54,7 @@ export interface WorkspaceShellProviderProps {
   readonly onAuthSuccess?: (token: string, user: WorkspaceShellUser) => void
   readonly apiUrl?: string
   readonly organizations?: readonly WorkspaceOrganization[]
+  readonly liveClient?: ILiveClient
   readonly children?: React.ReactNode
 }
 
@@ -71,6 +73,7 @@ export const WorkspaceShellProvider: React.FC<WorkspaceShellProviderProps> = ({
   onAuthSuccess,
   apiUrl: propApiUrl,
   organizations,
+  liveClient: propLiveClient,
   children,
 }) => {
   const queryClient = useQueryClient()
@@ -225,6 +228,7 @@ export const WorkspaceShellProvider: React.FC<WorkspaceShellProviderProps> = ({
     closeCreateOrgModal: () => setIsCreateOrgModalOpen(false),
     apiUrl: resolvedApiUrl,
     organizations,
+    liveClient: propLiveClient,
   }
 
   return (

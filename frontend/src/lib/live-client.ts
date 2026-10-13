@@ -6,6 +6,12 @@ export interface LiveSignalPayload {
   readonly revision: number
 }
 
+export interface InboxSignalPayload {
+  readonly event_id: string
+  readonly organization_id: number
+  readonly recipient_member_id: number
+}
+
 export type LiveStatus = 'connecting' | 'connected' | 'disconnected'
 
 export interface ILiveClient {
@@ -16,6 +22,9 @@ export interface ILiveClient {
   readonly subscribeToTicket: (
     ticketId: string,
     onSignal: (signal: LiveSignalPayload) => void
+  ) => () => void
+  readonly subscribeToNotifications?: (
+    onSignal: (signal: InboxSignalPayload) => void
   ) => () => void
   readonly onStatusChange: (listener: (status: LiveStatus) => void) => () => void
   readonly onReconnect: (listener: () => void) => () => void
@@ -58,9 +67,11 @@ export class LiveClient implements ILiveClient {
 
   private orgSignalListeners = new Set<(signal: LiveSignalPayload) => void>()
   private ticketSignalListeners = new Map<string, Set<(signal: LiveSignalPayload) => void>>()
+  private notificationSignalListeners = new Set<(signal: InboxSignalPayload) => void>()
 
   private currentOrgChannel: string | null = null
   private currentTicketChannels = new Map<string, string>() // ticketId -> channelName
+  private currentNotificationChannel: string | null = null
 
   private readonly apiUrl: string
   private readonly token?: string | null
@@ -184,6 +195,9 @@ export class LiveClient implements ILiveClient {
       } else if (eventName === 'ticket.changed') {
         const payload: LiveSignalPayload = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data
         this.dispatchSignal(parsed.channel, payload)
+      } else if (eventName === 'inbox.changed' || eventName === '.inbox.changed') {
+        const payload: InboxSignalPayload = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data
+        this.dispatchNotificationSignal(parsed.channel, payload)
       }
     } catch {
       // Ignore unparseable frames
@@ -213,6 +227,14 @@ export class LiveClient implements ILiveClient {
             listener(payload)
           }
         }
+      }
+    }
+  }
+
+  private dispatchNotificationSignal(channel: string, payload: InboxSignalPayload): void {
+    if (channel === this.currentNotificationChannel) {
+      for (const listener of this.notificationSignalListeners) {
+        listener(payload)
       }
     }
   }
@@ -268,6 +290,9 @@ export class LiveClient implements ILiveClient {
     if (this.currentOrgChannel) {
       promises.push(this.subscribeChannel(this.currentOrgChannel))
     }
+    if (this.currentNotificationChannel) {
+      promises.push(this.subscribeChannel(this.currentNotificationChannel))
+    }
     for (const channelName of this.currentTicketChannels.values()) {
       promises.push(this.subscribeChannel(channelName))
     }
@@ -302,6 +327,44 @@ export class LiveClient implements ILiveClient {
       const data = await res.json()
       if (data.channel) {
         this.currentOrgChannel = data.channel
+        await this.subscribeChannel(data.channel)
+      }
+    } catch {
+      // Channel discovery failure
+    }
+  }
+
+  public subscribeToNotifications(
+    onSignal: (signal: InboxSignalPayload) => void
+  ): () => void {
+    this.notificationSignalListeners.add(onSignal)
+
+    if (!this.currentNotificationChannel) {
+      this.discoverNotificationChannel()
+    }
+
+    return () => {
+      this.notificationSignalListeners.delete(onSignal)
+      if (this.notificationSignalListeners.size === 0 && this.currentNotificationChannel) {
+        this.unsubscribeChannel(this.currentNotificationChannel)
+        this.currentNotificationChannel = null
+      }
+    }
+  }
+
+  private async discoverNotificationChannel(): Promise<void> {
+    try {
+      const headers: Record<string, string> = { Accept: 'application/json' }
+      if (this.token) headers.Authorization = `Bearer ${this.token}`
+      const res = await fetch(`${this.apiUrl}/api/live/notification-channel`, { headers })
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.channel) {
+        const oldChannel = this.currentNotificationChannel
+        if (oldChannel && oldChannel !== data.channel) {
+          this.unsubscribeChannel(oldChannel)
+        }
+        this.currentNotificationChannel = data.channel
         await this.subscribeChannel(data.channel)
       }
     } catch {
@@ -375,6 +438,15 @@ export class LiveClient implements ILiveClient {
       }
     }
 
+    // Re-discover member notification channel
+    if (this.notificationSignalListeners.size > 0) {
+      const oldNotificationChannel = this.currentNotificationChannel
+      await this.discoverNotificationChannel()
+      if (oldNotificationChannel && oldNotificationChannel !== this.currentNotificationChannel) {
+        this.unsubscribeChannel(oldNotificationChannel)
+      }
+    }
+
     // Re-discover all active ticket channels in parallel
     await Promise.all(
       Array.from(this.ticketSignalListeners.keys()).map((ticketId) =>
@@ -412,6 +484,7 @@ export class MockLiveClient implements ILiveClient {
   private readonly reconnectListeners = new Set<() => void>()
   private readonly orgListeners = new Set<(signal: LiveSignalPayload) => void>()
   private readonly ticketListeners = new Map<string, Set<(signal: LiveSignalPayload) => void>>()
+  private readonly notificationListeners = new Set<(signal: InboxSignalPayload) => void>()
 
   constructor(initialStatus: LiveStatus = 'connected') {
     this.status = initialStatus
@@ -436,6 +509,13 @@ export class MockLiveClient implements ILiveClient {
     this.orgListeners.add(onSignal)
     return () => {
       this.orgListeners.delete(onSignal)
+    }
+  }
+
+  public subscribeToNotifications(onSignal: (signal: InboxSignalPayload) => void): () => void {
+    this.notificationListeners.add(onSignal)
+    return () => {
+      this.notificationListeners.delete(onSignal)
     }
   }
 
@@ -468,6 +548,12 @@ export class MockLiveClient implements ILiveClient {
       for (const listener of ticketListeners) {
         listener(signal)
       }
+    }
+  }
+
+  public emitInboxSignal(signal: InboxSignalPayload): void {
+    for (const listener of this.notificationListeners) {
+      listener(signal)
     }
   }
 

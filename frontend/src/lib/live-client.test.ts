@@ -184,4 +184,83 @@ describe('LiveClient and MockLiveClient', () => {
     expect(mock.status).toBe('connected')
     expect(reconnectSpy).toHaveBeenCalled()
   })
+
+  it('authorizes and subscribes to member notification channel and dispatches inbox.changed', async () => {
+    const originalFetch = global.fetch
+    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes('/api/live/notification-channel')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ channel: 'private-organization.1.member.2.notifications.gen1' }),
+        })
+      }
+      if (url.includes('/api/broadcasting/auth')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ auth: 'sig-notif' }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+    })
+
+    const client = new LiveClient({
+      apiUrl: 'http://localhost:8000',
+      token: 'test-token',
+      webSocketClass: MockWebSocket as any,
+    })
+
+    await vi.advanceTimersByTimeAsync(10)
+    const socket = MockWebSocket.instances[0]
+    socket.receive({
+      event: 'pusher:connection_established',
+      data: JSON.stringify({ socket_id: '123.456' }),
+    })
+
+    const notifSpy = vi.fn()
+    client.subscribeToNotifications?.(notifSpy)
+
+    await vi.advanceTimersByTimeAsync(50)
+
+    const subscribeFrame = socket.sent.find((msg) => msg.includes('private-organization.1.member.2.notifications.gen1'))
+    expect(subscribeFrame).toBeDefined()
+
+    socket.receive({
+      event: 'inbox.changed',
+      channel: 'private-organization.1.member.2.notifications.gen1',
+      data: JSON.stringify({
+        event_id: 'notif-ev-1',
+        organization_id: 1,
+        recipient_member_id: 2,
+      }),
+    })
+
+    expect(notifSpy).toHaveBeenCalledWith({
+      event_id: 'notif-ev-1',
+      organization_id: 1,
+      recipient_member_id: 2,
+    })
+
+    client.disconnect()
+    global.fetch = originalFetch
+  })
+
+  it('MockLiveClient emits inbox signals to notification listeners', () => {
+    const mock = createMockLiveClient()
+    const notifSpy = vi.fn()
+
+    mock.subscribeToNotifications?.(notifSpy)
+
+    mock.emitInboxSignal({
+      event_id: 'ev-inbox-1',
+      organization_id: 1,
+      recipient_member_id: 2,
+    })
+
+    expect(notifSpy).toHaveBeenCalledWith({
+      event_id: 'ev-inbox-1',
+      organization_id: 1,
+      recipient_member_id: 2,
+    })
+  })
 })
+

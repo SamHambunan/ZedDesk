@@ -17,6 +17,8 @@ import { clearAuthToken } from '../../lib/api-client'
 import { workspaceContentData } from '../../data/mockData'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
+import { NotificationBell } from '../notifications/NotificationBell'
+import type { ILiveClient } from '../../lib/live-client'
 import {
   WorkspaceShellContext,
   SafeQueryProvider,
@@ -40,6 +42,8 @@ export interface WorkspaceHeaderProps {
   readonly role?: RoleType | null
   readonly token?: string | null
   readonly apiUrl?: string
+  readonly liveClient?: ILiveClient
+  readonly onNavigate?: (view: string) => void
   readonly organizations?: readonly WorkspaceOrganization[]
   readonly onCopilotClick?: () => void
   readonly onSearch?: (query: string) => void
@@ -56,6 +60,8 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
   role: propRole,
   token: propToken,
   apiUrl: propApiUrl,
+  liveClient: propLiveClient,
+  onNavigate: propOnNavigate,
   organizations: propOrganizations,
   onCopilotClick: propOnCopilotClick,
   onSearch: propOnSearch,
@@ -362,15 +368,16 @@ const WorkspaceHeaderContent: React.FC<WorkspaceHeaderProps> = ({
         {/* Divider */}
         <div className="h-5 w-px bg-border-subtle hidden sm:block mx-0.5" />
 
-        {/* Notification Icon */}
-        <button
-          type="button"
-          aria-label="Notifications"
-          data-testid="notifications-bell-btn"
-          className="text-text-secondary hover:text-text-primary hover:bg-surface-subpanel p-1.5 rounded transition-colors hidden sm:flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber"
-        >
-          <Bell className="w-4 h-4" />
-        </button>
+        {/* Notification Bell & 5-item Inbox */}
+        <div className="hidden sm:flex items-center">
+          <NotificationBell
+            apiUrl={resolvedApiUrl}
+            token={token}
+            organizationId={shellContext?.organization?.id}
+            liveClient={propLiveClient ?? shellContext?.liveClient}
+            onNavigate={propOnNavigate ?? shellContext?.onNavigate}
+          />
+        </div>
 
         {/* User Info & Avatar with Online Status Dot */}
         <div className="relative flex items-center gap-2" ref={profileRef}>

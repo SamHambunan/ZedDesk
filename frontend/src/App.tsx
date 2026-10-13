@@ -12,6 +12,7 @@ import { CustomerPortalView } from './components/portal'
 import { TicketQueueView } from './components/tickets/TicketQueueView'
 import type { PresetFilter } from './components/tickets/types'
 import { parseTicketNumberFromPath } from './components/tickets/constants'
+import { NotificationHistoryView } from './components/notifications/NotificationHistoryView'
 import { useWorkspace } from './hooks/useWorkspace'
 import { getApiBaseUrl, getCentralHubUrl, getOrganizationUrl, getSubdomain } from './utils/url'
 
@@ -70,13 +71,14 @@ interface TeamItem {
   members: OrganizationMemberItem[]
 }
 
-const ROUTE_VIEW_MAP: Record<string, 'overview' | 'invitations' | 'members' | 'teams' | 'team-management' | 'tickets'> = {
+const ROUTE_VIEW_MAP: Record<string, 'overview' | 'invitations' | 'members' | 'teams' | 'team-management' | 'tickets' | 'notifications'> = {
   '/overview': 'overview',
   '/members': 'members',
   '/invitations': 'invitations',
   '/teams': 'teams',
   '/team-management': 'team-management',
   '/tickets': 'tickets',
+  '/notifications': 'notifications',
 }
 
 function extractErrorMessage(data: unknown, fallback: string): string {
@@ -131,7 +133,7 @@ function AppInner({
   const [isAccepting, setIsAccepting] = useState(false)
 
   // Workspace Shell Invitations State
-  const [workspaceView, setWorkspaceView] = useState<'overview' | 'invitations' | 'members' | 'teams' | 'team-management' | 'tickets'>(
+  const [workspaceView, setWorkspaceView] = useState<'overview' | 'invitations' | 'members' | 'teams' | 'team-management' | 'tickets' | 'notifications'>(
     () => {
       if (isTicketsRoute) return 'tickets'
       return ROUTE_VIEW_MAP[activePath] ?? 'overview'
@@ -922,7 +924,8 @@ function AppInner({
       baseSection === 'invitations' ||
       baseSection === 'members' ||
       baseSection === 'teams' ||
-      baseSection === 'team-management'
+      baseSection === 'team-management' ||
+      baseSection === 'notifications'
     ) {
       setWorkspaceView(baseSection as any)
       setActiveTicketNumber(undefined)
@@ -1118,7 +1121,7 @@ function AppInner({
               />
             )}
 
-            {!loadingWorkspace && workspaceData && workspaceView === 'tickets' && (
+            {!loadingWorkspace && workspaceData && workspaceView && workspaceView === 'tickets' && (
               <TicketQueueView
                 apiUrl={apiUrl}
                 token={token}
@@ -1126,6 +1129,15 @@ function AppInner({
                 currentUserId={user?.id}
                 initialTicketNumber={activeTicketNumber}
                 initialPreset={activePreset}
+              />
+            )}
+
+            {!loadingWorkspace && workspaceData && workspaceView === 'notifications' && (
+              <NotificationHistoryView
+                apiUrl={apiUrl}
+                token={token}
+                organizationId={workspaceData.organization?.id}
+                onNavigate={handleWorkspaceNavigate}
               />
             )}
 
