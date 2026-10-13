@@ -42,6 +42,10 @@ export interface TicketCockpitState {
   readonly isLoading?: boolean
   readonly isError?: boolean
   readonly isFetching?: boolean
+  readonly liveStatus?: 'connecting' | 'connected' | 'disconnected'
+  readonly hasPendingQueueReorder?: boolean
+  readonly isOutsidePreset?: boolean
+  readonly isUnavailable?: boolean
 }
 
 export interface TicketCockpitActions {
@@ -60,6 +64,7 @@ export interface TicketCockpitActions {
   readonly deleteTicket: (ticketId: string) => Promise<void> | void
   readonly restoreTicket?: (ticketId: string) => Promise<void> | void
   readonly submitComposer: (ticketId: string, payload: ComposerSubmitPayload) => void
+  readonly applyPendingQueueOrder?: () => void
 }
 
 export interface TicketCockpitMeta {
