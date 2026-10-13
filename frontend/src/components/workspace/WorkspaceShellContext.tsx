@@ -1,6 +1,7 @@
 import React, { createContext, use } from 'react'
 import { QueryClientContext, QueryClientProvider } from '@tanstack/react-query'
 import { queryClient as defaultQueryClient } from '../../lib/query-client'
+import type { ILiveClient } from '../../lib/live-client'
 import type { WorkspaceOrganization } from './WorkspaceHeader'
 
 export function SafeQueryProvider({ children }: { children: React.ReactNode }) {
@@ -45,6 +46,7 @@ export interface WorkspaceShellContextValue {
   readonly closeCreateOrgModal: () => void
   readonly apiUrl?: string
   readonly organizations?: readonly WorkspaceOrganization[]
+  readonly liveClient?: ILiveClient
 }
 
 export const WorkspaceShellContext = createContext<WorkspaceShellContextValue | null>(null)

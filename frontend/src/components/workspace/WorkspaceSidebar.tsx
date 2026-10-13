@@ -4,6 +4,7 @@ import {
   Ticket,
   Users2,
   User,
+  Bell,
   Sliders,
   UserPlus,
   FolderCog,
@@ -163,6 +164,18 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
               >
                 <User className="w-[18px] h-[18px] shrink-0" />
                 {!isCollapsed && <span>Members</span>}
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                data-testid="nav-notifications"
+                onClick={() => handleNav('notifications')}
+                title="Notifications"
+                className={navItemClass(activeRoute === 'notifications')}
+              >
+                <Bell className="w-[18px] h-[18px] shrink-0" />
+                {!isCollapsed && <span>Notifications</span>}
               </button>
             </li>
           </ul>
