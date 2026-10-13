@@ -723,6 +723,8 @@ function TicketCockpitInternalProvider({
 
   // Ticket typing presence tracking (Issue #152)
   const activeTypingTicketRef = useRef<string | null>(null)
+  const membersRef = useRef(members)
+  membersRef.current = members
 
   useEffect(() => {
     if (!liveClientInstance?.subscribeToTicketTyping || !targetTicketId) {
@@ -748,7 +750,7 @@ function TicketCockpitInternalProvider({
           const otherMembers = typingMembers.filter((m) => m.member_id !== currentUserId)
           const resolvedMembers = otherMembers.map((m) => {
             if (m.name.startsWith('Member ')) {
-              const matched = members.find((om) => om.id === m.member_id)
+              const matched = membersRef.current.find((om) => om.id === m.member_id)
               if (matched) return { ...m, name: matched.name }
             }
             return m
@@ -797,7 +799,7 @@ function TicketCockpitInternalProvider({
       }
       setTicketTypingMembers([])
     }
-  }, [liveClientInstance, targetTicketId, currentUserId, members])
+  }, [liveClientInstance, targetTicketId, currentUserId])
 
   // Active Ticket: derives base ticket from queue, merging live server details if available
   const activeTicket = useMemo(() => {

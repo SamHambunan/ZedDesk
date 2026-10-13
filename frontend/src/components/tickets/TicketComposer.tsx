@@ -715,7 +715,12 @@ export const ComposerTypingIndicator: React.FC<{
         {formatTypingText(members)}
       </span>
       {members.map((m) => (
-        <span key={m.member_id} data-testid={`typing-member-${m.member_id}`} className="sr-only">
+        <span
+          key={m.member_id}
+          data-testid={`typing-member-${m.member_id}`}
+          aria-hidden="true"
+          className="sr-only"
+        >
           {m.name}
         </span>
       ))}
@@ -741,9 +746,9 @@ function TicketComposerView({ className = '' }: { readonly className?: string })
 
   return (
     <div className="space-y-1.5">
-      {state.typingMembers && state.typingMembers.length > 0 && (
-        <ComposerTypingIndicator members={state.typingMembers} />
-      )}
+      {state.typingMembers && state.typingMembers.length > 0 ? (
+        <ComposerTypingIndicator />
+      ) : null}
       <ComposerFrame className={className}>
         <ComposerHeader />
         <ComposerInput />
