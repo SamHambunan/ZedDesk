@@ -13,6 +13,7 @@ import { TicketQueueView } from './components/tickets/TicketQueueView'
 import type { PresetFilter } from './components/tickets/types'
 import { parseTicketNumberFromPath } from './components/tickets/constants'
 import { NotificationHistoryView } from './components/notifications/NotificationHistoryView'
+import { createLiveClient, type PresenceMember } from './lib/live-client'
 import { useWorkspace } from './hooks/useWorkspace'
 import { getApiBaseUrl, getCentralHubUrl, getOrganizationUrl, getSubdomain } from './utils/url'
 
@@ -215,6 +216,33 @@ function AppInner({
     localStorage.setItem('zeddesk_token', newToken)
     localStorage.setItem('zeddesk_user', JSON.stringify(newUser))
   }
+
+  // Live Client for Real-Time Presence & Updates (Issue #151)
+  const liveClient = useMemo(() => {
+    if (!isWorkspace || !token) return undefined
+    return createLiveClient({ apiUrl, token })
+  }, [isWorkspace, apiUrl, token])
+
+  useEffect(() => {
+    return () => {
+      liveClient?.disconnect()
+    }
+  }, [liveClient])
+
+  const [onlineMembers, setOnlineMembers] = useState<readonly PresenceMember[]>([])
+
+  useEffect(() => {
+    if (!liveClient?.subscribeToOrganizationPresence) {
+      setOnlineMembers([])
+      return
+    }
+    const unsub = liveClient.subscribeToOrganizationPresence((members) => {
+      setOnlineMembers(members)
+    })
+    return () => {
+      unsub()
+    }
+  }, [liveClient])
 
   // Public Invitation fetch effect
   useEffect(() => {
@@ -459,11 +487,19 @@ function AppInner({
     }
   }, [workspaceView, isWorkspace, token, apiUrl])
 
+  const onlineMemberIds = useMemo(() => {
+    return new Set(onlineMembers.map((m) => m.member_id))
+  }, [onlineMembers])
+
   const rosterMembers = useMemo(() => {
     return orgMembers.map((m) => {
       const memberTeams = teams
         .filter((t) => t.members?.some((tm) => tm.user_id === m.user_id))
         .map((t) => t.name)
+      const isOnline =
+        onlineMemberIds.size > 0
+          ? onlineMemberIds.has(m.id) || (m.user_id ? onlineMemberIds.has(m.user_id) : false)
+          : m.user_id === user?.id
       return {
         id: m.id,
         organization_id: m.organization_id,
@@ -472,10 +508,10 @@ function AppInner({
         user: m.user,
         teams: memberTeams,
         joined_date: m.created_at ? new Date(m.created_at).toISOString().split('T')[0] : '2023-01-15',
-        status: (m.user_id === user?.id ? 'online' : (m.id % 2 === 0 ? 'online' : 'offline')) as 'online' | 'offline',
+        status: (isOnline ? 'online' : 'offline') as 'online' | 'offline',
       }
     })
-  }, [orgMembers, teams, user])
+  }, [orgMembers, teams, onlineMemberIds, user])
 
   const handleCreateTeam = async (nameOrEvent?: string | React.FormEvent, desc?: string) => {
     if (nameOrEvent && typeof nameOrEvent !== 'string' && 'preventDefault' in nameOrEvent) {
@@ -1013,6 +1049,7 @@ function AppInner({
         onNavigate={handleWorkspaceNavigate}
         onLogout={handleLogout}
         onAuthSuccess={persistSession}
+        liveClient={liveClient}
       >
         {!loadingWorkspace && workspaceData && workspaceView === 'overview' ? (
           <WorkspaceOverview
@@ -1022,6 +1059,8 @@ function AppInner({
             token={token ?? undefined}
             apiUrl={apiUrl}
             onNavigate={handleWorkspaceNavigate}
+            onlineMembers={onlineMembers}
+            liveClient={liveClient}
           />
         ) : null}
 
@@ -1034,6 +1073,8 @@ function AppInner({
             isLoadingInvitations={loadingWorkspaceInvitations}
             inviteError={inviteError}
             inviteSuccess={inviteSuccess}
+            onlineMembers={onlineMembers}
+            liveClient={liveClient}
             onInviteSubmit={(email, role) => handleSendInvite(email, role)}
             onRevokeInvite={handleRevokeInvite}
             onCopyInviteLink={(inv) => {
@@ -1125,6 +1166,7 @@ function AppInner({
               <TicketQueueView
                 apiUrl={apiUrl}
                 token={token}
+                liveClient={liveClient}
                 userRole={workspaceData.role as 'admin' | 'agent'}
                 currentUserId={user?.id}
                 initialTicketNumber={activeTicketNumber}

@@ -6,11 +6,13 @@ import {
   type ILiveClient,
   type LiveSignalPayload,
   type LiveStatus,
+  type PresenceMember,
 } from '../../lib/live-client'
 import {
   Search,
   ArrowLeft,
   Share2,
+  Eye,
 } from 'lucide-react'
 import type {
   TicketItem,
@@ -22,6 +24,13 @@ import type {
   OrgMemberOption,
   TicketTag,
 } from './types'
+
+function getViewerInitials(name?: string): string {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
 import {
   TicketCockpitContext,
   useTicketCockpit,
@@ -203,6 +212,7 @@ function TicketCockpitInternalProvider({
   const [internalSelectedTicketId, setInternalSelectedTicketId] = useState<string | null>(
     () => initialTicket?.id ?? null
   )
+  const [ticketViewers, setTicketViewers] = useState<readonly PresenceMember[]>([])
   const [activePreset, setActivePreset] = useState<PresetFilter>(() => {
     if (initialPreset) return initialPreset
     if (initialTicket && ['resolved', 'closed'].includes(initialTicket.status)) {
@@ -660,6 +670,62 @@ function TicketCockpitInternalProvider({
     }
   }, [liveClientInstance, targetTicketId, queryClient])
 
+  // Ticket viewing presence tracking (Issue #151)
+  useEffect(() => {
+    if (!liveClientInstance?.subscribeToTicketViewers || !targetTicketId) {
+      setTicketViewers([])
+      return
+    }
+
+    let activeUnsubscribe: (() => void) | null = null
+
+    const subscribe = () => {
+      if (activeUnsubscribe) {
+        activeUnsubscribe()
+        activeUnsubscribe = null
+      }
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        setTicketViewers([])
+        return
+      }
+      activeUnsubscribe = liveClientInstance.subscribeToTicketViewers!(
+        targetTicketId,
+        (viewers) => {
+          setTicketViewers(viewers)
+        }
+      )
+    }
+
+    subscribe()
+
+    const handleVisibilityChange = () => {
+      if (typeof document === 'undefined') return
+      if (document.visibilityState === 'hidden') {
+        if (activeUnsubscribe) {
+          activeUnsubscribe()
+          activeUnsubscribe = null
+        }
+        setTicketViewers([])
+      } else {
+        subscribe()
+      }
+    }
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+    }
+
+    return () => {
+      if (activeUnsubscribe) {
+        activeUnsubscribe()
+        activeUnsubscribe = null
+      }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+      }
+    }
+  }, [liveClientInstance, targetTicketId])
+
   // Active Ticket: derives base ticket from queue, merging live server details if available
   const activeTicket = useMemo(() => {
     if (isUnavailable) return null
@@ -1102,6 +1168,7 @@ function TicketCockpitInternalProvider({
     hasPendingQueueReorder,
     isOutsidePreset,
     isUnavailable,
+    ticketViewers,
   }), [
     effectiveTickets,
     filteredTickets,
@@ -1124,6 +1191,7 @@ function TicketCockpitInternalProvider({
     hasPendingQueueReorder,
     isOutsidePreset,
     isUnavailable,
+    ticketViewers,
   ])
 
   const meta: TicketCockpitMeta = useMemo(() => ({
@@ -1642,6 +1710,39 @@ export const TicketCockpitDetail: React.FC<TicketCockpitDetailProps> = ({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              {/* Verified Ticket Viewers (Issue #151) */}
+              {state.ticketViewers && state.ticketViewers.length > 0 && (
+                <div
+                  data-testid="ticket-viewers"
+                  role="status"
+                  aria-label={`${state.ticketViewers.length} viewing this ticket`}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-subpanel/80 border border-border-subtle"
+                >
+                  <Eye className="w-3.5 h-3.5 text-sentiment-positive shrink-0" aria-hidden="true" />
+                  <span
+                    data-testid="ticket-viewers-count"
+                    className="text-[11px] font-mono-data text-text-muted mr-1 hidden sm:inline"
+                  >
+                    {state.ticketViewers.length === 1 ? '1 viewer' : `${state.ticketViewers.length} viewers`}
+                  </span>
+                  <div className="flex items-center -space-x-1.5 overflow-hidden">
+                    {state.ticketViewers.map((viewer) => {
+                      const initials = getViewerInitials(viewer.name)
+                      return (
+                        <div
+                          key={viewer.member_id}
+                          data-testid={`ticket-viewer-${viewer.member_id}`}
+                          title={`Viewing: ${viewer.name}`}
+                          className="w-5 h-5 rounded-full bg-surface-container border border-border-prominent text-[9px] font-mono-data font-semibold text-text-primary flex items-center justify-center shadow-xs"
+                        >
+                          {initials}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               <button
                 type="button"
                 title="Deep link ticket"

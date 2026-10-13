@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useContext } from 'react'
+import React, { useState, useMemo, useEffect, useContext } from 'react'
 import { Plus, Search, Filter } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Toast } from '../ui/Toast'
@@ -9,6 +9,7 @@ import { membersContentData } from '../../data/mockData'
 import { WorkspaceShellContext } from '../workspace/WorkspaceShellContext'
 import { getCentralHubUrl } from '../../utils/url'
 import type { Member, PendingInvitation } from './types'
+import type { ILiveClient, PresenceMember } from '../../lib/live-client'
 
 export interface MembersViewProps {
   readonly members: readonly Member[]
@@ -24,6 +25,8 @@ export interface MembersViewProps {
   readonly onActionClick?: (member: Member) => void
   readonly revokingId?: number | null
   readonly copiedId?: number | null
+  readonly onlineMembers?: readonly PresenceMember[]
+  readonly liveClient?: ILiveClient
   readonly className?: string
 }
 
@@ -41,6 +44,8 @@ export const MembersView: React.FC<MembersViewProps> = ({
   onActionClick,
   revokingId = null,
   copiedId = null,
+  onlineMembers,
+  liveClient,
   className = '',
 }) => {
   const shellContext = useContext(WorkspaceShellContext)
@@ -57,6 +62,29 @@ export const MembersView: React.FC<MembersViewProps> = ({
   const [optimisticRemovedIds, setOptimisticRemovedIds] = useState<number[]>([])
 
   const effectiveCopiedId = copiedId ?? internalCopiedId
+
+  // Live organization presence tracking (Issue #151)
+  const [liveOnlineMembers, setLiveOnlineMembers] = useState<readonly PresenceMember[]>([])
+  const effectiveLiveClient = liveClient ?? shellContext?.liveClient
+
+  useEffect(() => {
+    if (!effectiveLiveClient?.subscribeToOrganizationPresence) {
+      setLiveOnlineMembers([])
+      return
+    }
+    const unsub = effectiveLiveClient.subscribeToOrganizationPresence((members) => {
+      setLiveOnlineMembers(members)
+    })
+    return () => {
+      unsub()
+    }
+  }, [effectiveLiveClient])
+
+  const effectiveOnlineMembers = onlineMembers ?? (effectiveLiveClient ? liveOnlineMembers : undefined)
+
+  const effectiveOnlineMemberIds = useMemo(() => {
+    return new Set((effectiveOnlineMembers ?? []).map((m) => m.member_id))
+  }, [effectiveOnlineMembers])
 
   const displayedInvitations = useMemo(() => {
     return pendingInvitations.filter((inv) => !optimisticRemovedIds.includes(inv.id))
@@ -80,6 +108,16 @@ export const MembersView: React.FC<MembersViewProps> = ({
       return matchesSearch && matchesRole
     })
   }, [members, searchQuery, selectedRole])
+
+  const displayMembers = useMemo(() => {
+    if (effectiveOnlineMembers === undefined) {
+      return filteredMembers
+    }
+    return filteredMembers.map((m) => ({
+      ...m,
+      status: (effectiveOnlineMemberIds.has(m.id) ? 'online' : 'offline') as 'online' | 'offline',
+    }))
+  }, [filteredMembers, effectiveOnlineMembers, effectiveOnlineMemberIds])
 
   // Collect all existing emails for duplicate validation in modal
   const existingEmails = useMemo(() => {
@@ -219,9 +257,64 @@ export const MembersView: React.FC<MembersViewProps> = ({
         </div>
       </div>
 
+      {/* Online Subsection (Issue #151: Transient Presence, distinct from On-Duty / Workload) */}
+      {effectiveOnlineMembers !== undefined && (
+        <div
+          data-testid="online-members-subsection"
+          className="bg-surface-panel border border-border-subtle rounded-lg p-4 shadow-keylight space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-sentiment-positive shadow-[0_0_4px_rgba(16,185,129,0.5)]" />
+              <h2 className="text-body-compact font-semibold text-text-primary">
+                Online Members ({effectiveOnlineMembers.length})
+              </h2>
+            </div>
+            <span className="text-[10px] font-mono-data text-text-muted">
+              Connected Presence
+            </span>
+          </div>
+          <p className="text-[11px] font-mono-data text-text-muted">
+            Connected organization members (transient presence, distinct from on-duty schedule or ticket workload).
+          </p>
+
+          {effectiveOnlineMembers.length === 0 ? (
+            <div
+              data-testid="online-members-empty"
+              className="text-center py-3 text-text-muted text-xs font-mono-data border border-dashed border-border-subtle rounded-lg"
+            >
+              No members currently online.
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 flex-wrap" data-testid="online-members-list">
+              {effectiveOnlineMembers.map((member) => (
+                <div
+                  key={member.member_id}
+                  data-testid={`online-member-${member.member_id}`}
+                  className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-subpanel/60 border border-border-subtle rounded-md text-xs"
+                >
+                  <span
+                    data-testid={`online-member-name-${member.member_id}`}
+                    className="text-text-primary font-medium"
+                  >
+                    {member.name}
+                  </span>
+                  <span
+                    data-testid={`online-member-badge-${member.member_id}`}
+                    className="text-[10px] font-mono-data font-semibold text-sentiment-positive bg-sentiment-positive/10 border border-sentiment-positive/20 px-1.5 py-0.5 rounded"
+                  >
+                    Connected
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Member Roster Table */}
       <MemberRosterTable
-        members={filteredMembers}
+        members={displayMembers}
         isAdmin={effectiveIsAdmin}
         isLoading={isLoadingMembers}
         onActionClick={onActionClick}

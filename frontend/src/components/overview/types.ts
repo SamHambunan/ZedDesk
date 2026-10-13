@@ -66,12 +66,16 @@ export interface OverviewInvitation {
   readonly created_at?: string
 }
 
+import type { ILiveClient, PresenceMember } from '../../lib/live-client'
+
 export interface WorkspaceOverviewProps {
   readonly organization?: { readonly id?: number; readonly name: string; readonly slug: string }
   readonly subdomain?: string
   readonly role?: 'admin' | 'agent' | string | null
   readonly token?: string | null
   readonly apiUrl?: string
+  readonly liveClient?: ILiveClient
+  readonly onlineMembers?: readonly PresenceMember[]
   readonly teams?: readonly OverviewTeam[]
   readonly members?: readonly any[]
   readonly agents?: readonly OverviewAgent[]

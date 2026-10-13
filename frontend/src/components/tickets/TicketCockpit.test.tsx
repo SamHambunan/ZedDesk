@@ -1390,4 +1390,113 @@ describe('Live Signals and Authorized REST Refresh (Issue #149)', () => {
       expect(claimCalled).toBe(true)
     })
   })
+
+  describe('Ticket Viewing Presence (Issue #151)', () => {
+    it('displays verified viewers beside selected Ticket header and updates dynamically', async () => {
+      const liveClient = createMockLiveClient()
+
+      render(
+        <TicketCockpit.Provider
+          tickets={INITIAL_MOCK_TICKETS}
+          selectedTicketId="ticket-1"
+          liveClient={liveClient}
+        >
+          <TicketCockpit.Frame>
+            <TicketCockpit.Detail />
+          </TicketCockpit.Frame>
+        </TicketCockpit.Provider>
+      )
+
+      // Initially no viewers
+      expect(screen.queryByTestId('ticket-viewers')).not.toBeInTheDocument()
+
+      // Emit viewers on selected ticket
+      liveClient.emitTicketViewers('ticket-1', [
+        { member_id: 10, name: 'Alice Agent' },
+        { member_id: 11, name: 'Bob Admin' },
+      ])
+
+      await waitFor(() => {
+        expect(screen.getByTestId('ticket-viewers')).toBeInTheDocument()
+        expect(screen.getByTestId('ticket-viewer-10')).toHaveAttribute('title', 'Viewing: Alice Agent')
+        expect(screen.getByTestId('ticket-viewer-11')).toHaveAttribute('title', 'Viewing: Bob Admin')
+        expect(screen.getByTestId('ticket-viewers-count')).toHaveTextContent('2 viewers')
+      })
+    })
+
+    it('unsubscribes viewing presence when tab is hidden and resubscribes when visible', async () => {
+      const liveClient = createMockLiveClient()
+      const subscribeSpy = vi.spyOn(liveClient, 'subscribeToTicketViewers')
+
+      render(
+        <TicketCockpit.Provider
+          tickets={INITIAL_MOCK_TICKETS}
+          selectedTicketId="ticket-1"
+          liveClient={liveClient}
+        >
+          <TicketCockpit.Frame>
+            <TicketCockpit.Detail />
+          </TicketCockpit.Frame>
+        </TicketCockpit.Provider>
+      )
+
+      expect(subscribeSpy).toHaveBeenCalledWith('ticket-1', expect.any(Function))
+
+      // Simulate tab hidden
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => 'hidden',
+      })
+      document.dispatchEvent(new Event('visibilitychange'))
+
+      // Viewers cleared while hidden
+      await waitFor(() => {
+        expect(screen.queryByTestId('ticket-viewers')).not.toBeInTheDocument()
+      })
+
+      // Simulate tab visible again
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => 'visible',
+      })
+      document.dispatchEvent(new Event('visibilitychange'))
+
+      expect(subscribeSpy).toHaveBeenCalledTimes(2)
+
+      // Clean up visibilityState definition
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => 'visible',
+      })
+    })
+
+    it('leaves viewing presence when navigating to another ticket', async () => {
+      const liveClient = createMockLiveClient()
+      const subscribeSpy = vi.spyOn(liveClient, 'subscribeToTicketViewers')
+      const user = userEvent.setup()
+
+      render(
+        <TicketCockpit.Provider
+          tickets={INITIAL_MOCK_TICKETS}
+          initialTicketNumber={1001}
+          liveClient={liveClient}
+        >
+          <TicketCockpit.Frame>
+            <TicketCockpit.Queue />
+            <TicketCockpit.Detail />
+          </TicketCockpit.Frame>
+        </TicketCockpit.Provider>
+      )
+
+      expect(subscribeSpy).toHaveBeenCalledWith('ticket-1', expect.any(Function))
+
+      // Switch to ticket-2
+      const ticket2Row = screen.getByTestId('ticket-row-ticket-2')
+      await user.click(ticket2Row)
+
+      await waitFor(() => {
+        expect(subscribeSpy).toHaveBeenCalledWith('ticket-2', expect.any(Function))
+      })
+    })
+  })
 })

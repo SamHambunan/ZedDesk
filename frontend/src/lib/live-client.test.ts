@@ -262,5 +262,270 @@ describe('LiveClient and MockLiveClient', () => {
       recipient_member_id: 2,
     })
   })
+
+  it('subscribes to Organization presence channel, authorizes with channel_data, and tracks member joins and leaves', async () => {
+    const originalFetch = global.fetch
+    global.fetch = vi.fn().mockImplementation((url: string, _init?: RequestInit) => {
+      if (url.includes('/api/live/presence-channel')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            channel: 'presence-organization.1.members.gen100',
+            offline_grace_seconds: 30,
+          }),
+        })
+      }
+      if (url.includes('/api/broadcasting/auth')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            auth: 'sig-org-presence',
+            channel_data: JSON.stringify({
+              user_id: '1',
+              user_info: { member_id: 1, name: 'Alice' },
+            }),
+          }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+    })
+
+    const client = new LiveClient({
+      apiUrl: 'http://localhost:8000',
+      token: 'test-token',
+      webSocketClass: MockWebSocket as any,
+    })
+
+    await vi.advanceTimersByTimeAsync(10)
+    const socket = MockWebSocket.instances[0]
+    socket.receive({
+      event: 'pusher:connection_established',
+      data: JSON.stringify({ socket_id: '123.456' }),
+    })
+
+    const presenceSpy = vi.fn()
+    const unsubscribe = client.subscribeToOrganizationPresence?.(presenceSpy)
+
+    await vi.advanceTimersByTimeAsync(50)
+
+    const subscribeFrame = socket.sent.find((msg) => msg.includes('presence-organization.1.members.gen100'))
+    expect(subscribeFrame).toBeDefined()
+    expect(JSON.parse(subscribeFrame!)).toEqual({
+      event: 'pusher:subscribe',
+      data: {
+        channel: 'presence-organization.1.members.gen100',
+        auth: 'sig-org-presence',
+        channel_data: JSON.stringify({
+          user_id: '1',
+          user_info: { member_id: 1, name: 'Alice' },
+        }),
+      },
+    })
+
+    // Subscription succeeded snapshot
+    socket.receive({
+      event: 'pusher_internal:subscription_succeeded',
+      channel: 'presence-organization.1.members.gen100',
+      data: JSON.stringify({
+        presence: {
+          ids: ['1', '2'],
+          hash: {
+            '1': { member_id: 1, name: 'Alice' },
+            '2': { member_id: 2, name: 'Bob' },
+          },
+          count: 2,
+        },
+      }),
+    })
+
+    expect(presenceSpy).toHaveBeenCalledWith([
+      { member_id: 1, name: 'Alice' },
+      { member_id: 2, name: 'Bob' },
+    ])
+
+    // Member added
+    socket.receive({
+      event: 'pusher_internal:member_added',
+      channel: 'presence-organization.1.members.gen100',
+      data: JSON.stringify({
+        user_id: '3',
+        user_info: { member_id: 3, name: 'Charlie' },
+      }),
+    })
+
+    expect(presenceSpy).toHaveBeenLastCalledWith([
+      { member_id: 1, name: 'Alice' },
+      { member_id: 2, name: 'Bob' },
+      { member_id: 3, name: 'Charlie' },
+    ])
+
+    // Duplicate add for existing member (multi-tab) does not duplicate
+    socket.receive({
+      event: 'pusher_internal:member_added',
+      channel: 'presence-organization.1.members.gen100',
+      data: JSON.stringify({
+        user_id: '3',
+        user_info: { member_id: 3, name: 'Charlie' },
+      }),
+    })
+    expect(presenceSpy).toHaveBeenLastCalledWith([
+      { member_id: 1, name: 'Alice' },
+      { member_id: 2, name: 'Bob' },
+      { member_id: 3, name: 'Charlie' },
+    ])
+
+    // Member removed
+    socket.receive({
+      event: 'pusher_internal:member_removed',
+      channel: 'presence-organization.1.members.gen100',
+      data: JSON.stringify({
+        user_id: '2',
+      }),
+    })
+
+    expect(presenceSpy).toHaveBeenLastCalledWith([
+      { member_id: 1, name: 'Alice' },
+      { member_id: 3, name: 'Charlie' },
+    ])
+
+    // Unsubscribe sends pusher:unsubscribe
+    unsubscribe?.()
+    const unsubFrame = socket.sent.find((msg) => msg.includes('pusher:unsubscribe') && msg.includes('presence-organization.1.members.gen100'))
+    expect(unsubFrame).toBeDefined()
+
+    client.disconnect()
+    global.fetch = originalFetch
+  })
+
+  it('subscribes to Ticket viewing presence channel and tracks active ticket viewers', async () => {
+    const originalFetch = global.fetch
+    global.fetch = vi.fn().mockImplementation((url: string, _init?: RequestInit) => {
+      if (url.includes('/api/tickets/ticket-42/viewing-channel')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            channel: 'presence-ticket.ticket-42.viewers.gen100',
+            typing_expires_after_seconds: 5,
+          }),
+        })
+      }
+      if (url.includes('/api/broadcasting/auth')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            auth: 'sig-ticket-presence',
+            channel_data: JSON.stringify({
+              user_id: '1',
+              user_info: { member_id: 1, name: 'Alice' },
+            }),
+          }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+    })
+
+    const client = new LiveClient({
+      apiUrl: 'http://localhost:8000',
+      token: 'test-token',
+      webSocketClass: MockWebSocket as any,
+    })
+
+    await vi.advanceTimersByTimeAsync(10)
+    const socket = MockWebSocket.instances[0]
+    socket.receive({
+      event: 'pusher:connection_established',
+      data: JSON.stringify({ socket_id: '123.456' }),
+    })
+
+    const viewersSpy = vi.fn()
+    const unsubscribe = client.subscribeToTicketViewers?.('ticket-42', viewersSpy)
+
+    await vi.advanceTimersByTimeAsync(50)
+
+    const subscribeFrame = socket.sent.find((msg) => msg.includes('presence-ticket.ticket-42.viewers.gen100'))
+    expect(subscribeFrame).toBeDefined()
+
+    socket.receive({
+      event: 'pusher_internal:subscription_succeeded',
+      channel: 'presence-ticket.ticket-42.viewers.gen100',
+      data: JSON.stringify({
+        presence: {
+          ids: ['1'],
+          hash: {
+            '1': { member_id: 1, name: 'Alice' },
+          },
+          count: 1,
+        },
+      }),
+    })
+
+    expect(viewersSpy).toHaveBeenCalledWith([{ member_id: 1, name: 'Alice' }])
+
+    unsubscribe?.()
+    const unsubFrame = socket.sent.find((msg) => msg.includes('pusher:unsubscribe') && msg.includes('presence-ticket.ticket-42.viewers.gen100'))
+    expect(unsubFrame).toBeDefined()
+
+    client.disconnect()
+    global.fetch = originalFetch
+  })
+
+  it('handles denied authorization gracefully by clearing presence members', async () => {
+    const originalFetch = global.fetch
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/live/presence-channel')) {
+        return Promise.resolve({
+          ok: false,
+          status: 403,
+          json: () => Promise.resolve({ message: 'Forbidden' }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+    })
+
+    const client = new LiveClient({
+      apiUrl: 'http://localhost:8000',
+      token: 'bad-token',
+      webSocketClass: MockWebSocket as any,
+    })
+
+    await vi.advanceTimersByTimeAsync(10)
+    const socket = MockWebSocket.instances[0]
+    socket.receive({
+      event: 'pusher:connection_established',
+      data: JSON.stringify({ socket_id: '123.456' }),
+    })
+
+    const presenceSpy = vi.fn()
+    client.subscribeToOrganizationPresence?.(presenceSpy)
+
+    await vi.advanceTimersByTimeAsync(50)
+
+    expect(presenceSpy).toHaveBeenCalledWith([])
+
+    client.disconnect()
+    global.fetch = originalFetch
+  })
+
+  it('MockLiveClient supports presence and viewer emitting', () => {
+    const mock = createMockLiveClient()
+    const orgPresenceSpy = vi.fn()
+    const ticketViewersSpy = vi.fn()
+
+    mock.subscribeToOrganizationPresence?.(orgPresenceSpy)
+    mock.subscribeToTicketViewers?.('ticket-10', ticketViewersSpy)
+
+    mock.emitOrganizationPresence([
+      { member_id: 1, name: 'Alice' },
+      { member_id: 2, name: 'Bob' },
+    ])
+    expect(orgPresenceSpy).toHaveBeenCalledWith([
+      { member_id: 1, name: 'Alice' },
+      { member_id: 2, name: 'Bob' },
+    ])
+
+    mock.emitTicketViewers('ticket-10', [{ member_id: 1, name: 'Alice' }])
+    expect(ticketViewersSpy).toHaveBeenCalledWith([{ member_id: 1, name: 'Alice' }])
+  })
 })
+
 

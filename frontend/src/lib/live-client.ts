@@ -12,6 +12,11 @@ export interface InboxSignalPayload {
   readonly recipient_member_id: number
 }
 
+export interface PresenceMember {
+  readonly member_id: number
+  readonly name: string
+}
+
 export type LiveStatus = 'connecting' | 'connected' | 'disconnected'
 
 export interface ILiveClient {
@@ -25,6 +30,13 @@ export interface ILiveClient {
   ) => () => void
   readonly subscribeToNotifications?: (
     onSignal: (signal: InboxSignalPayload) => void
+  ) => () => void
+  readonly subscribeToOrganizationPresence?: (
+    onPresenceChange: (members: readonly PresenceMember[]) => void
+  ) => () => void
+  readonly subscribeToTicketViewers?: (
+    ticketId: string,
+    onViewersChange: (viewers: readonly PresenceMember[]) => void
   ) => () => void
   readonly onStatusChange: (listener: (status: LiveStatus) => void) => () => void
   readonly onReconnect: (listener: () => void) => () => void
@@ -68,10 +80,17 @@ export class LiveClient implements ILiveClient {
   private orgSignalListeners = new Set<(signal: LiveSignalPayload) => void>()
   private ticketSignalListeners = new Map<string, Set<(signal: LiveSignalPayload) => void>>()
   private notificationSignalListeners = new Set<(signal: InboxSignalPayload) => void>()
+  private orgPresenceListeners = new Set<(members: readonly PresenceMember[]) => void>()
+  private ticketViewersListeners = new Map<string, Set<(viewers: readonly PresenceMember[]) => void>>()
 
   private currentOrgChannel: string | null = null
   private currentTicketChannels = new Map<string, string>() // ticketId -> channelName
   private currentNotificationChannel: string | null = null
+  private currentOrgPresenceChannel: string | null = null
+  private currentOrgPresenceMembers = new Map<number, PresenceMember>()
+  private currentTicketViewingChannels = new Map<string, string>() // ticketId -> channelName
+  private currentTicketViewersMembers = new Map<string, Map<number, PresenceMember>>()
+  private channelToTicketId = new Map<string, string>() // channelName -> ticketId
 
   private readonly apiUrl: string
   private readonly token?: string | null
@@ -198,6 +217,15 @@ export class LiveClient implements ILiveClient {
       } else if (eventName === 'inbox.changed' || eventName === '.inbox.changed') {
         const payload: InboxSignalPayload = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data
         this.dispatchNotificationSignal(parsed.channel, payload)
+      } else if (eventName === 'pusher_internal:subscription_succeeded' || eventName === 'pusher:subscription_succeeded') {
+        const data = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data
+        this.dispatchPresenceSubscriptionSucceeded(parsed.channel, data)
+      } else if (eventName === 'pusher_internal:member_added' || eventName === 'pusher:member_added') {
+        const data = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data
+        this.dispatchPresenceMemberAdded(parsed.channel, data)
+      } else if (eventName === 'pusher_internal:member_removed' || eventName === 'pusher:member_removed') {
+        const data = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data
+        this.dispatchPresenceMemberRemoved(parsed.channel, data)
       }
     } catch {
       // Ignore unparseable frames
@@ -207,6 +235,110 @@ export class LiveClient implements ILiveClient {
   private send(message: unknown): void {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(message))
+    }
+  }
+
+  private parsePresenceMember(item: any): PresenceMember | null {
+    if (!item) return null
+    const memberId = Number(item.member_id ?? item.user_id)
+    if (Number.isNaN(memberId)) return null
+    const name = item.name ?? item.user_info?.name ?? `Member ${memberId}`
+    return { member_id: memberId, name }
+  }
+
+  private dispatchPresenceSubscriptionSucceeded(channel: string, data: any): void {
+    if (channel === this.currentOrgPresenceChannel) {
+      this.currentOrgPresenceMembers.clear()
+      if (data?.presence?.hash) {
+        for (const [idStr, info] of Object.entries(data.presence.hash)) {
+          const m = this.parsePresenceMember({ ...(info as object), user_id: idStr })
+          if (m) this.currentOrgPresenceMembers.set(m.member_id, m)
+        }
+      } else if (Array.isArray(data?.presence?.ids)) {
+        for (const id of data.presence.ids) {
+          const m = this.parsePresenceMember({ user_id: id })
+          if (m) this.currentOrgPresenceMembers.set(m.member_id, m)
+        }
+      }
+      this.dispatchOrgPresence()
+    } else if (this.channelToTicketId.has(channel)) {
+      const ticketId = this.channelToTicketId.get(channel)!
+      let membersMap = this.currentTicketViewersMembers.get(ticketId)
+      if (!membersMap) {
+        membersMap = new Map()
+        this.currentTicketViewersMembers.set(ticketId, membersMap)
+      }
+      membersMap.clear()
+      if (data?.presence?.hash) {
+        for (const [idStr, info] of Object.entries(data.presence.hash)) {
+          const m = this.parsePresenceMember({ ...(info as object), user_id: idStr })
+          if (m) membersMap.set(m.member_id, m)
+        }
+      } else if (Array.isArray(data?.presence?.ids)) {
+        for (const id of data.presence.ids) {
+          const m = this.parsePresenceMember({ user_id: id })
+          if (m) membersMap.set(m.member_id, m)
+        }
+      }
+      this.dispatchTicketViewers(ticketId)
+    }
+  }
+
+  private dispatchPresenceMemberAdded(channel: string, data: any): void {
+    if (channel === this.currentOrgPresenceChannel) {
+      const m = this.parsePresenceMember(data?.user_info ?? data)
+      if (m) {
+        this.currentOrgPresenceMembers.set(m.member_id, m)
+        this.dispatchOrgPresence()
+      }
+    } else if (this.channelToTicketId.has(channel)) {
+      const ticketId = this.channelToTicketId.get(channel)!
+      let membersMap = this.currentTicketViewersMembers.get(ticketId)
+      if (!membersMap) {
+        membersMap = new Map()
+        this.currentTicketViewersMembers.set(ticketId, membersMap)
+      }
+      const m = this.parsePresenceMember(data?.user_info ?? data)
+      if (m) {
+        membersMap.set(m.member_id, m)
+        this.dispatchTicketViewers(ticketId)
+      }
+    }
+  }
+
+  private dispatchPresenceMemberRemoved(channel: string, data: any): void {
+    const id = Number(data?.user_id ?? data?.member_id)
+    if (Number.isNaN(id)) return
+    if (channel === this.currentOrgPresenceChannel) {
+      if (this.currentOrgPresenceMembers.has(id)) {
+        this.currentOrgPresenceMembers.delete(id)
+        this.dispatchOrgPresence()
+      }
+    } else if (this.channelToTicketId.has(channel)) {
+      const ticketId = this.channelToTicketId.get(channel)!
+      const membersMap = this.currentTicketViewersMembers.get(ticketId)
+      if (membersMap && membersMap.has(id)) {
+        membersMap.delete(id)
+        this.dispatchTicketViewers(ticketId)
+      }
+    }
+  }
+
+  private dispatchOrgPresence(): void {
+    const list = Array.from(this.currentOrgPresenceMembers.values())
+    for (const listener of this.orgPresenceListeners) {
+      listener(list)
+    }
+  }
+
+  private dispatchTicketViewers(ticketId: string): void {
+    const membersMap = this.currentTicketViewersMembers.get(ticketId)
+    const list = membersMap ? Array.from(membersMap.values()) : []
+    const listeners = this.ticketViewersListeners.get(ticketId)
+    if (listeners) {
+      for (const listener of listeners) {
+        listener(list)
+      }
     }
   }
 
@@ -239,7 +371,7 @@ export class LiveClient implements ILiveClient {
     }
   }
 
-  private async authorizeChannel(channelName: string): Promise<string | null> {
+  private async authorizeChannel(channelName: string): Promise<{ auth: string; channel_data?: string } | null> {
     if (!this.socketId || !this.token) return null
     try {
       const url = `${this.apiUrl}/api/broadcasting/auth`
@@ -257,7 +389,11 @@ export class LiveClient implements ILiveClient {
       })
       if (!res.ok) return null
       const data = await res.json()
-      return data.auth ?? null
+      if (!data.auth) return null
+      return {
+        auth: data.auth,
+        channel_data: data.channel_data,
+      }
     } catch {
       return null
     }
@@ -265,14 +401,18 @@ export class LiveClient implements ILiveClient {
 
   private async subscribeChannel(channelName: string): Promise<void> {
     if (!this.socketId || !this.socket || this.socket.readyState !== WebSocket.OPEN) return
-    const auth = await this.authorizeChannel(channelName)
-    if (!auth) return
+    const authData = await this.authorizeChannel(channelName)
+    if (!authData) return
+    const data: Record<string, any> = {
+      channel: channelName,
+      auth: authData.auth,
+    }
+    if (authData.channel_data !== undefined) {
+      data.channel_data = authData.channel_data
+    }
     this.send({
       event: 'pusher:subscribe',
-      data: {
-        channel: channelName,
-        auth,
-      },
+      data,
     })
   }
 
@@ -293,7 +433,13 @@ export class LiveClient implements ILiveClient {
     if (this.currentNotificationChannel) {
       promises.push(this.subscribeChannel(this.currentNotificationChannel))
     }
+    if (this.currentOrgPresenceChannel) {
+      promises.push(this.subscribeChannel(this.currentOrgPresenceChannel))
+    }
     for (const channelName of this.currentTicketChannels.values()) {
+      promises.push(this.subscribeChannel(channelName))
+    }
+    for (const channelName of this.currentTicketViewingChannels.values()) {
       promises.push(this.subscribeChannel(channelName))
     }
     await Promise.all(promises)
@@ -432,6 +578,112 @@ export class LiveClient implements ILiveClient {
     }, this.channelRotationIntervalMs)
   }
 
+  public subscribeToOrganizationPresence(
+    onPresenceChange: (members: readonly PresenceMember[]) => void
+  ): () => void {
+    this.orgPresenceListeners.add(onPresenceChange)
+    onPresenceChange(Array.from(this.currentOrgPresenceMembers.values()))
+
+    if (!this.currentOrgPresenceChannel) {
+      this.discoverOrgPresenceChannel()
+    }
+
+    return () => {
+      this.orgPresenceListeners.delete(onPresenceChange)
+      if (this.orgPresenceListeners.size === 0 && this.currentOrgPresenceChannel) {
+        this.unsubscribeChannel(this.currentOrgPresenceChannel)
+        this.currentOrgPresenceChannel = null
+        this.currentOrgPresenceMembers.clear()
+      }
+    }
+  }
+
+  private async discoverOrgPresenceChannel(): Promise<void> {
+    try {
+      const headers: Record<string, string> = { Accept: 'application/json' }
+      if (this.token) headers.Authorization = `Bearer ${this.token}`
+      const res = await fetch(`${this.apiUrl}/api/live/presence-channel`, { headers })
+      if (!res.ok) {
+        this.currentOrgPresenceMembers.clear()
+        this.dispatchOrgPresence()
+        return
+      }
+      const data = await res.json()
+      if (data.channel) {
+        const oldChannel = this.currentOrgPresenceChannel
+        if (oldChannel && oldChannel !== data.channel) {
+          this.unsubscribeChannel(oldChannel)
+        }
+        this.currentOrgPresenceChannel = data.channel
+        await this.subscribeChannel(data.channel)
+      }
+    } catch {
+      this.currentOrgPresenceMembers.clear()
+      this.dispatchOrgPresence()
+    }
+  }
+
+  public subscribeToTicketViewers(
+    ticketId: string,
+    onViewersChange: (viewers: readonly PresenceMember[]) => void
+  ): () => void {
+    let listeners = this.ticketViewersListeners.get(ticketId)
+    if (!listeners) {
+      listeners = new Set()
+      this.ticketViewersListeners.set(ticketId, listeners)
+    }
+    listeners.add(onViewersChange)
+
+    const membersMap = this.currentTicketViewersMembers.get(ticketId)
+    onViewersChange(membersMap ? Array.from(membersMap.values()) : [])
+
+    this.discoverTicketViewingChannel(ticketId)
+
+    return () => {
+      const currentListeners = this.ticketViewersListeners.get(ticketId)
+      if (currentListeners) {
+        currentListeners.delete(onViewersChange)
+        if (currentListeners.size === 0) {
+          this.ticketViewersListeners.delete(ticketId)
+          const channelName = this.currentTicketViewingChannels.get(ticketId)
+          if (channelName) {
+            this.unsubscribeChannel(channelName)
+            this.currentTicketViewingChannels.delete(ticketId)
+            this.channelToTicketId.delete(channelName)
+            this.currentTicketViewersMembers.delete(ticketId)
+          }
+        }
+      }
+    }
+  }
+
+  private async discoverTicketViewingChannel(ticketId: string): Promise<void> {
+    try {
+      const headers: Record<string, string> = { Accept: 'application/json' }
+      if (this.token) headers.Authorization = `Bearer ${this.token}`
+      const res = await fetch(`${this.apiUrl}/api/tickets/${ticketId}/viewing-channel`, { headers })
+      if (!res.ok) {
+        this.currentTicketViewersMembers.get(ticketId)?.clear()
+        this.dispatchTicketViewers(ticketId)
+        return
+      }
+      const data = await res.json()
+      if (data.channel) {
+        const oldChannel = this.currentTicketViewingChannels.get(ticketId)
+        if (oldChannel && oldChannel !== data.channel) {
+          this.unsubscribeChannel(oldChannel)
+          this.channelToTicketId.delete(oldChannel)
+        }
+        this.currentTicketViewingChannels.set(ticketId, data.channel)
+        this.channelToTicketId.set(data.channel, ticketId)
+        await this.subscribeChannel(data.channel)
+      }
+    } catch {
+      this.currentTicketViewersMembers.get(ticketId)?.clear()
+      this.dispatchTicketViewers(ticketId)
+    }
+  }
+
   public async rotateChannels(): Promise<void> {
     const promises: Promise<void>[] = []
 
@@ -445,9 +697,19 @@ export class LiveClient implements ILiveClient {
       promises.push(this.discoverNotificationChannel())
     }
 
+    // Re-discover organization presence channel in parallel if active
+    if (this.orgPresenceListeners.size > 0) {
+      promises.push(this.discoverOrgPresenceChannel())
+    }
+
     // Re-discover all active ticket channels in parallel
     for (const ticketId of this.ticketSignalListeners.keys()) {
       promises.push(this.discoverTicketChannel(ticketId))
+    }
+
+    // Re-discover all active ticket viewing channels in parallel
+    for (const ticketId of this.ticketViewersListeners.keys()) {
+      promises.push(this.discoverTicketViewingChannel(ticketId))
     }
 
     await Promise.all(promises)
@@ -483,6 +745,10 @@ export class MockLiveClient implements ILiveClient {
   private readonly orgListeners = new Set<(signal: LiveSignalPayload) => void>()
   private readonly ticketListeners = new Map<string, Set<(signal: LiveSignalPayload) => void>>()
   private readonly notificationListeners = new Set<(signal: InboxSignalPayload) => void>()
+  private readonly orgPresenceListeners = new Set<(members: readonly PresenceMember[]) => void>()
+  private readonly ticketViewersListeners = new Map<string, Set<(viewers: readonly PresenceMember[]) => void>>()
+  private currentOrgPresence: readonly PresenceMember[] = []
+  private currentTicketViewers = new Map<string, readonly PresenceMember[]>()
 
   constructor(initialStatus: LiveStatus = 'connected') {
     this.status = initialStatus
@@ -517,6 +783,16 @@ export class MockLiveClient implements ILiveClient {
     }
   }
 
+  public subscribeToOrganizationPresence(
+    onPresenceChange: (members: readonly PresenceMember[]) => void
+  ): () => void {
+    this.orgPresenceListeners.add(onPresenceChange)
+    onPresenceChange(this.currentOrgPresence)
+    return () => {
+      this.orgPresenceListeners.delete(onPresenceChange)
+    }
+  }
+
   public subscribeToTicket(ticketId: string, onSignal: (signal: LiveSignalPayload) => void): () => void {
     let set = this.ticketListeners.get(ticketId)
     if (!set) {
@@ -530,6 +806,28 @@ export class MockLiveClient implements ILiveClient {
         current.delete(onSignal)
         if (current.size === 0) {
           this.ticketListeners.delete(ticketId)
+        }
+      }
+    }
+  }
+
+  public subscribeToTicketViewers(
+    ticketId: string,
+    onViewersChange: (viewers: readonly PresenceMember[]) => void
+  ): () => void {
+    let set = this.ticketViewersListeners.get(ticketId)
+    if (!set) {
+      set = new Set()
+      this.ticketViewersListeners.set(ticketId, set)
+    }
+    set.add(onViewersChange)
+    onViewersChange(this.currentTicketViewers.get(ticketId) ?? [])
+    return () => {
+      const current = this.ticketViewersListeners.get(ticketId)
+      if (current) {
+        current.delete(onViewersChange)
+        if (current.size === 0) {
+          this.ticketViewersListeners.delete(ticketId)
         }
       }
     }
@@ -552,6 +850,23 @@ export class MockLiveClient implements ILiveClient {
   public emitInboxSignal(signal: InboxSignalPayload): void {
     for (const listener of this.notificationListeners) {
       listener(signal)
+    }
+  }
+
+  public emitOrganizationPresence(members: readonly PresenceMember[]): void {
+    this.currentOrgPresence = members
+    for (const listener of this.orgPresenceListeners) {
+      listener(members)
+    }
+  }
+
+  public emitTicketViewers(ticketId: string, viewers: readonly PresenceMember[]): void {
+    this.currentTicketViewers.set(ticketId, viewers)
+    const listeners = this.ticketViewersListeners.get(ticketId)
+    if (listeners) {
+      for (const listener of listeners) {
+        listener(viewers)
+      }
     }
   }
 

@@ -2,9 +2,11 @@ import React from 'react'
 import { Radio } from 'lucide-react'
 import type { OverviewAgent } from './types'
 import { getInitials } from './types'
+import type { PresenceMember } from '../../lib/live-client'
 
 export interface ShiftRosterProps {
   readonly agents: readonly OverviewAgent[]
+  readonly onlineMembers?: readonly PresenceMember[]
 }
 
 function getStatusDotClass(status: OverviewAgent['status']): string {
@@ -13,7 +15,7 @@ function getStatusDotClass(status: OverviewAgent['status']): string {
   return 'bg-sentiment-neutral'
 }
 
-export const ShiftRoster: React.FC<ShiftRosterProps> = ({ agents }) => {
+export const ShiftRoster: React.FC<ShiftRosterProps> = ({ agents, onlineMembers }) => {
   return (
     <div
       data-testid="on-duty-shift-roster"
@@ -101,6 +103,78 @@ export const ShiftRoster: React.FC<ShiftRosterProps> = ({ agents }) => {
           })
         )}
       </div>
+
+      {/* Online Members Subsection (Issue #151: Transient Presence, distinct from On-Duty / Workload) */}
+      {onlineMembers !== undefined && (
+        <div
+          data-testid="online-members-subsection"
+          className="border-t border-border-subtle pt-4 mt-4 space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-sentiment-positive shadow-[0_0_4px_rgba(16,185,129,0.5)]" />
+              <h3 className="text-headline-sm font-semibold text-text-primary">
+                Online
+              </h3>
+              <span
+                data-testid="online-members-count"
+                className="text-xs font-mono-data text-sentiment-positive tabular-nums"
+              >
+                ({onlineMembers.length})
+              </span>
+            </div>
+            <span className="text-[10px] font-mono-data text-text-muted">
+              Connected Presence
+            </span>
+          </div>
+          <p className="text-[11px] font-mono-data text-text-muted">
+            Connected organization members (transient presence, distinct from on-duty schedule or ticket workload).
+          </p>
+
+          {onlineMembers.length === 0 ? (
+            <div
+              data-testid="online-members-empty"
+              className="text-center py-4 text-text-muted text-xs font-mono-data border border-dashed border-border-subtle rounded-lg"
+            >
+              No members currently online.
+            </div>
+          ) : (
+            <div className="space-y-2" data-testid="online-members-list">
+              {onlineMembers.map((member) => {
+                const initials = getInitials(member.name)
+                return (
+                  <div
+                    key={member.member_id}
+                    data-testid={`online-member-${member.member_id}`}
+                    className="bg-surface-subpanel/40 border border-border-subtle rounded-lg p-2.5 flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        data-testid={`online-member-initials-${member.member_id}`}
+                        className="w-7 h-7 rounded-md bg-surface-container border border-border-prominent text-xs font-mono-data font-semibold text-text-primary flex items-center justify-center shrink-0 shadow-xs"
+                      >
+                        {initials}
+                      </div>
+                      <span
+                        data-testid={`online-member-name-${member.member_id}`}
+                        className="text-body-default text-text-primary font-medium truncate"
+                      >
+                        {member.name}
+                      </span>
+                    </div>
+                    <span
+                      data-testid={`online-member-badge-${member.member_id}`}
+                      className="text-[10px] font-mono-data font-semibold text-sentiment-positive bg-sentiment-positive/10 border border-sentiment-positive/20 px-2 py-0.5 rounded-full shrink-0"
+                    >
+                      Connected
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
