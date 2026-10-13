@@ -9,6 +9,7 @@ import type {
   TicketTag,
 } from './types'
 import type { ComposerSubmitPayload } from './TicketComposer'
+import type { PresenceMember } from '../../lib/live-client'
 
 export interface CompoundFilters {
   readonly status: TicketStatus | 'all'
@@ -46,6 +47,7 @@ export interface TicketCockpitState {
   readonly hasPendingQueueReorder?: boolean
   readonly isOutsidePreset?: boolean
   readonly isUnavailable?: boolean
+  readonly ticketViewers?: readonly PresenceMember[]
 }
 
 export interface TicketCockpitActions {

@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-query'
 import { queryClient as defaultQueryClient } from '../../lib/query-client'
 import apiClient, { getAuthToken } from '../../lib/api-client'
+import { useOrganizationPresence } from '../../hooks/useOrganizationPresence'
 import { WorkspaceShellContext } from '../workspace/WorkspaceShellContext'
 import { ContextRibbon } from './ContextRibbon'
 import { TeamCapacityLanes } from './TeamCapacityLanes'
@@ -54,6 +55,10 @@ const WorkspaceOverviewInner: React.FC<WorkspaceOverviewProps> = (props) => {
 
   // Optimistic tracking for claimed tickets to immediately decrement unassigned counters
   const [claimedTicketIds, setClaimedTicketIds] = useState<readonly string[]>([])
+
+  // Live organization presence tracking (Issue #151)
+  const effectiveLiveClient = props.liveClient ?? shellContext?.liveClient
+  const effectiveOnlineMembers = useOrganizationPresence(effectiveLiveClient, props.onlineMembers)
 
   const getRequestConfig = () => {
     return effectiveToken ? { headers: { Authorization: `Bearer ${effectiveToken}` } } : {}
@@ -383,7 +388,10 @@ const WorkspaceOverviewInner: React.FC<WorkspaceOverviewProps> = (props) => {
           aria-label="Action and Dispatch Ledger"
           className="w-full lg:w-[35%] flex flex-col gap-6 shrink-0"
         >
-          <ShiftRoster agents={effectiveAgents} />
+          <ShiftRoster
+            agents={effectiveAgents}
+            onlineMembers={effectiveOnlineMembers}
+          />
 
           <PendingInvitationsLedger
             invitations={effectiveInvitations}
