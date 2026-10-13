@@ -187,7 +187,7 @@ describe('LiveClient and MockLiveClient', () => {
 
   it('authorizes and subscribes to member notification channel and dispatches inbox.changed', async () => {
     const originalFetch = global.fetch
-    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+    global.fetch = vi.fn().mockImplementation((url: string, _init?: RequestInit) => {
       if (url.includes('/api/live/notification-channel')) {
         return Promise.resolve({
           ok: true,

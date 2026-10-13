@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -115,7 +114,7 @@ describe('NotificationHistoryView Component', () => {
     const totalAll = options.totalAll ?? items.length
     const totalUnread = options.totalUnread ?? items.filter((i) => i.read_at === null).length
 
-    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+    global.fetch = vi.fn().mockImplementation((url: string, _init?: RequestInit) => {
       const urlStr = String(url)
 
       if (urlStr.includes('/api/notifications/unread-count')) {

@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import App from './App'
 import { queryClient } from './lib/query-client'
-import { createMockLiveClient } from './lib/live-client'
 import type { NotificationItem } from './components/notifications/types'
 
 describe('Organization Notification Bell and History Harness', () => {
@@ -101,7 +100,7 @@ describe('Organization Notification Bell and History Harness', () => {
     let items = [...mockNotifications]
     let unreadCount = items.filter((i) => i.read_at === null).length
 
-    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+    global.fetch = vi.fn().mockImplementation((url: string, _init?: RequestInit) => {
       const urlStr = String(url)
 
       if (urlStr.includes('/api/workspace')) {

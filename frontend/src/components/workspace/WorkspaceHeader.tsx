@@ -3,7 +3,6 @@ import {
   Sparkles,
   Search,
   ChevronsUpDown,
-  Bell,
   LogOut,
   ExternalLink,
   Check,

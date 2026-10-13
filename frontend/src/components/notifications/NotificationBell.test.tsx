@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -132,7 +131,7 @@ describe('NotificationBell Component', () => {
     let unreadCount = overrides.unreadCount ?? 3
     let recentItems = overrides.recentItems ? [...overrides.recentItems] : [...mockRecentNotifications]
 
-    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+    global.fetch = vi.fn().mockImplementation((url: string, _init?: RequestInit) => {
       const urlStr = String(url)
 
       if (urlStr.includes('/api/notifications/unread-count')) {
