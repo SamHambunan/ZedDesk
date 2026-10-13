@@ -1,14 +1,17 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { TicketCockpit } from './TicketCockpit'
 import { useTicketCockpit, DEFAULT_COMPOUND_FILTERS } from './TicketCockpitContext'
 import { TicketQueueView } from './TicketQueueView'
 import { INITIAL_MOCK_TICKETS, MOCK_TEAMS, MOCK_MEMBERS, MOCK_TAGS_POOL } from './mockData'
+import { createMockLiveClient } from '../../lib/live-client'
+import { queryClient } from '../../lib/query-client'
 
 describe('TicketCockpit Compound Component Baseline', () => {
   beforeEach(() => {
     window.history.pushState({}, '', '/')
+    queryClient.clear()
   })
 
   it('exposes generic TicketCockpitContextValue with state, actions, and meta via use()', () => {
@@ -641,5 +644,750 @@ describe('TicketCockpit Compound Component Baseline', () => {
     )
 
     consoleError.mockRestore()
+  })
+})
+
+describe('Live Signals and Authorized REST Refresh (Issue #149)', () => {
+  const originalFetch = global.fetch
+
+  beforeEach(() => {
+    window.history.pushState({}, '', '/')
+    global.fetch = originalFetch
+    queryClient.clear()
+  })
+
+  afterEach(() => {
+    global.fetch = originalFetch
+    queryClient.clear()
+  })
+
+  it('subscribes to Organization and selected Ticket channels and refetches authoritative REST data on relevant signal', async () => {
+    const liveClient = createMockLiveClient('connected')
+    let ticket1Subject = 'Initial Subject 1'
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/tickets?')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: [
+                {
+                  id: 'ticket-1',
+                  ticket_number: 1001,
+                  subject: ticket1Subject,
+                  status: 'open',
+                  priority: 'medium',
+                  revision: 1,
+                  customer: { id: 'c1', name: 'Alice Customer', email: 'alice@example.com' },
+                  created_at: '2026-10-10T10:00:00Z',
+                  updated_at: '2026-10-10T10:00:00Z',
+                },
+                {
+                  id: 'ticket-2',
+                  ticket_number: 1002,
+                  subject: 'Second Ticket',
+                  status: 'open',
+                  priority: 'low',
+                  revision: 1,
+                  customer: { id: 'c2', name: 'Bob Customer', email: 'bob@example.com' },
+                  created_at: '2026-10-10T09:00:00Z',
+                  updated_at: '2026-10-10T09:00:00Z',
+                },
+              ],
+            }),
+        })
+      }
+      if (url.includes('/api/tickets/ticket-1')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: {
+                id: 'ticket-1',
+                ticket_number: 1001,
+                subject: ticket1Subject,
+                status: 'open',
+                priority: 'medium',
+                revision: ticket1Subject === 'Refreshed Authoritative Subject' ? 2 : 1,
+                customer: { id: 'c1', name: 'Alice Customer', email: 'alice@example.com' },
+                messages: [
+                  {
+                    id: 'msg-1',
+                    body: 'First message',
+                    message_type: 'public_reply',
+                    author_type: 'Customer',
+                    author_name: 'Alice Customer',
+                    created_at: '2026-10-10T10:00:00Z',
+                  },
+                ],
+              },
+            }),
+        })
+      }
+      if (url.includes('/api/tags')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+    })
+
+    render(
+      <TicketCockpit.Provider
+        apiUrl="http://localhost:8000"
+        token="valid-bearer-token"
+        liveClient={liveClient}
+        teams={MOCK_TEAMS}
+        members={MOCK_MEMBERS}
+        allTags={MOCK_TAGS_POOL}
+      >
+        <TicketCockpit.Frame>
+          <TicketCockpit.SubRail />
+          <TicketCockpit.Queue />
+          <TicketCockpit.Detail />
+          <TicketCockpit.Inspector />
+        </TicketCockpit.Frame>
+      </TicketCockpit.Provider>
+    )
+
+    // Initial render displays ticket 1001 with Initial Subject 1
+    await waitFor(() => {
+      expect(screen.getByTestId('ticket-subject-ticket-1')).toHaveTextContent('Initial Subject 1')
+      expect(screen.getByTestId('detail-subject')).toHaveTextContent('Initial Subject 1')
+    })
+
+    // Now update server state and emit live signal
+    ticket1Subject = 'Refreshed Authoritative Subject'
+    liveClient.emitSignal({
+      event_id: 'sig-1',
+      organization_id: 1,
+      ticket_id: 'ticket-1',
+      change_type: 'status_changed',
+      revision: 2,
+    })
+
+    // Assert that authoritative REST query was refetched and view displays updated subject
+    await waitFor(() => {
+      expect(screen.getByTestId('ticket-subject-ticket-1')).toHaveTextContent('Refreshed Authoritative Subject')
+      expect(screen.getByTestId('detail-subject')).toHaveTextContent('Refreshed Authoritative Subject')
+    })
+  })
+
+  it('ignores duplicate event IDs and older revisions without disturbing the view', async () => {
+    const liveClient = createMockLiveClient('connected')
+    let fetchCallCount = 0
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/tickets?')) {
+        fetchCallCount++
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: [
+                {
+                  id: 'ticket-1',
+                  ticket_number: 1001,
+                  subject: 'Stable Ticket',
+                  status: 'open',
+                  priority: 'medium',
+                  revision: 5,
+                  customer: { id: 'c1', name: 'Alice Customer', email: 'alice@example.com' },
+                },
+              ],
+            }),
+        })
+      }
+      if (url.includes('/api/tickets/ticket-1')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: {
+                id: 'ticket-1',
+                ticket_number: 1001,
+                subject: 'Stable Ticket',
+                status: 'open',
+                priority: 'medium',
+                revision: 5,
+                customer: { id: 'c1', name: 'Alice Customer', email: 'alice@example.com' },
+                messages: [],
+              },
+            }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) })
+    })
+
+    render(
+      <TicketCockpit.Provider
+        apiUrl="http://localhost:8000"
+        token="valid-bearer-token"
+        liveClient={liveClient}
+        teams={MOCK_TEAMS}
+        members={MOCK_MEMBERS}
+        allTags={MOCK_TAGS_POOL}
+      >
+        <TicketCockpit.Frame>
+          <TicketCockpit.Queue />
+          <TicketCockpit.Detail />
+        </TicketCockpit.Frame>
+      </TicketCockpit.Provider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ticket-subject-ticket-1')).toHaveTextContent('Stable Ticket')
+    })
+
+    const initialFetchCount = fetchCallCount
+
+    // Emit duplicate signal with already seen event_id
+    liveClient.emitSignal({
+      event_id: 'duplicate-evt-1',
+      organization_id: 1,
+      ticket_id: 'ticket-1',
+      change_type: 'priority_changed',
+      revision: 6,
+    })
+
+    await waitFor(() => {
+      expect(fetchCallCount).toBeGreaterThan(initialFetchCount)
+    })
+    const countAfterFirst = fetchCallCount
+
+    // Emit exact same event_id again -> must be ignored
+    liveClient.emitSignal({
+      event_id: 'duplicate-evt-1',
+      organization_id: 1,
+      ticket_id: 'ticket-1',
+      change_type: 'priority_changed',
+      revision: 6,
+    })
+
+    // Emit older revision signal (revision 3 <= 6) -> must be ignored
+    liveClient.emitSignal({
+      event_id: 'older-rev-evt',
+      organization_id: 1,
+      ticket_id: 'ticket-1',
+      change_type: 'priority_changed',
+      revision: 3,
+    })
+
+    // View remains completely stable with same fetch count
+    expect(fetchCallCount).toBe(countAfterFirst)
+    expect(screen.getByTestId('ticket-subject-ticket-1')).toHaveTextContent('Stable Ticket')
+  })
+
+  it('recovers current REST state on reconnect and channel rotation', async () => {
+    const liveClient = createMockLiveClient('connected')
+    let currentStatus = 'open'
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/tickets?')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: [
+                {
+                  id: 'ticket-1',
+                  ticket_number: 1001,
+                  subject: 'Reconnecting Ticket',
+                  status: currentStatus,
+                  priority: 'medium',
+                  revision: 2,
+                  customer: { id: 'c1', name: 'Alice Customer', email: 'alice@example.com' },
+                },
+              ],
+            }),
+        })
+      }
+      if (url.includes('/api/tickets/ticket-1')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: {
+                id: 'ticket-1',
+                ticket_number: 1001,
+                subject: 'Reconnecting Ticket',
+                status: currentStatus,
+                priority: 'medium',
+                revision: 2,
+                customer: { id: 'c1', name: 'Alice Customer', email: 'alice@example.com' },
+                messages: [],
+              },
+            }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) })
+    })
+
+    render(
+      <TicketCockpit.Provider
+        apiUrl="http://localhost:8000"
+        token="valid-bearer-token"
+        liveClient={liveClient}
+        teams={MOCK_TEAMS}
+        members={MOCK_MEMBERS}
+        allTags={MOCK_TAGS_POOL}
+      >
+        <TicketCockpit.Frame>
+          <TicketCockpit.Queue />
+          <TicketCockpit.Detail />
+        </TicketCockpit.Frame>
+      </TicketCockpit.Provider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ticket-status-ticket-1')).toHaveTextContent(/open/i)
+    })
+
+    // Change server state during disconnect
+    currentStatus = 'pending'
+    liveClient.simulateDisconnect()
+    await waitFor(() => {
+      expect(screen.getByTestId('live-status-indicator')).toBeInTheDocument()
+    })
+
+    // Reconnect recovers current state
+    liveClient.simulateReconnect()
+    await waitFor(() => {
+      expect(screen.getByTestId('ticket-status-ticket-1')).toHaveTextContent(/pending/i)
+      expect(screen.queryByTestId('live-status-indicator')).not.toBeInTheDocument()
+    })
+
+    // Channel rotation also recovers current state
+    currentStatus = 'new'
+    await liveClient.rotateChannels?.()
+    await waitFor(() => {
+      expect(screen.getByTestId('ticket-status-ticket-1')).toHaveTextContent(/new/i)
+    })
+  })
+
+  it('updates visible rows in place, keeps selection stable, and applies changed queue order deliberately via New activity', async () => {
+    const user = userEvent.setup()
+    const liveClient = createMockLiveClient('connected')
+    let currentQueue = [
+      {
+        id: 'ticket-1',
+        ticket_number: 1001,
+        subject: 'First in Queue',
+        status: 'open',
+        priority: 'medium',
+        revision: 1,
+        customer: { id: 'c1', name: 'Alice', email: 'alice@example.com' },
+        updated_at: '2026-10-10T10:00:00Z',
+      },
+      {
+        id: 'ticket-2',
+        ticket_number: 1002,
+        subject: 'Second in Queue',
+        status: 'open',
+        priority: 'low',
+        revision: 1,
+        customer: { id: 'c2', name: 'Bob', email: 'bob@example.com' },
+        updated_at: '2026-10-10T09:00:00Z',
+      },
+    ]
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/tickets?')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ data: currentQueue }),
+        })
+      }
+      if (url.includes('/api/tickets/ticket-1')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: {
+                id: 'ticket-1',
+                ticket_number: 1001,
+                subject: 'First in Queue',
+                status: 'open',
+                priority: 'medium',
+                revision: 2,
+                customer: { id: 'c1', name: 'Alice', email: 'alice@example.com' },
+                messages: [],
+              },
+            }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) })
+    })
+
+    render(
+      <TicketCockpit.Provider
+        apiUrl="http://localhost:8000"
+        token="valid-bearer-token"
+        liveClient={liveClient}
+        teams={MOCK_TEAMS}
+        members={MOCK_MEMBERS}
+        allTags={MOCK_TAGS_POOL}
+      >
+        <TicketCockpit.Frame>
+          <TicketCockpit.Queue />
+          <TicketCockpit.Detail />
+        </TicketCockpit.Frame>
+      </TicketCockpit.Provider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ticket-row-ticket-1')).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByTestId('ticket-subject-ticket-1')).toHaveTextContent('First in Queue')
+    })
+
+    // Now a new ticket arrives and ticket-2 has new activity making it newer than ticket-1
+    currentQueue = [
+      {
+        id: 'ticket-3',
+        ticket_number: 1003,
+        subject: 'Newly Created Ticket',
+        status: 'new',
+        priority: 'urgent',
+        revision: 1,
+        customer: { id: 'c3', name: 'Charlie', email: 'charlie@example.com' },
+        updated_at: '2026-10-10T11:00:00Z',
+      },
+      {
+        id: 'ticket-2',
+        ticket_number: 1002,
+        subject: 'Second in Queue (Updated)',
+        status: 'pending',
+        priority: 'high',
+        revision: 2,
+        customer: { id: 'c2', name: 'Bob', email: 'bob@example.com' },
+        updated_at: '2026-10-10T10:30:00Z',
+      },
+      {
+        id: 'ticket-1',
+        ticket_number: 1001,
+        subject: 'First in Queue',
+        status: 'open',
+        priority: 'medium',
+        revision: 1,
+        customer: { id: 'c1', name: 'Alice', email: 'alice@example.com' },
+        updated_at: '2026-10-10T10:00:00Z',
+      },
+    ]
+
+    // Emit live signal for ticket creation
+    liveClient.emitSignal({
+      event_id: 'signal-created-3',
+      organization_id: 1,
+      ticket_id: 'ticket-3',
+      change_type: 'created',
+      revision: 1,
+    })
+
+    // 1. Visible rows update in place: ticket-2's status changed to pending, but ticket-1 is STILL the first displayed card
+    await waitFor(() => {
+      expect(screen.getByTestId('ticket-status-ticket-2')).toHaveTextContent(/pending/i)
+      expect(screen.getByTestId('new-activity-btn')).toBeInTheDocument()
+    })
+
+    // Assert that the order is HELD: ticket-1 is still the first card rendered, and remains selected
+    const rows = screen.getAllByRole('button', { name: /#100/i })
+    expect(rows[0]).toHaveAttribute('data-testid', 'ticket-row-ticket-1')
+    expect(screen.getByTestId('ticket-row-ticket-1')).toHaveAttribute('aria-pressed', 'true')
+    // ticket-3 is not yet displayed in the held order
+    expect(screen.queryByTestId('ticket-row-ticket-3')).not.toBeInTheDocument()
+
+    // 2. Click "New activity" to deliberately apply changed queue order
+    await user.click(screen.getByTestId('new-activity-btn'))
+
+    // Now ticket-3 is at the top of the queue and the "New activity" button is gone
+    await waitFor(() => {
+      expect(screen.queryByTestId('new-activity-btn')).not.toBeInTheDocument()
+      expect(screen.getByTestId('ticket-row-ticket-3')).toBeInTheDocument()
+    })
+
+    const updatedRows = screen.getAllByRole('button', { name: /#100/i })
+    expect(updatedRows[0]).toHaveAttribute('data-testid', 'ticket-row-ticket-3')
+    // ticket-1 selection remains preserved
+    expect(screen.getByTestId('ticket-row-ticket-1')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('keeps selected ticket open with outside-queue-notice when ticket moves outside active preset', async () => {
+    const liveClient = createMockLiveClient('connected')
+    let ticket1Status = 'open'
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/tickets?')) {
+        const list = ticket1Status === 'resolved' ? [] : [
+          {
+            id: 'ticket-1',
+            ticket_number: 1001,
+            subject: 'Ticket to Resolve',
+            status: ticket1Status,
+            priority: 'medium',
+            revision: 1,
+            customer: { id: 'c1', name: 'Alice', email: 'alice@example.com' },
+          },
+        ]
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: list }) })
+      }
+      if (url.includes('/api/tickets/ticket-1')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: {
+                id: 'ticket-1',
+                ticket_number: 1001,
+                subject: 'Ticket to Resolve',
+                status: ticket1Status,
+                priority: 'medium',
+                revision: ticket1Status === 'resolved' ? 2 : 1,
+                customer: { id: 'c1', name: 'Alice', email: 'alice@example.com' },
+                messages: [],
+              },
+            }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) })
+    })
+
+    render(
+      <TicketCockpit.Provider
+        apiUrl="http://localhost:8000"
+        token="valid-bearer-token"
+        liveClient={liveClient}
+        initialPreset="all_open"
+        teams={MOCK_TEAMS}
+        members={MOCK_MEMBERS}
+        allTags={MOCK_TAGS_POOL}
+      >
+        <TicketCockpit.Frame>
+          <TicketCockpit.SubRail />
+          <TicketCockpit.Queue />
+          <TicketCockpit.Detail />
+        </TicketCockpit.Frame>
+      </TicketCockpit.Provider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('detail-subject')).toHaveTextContent('Ticket to Resolve')
+      expect(screen.queryByTestId('outside-queue-notice')).not.toBeInTheDocument()
+    })
+
+    // Ticket is marked resolved on backend and signal arrives
+    ticket1Status = 'resolved'
+    liveClient.emitSignal({
+      event_id: 'sig-resolved',
+      organization_id: 1,
+      ticket_id: 'ticket-1',
+      change_type: 'status_changed',
+      revision: 2,
+    })
+
+    // Selected ticket stays open in detail view and displays outside-queue-notice
+    await waitFor(() => {
+      expect(screen.getByTestId('outside-queue-notice')).toBeInTheDocument()
+      expect(screen.getByTestId('outside-queue-notice')).toHaveTextContent('Outside this queue')
+      expect(screen.getByTestId('detail-subject')).toHaveTextContent('Ticket to Resolve')
+    })
+  })
+
+  it('replaces detail with unavailable state and clears protected content when ticket is deleted or inaccessible', async () => {
+    const liveClient = createMockLiveClient('connected')
+    let isDeleted = false
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/tickets?')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: isDeleted
+                ? []
+                : [
+                    {
+                      id: 'ticket-1',
+                      ticket_number: 1001,
+                      subject: 'Top Secret Subject',
+                      status: 'open',
+                      priority: 'high',
+                      revision: 1,
+                      customer: { id: 'c1', name: 'Secret Customer', email: 'secret@example.com' },
+                    },
+                  ],
+            }),
+        })
+      }
+      if (url.includes('/api/tickets/ticket-1')) {
+        if (isDeleted) {
+          return Promise.resolve({
+            ok: false,
+            status: 404,
+            json: () => Promise.resolve({ message: 'Ticket not found' }),
+          })
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: {
+                id: 'ticket-1',
+                ticket_number: 1001,
+                subject: 'Top Secret Subject',
+                status: 'open',
+                priority: 'high',
+                revision: 1,
+                customer: { id: 'c1', name: 'Secret Customer', email: 'secret@example.com' },
+                messages: [
+                  {
+                    id: 'msg-1',
+                    body: 'Confidential conversation body',
+                    message_type: 'public_reply',
+                    author_type: 'Customer',
+                    author_name: 'Secret Customer',
+                    created_at: '2026-10-10T10:00:00Z',
+                  },
+                ],
+              },
+            }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) })
+    })
+
+    render(
+      <TicketCockpit.Provider
+        apiUrl="http://localhost:8000"
+        token="valid-bearer-token"
+        liveClient={liveClient}
+        teams={MOCK_TEAMS}
+        members={MOCK_MEMBERS}
+        allTags={MOCK_TAGS_POOL}
+      >
+        <TicketCockpit.Frame>
+          <TicketCockpit.Queue />
+          <TicketCockpit.Detail />
+          <TicketCockpit.Inspector />
+        </TicketCockpit.Frame>
+      </TicketCockpit.Provider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('detail-subject')).toHaveTextContent('Top Secret Subject')
+      expect(screen.getByText('Confidential conversation body')).toBeInTheDocument()
+      expect(screen.getByTestId('customer-name')).toHaveTextContent('Secret Customer')
+    })
+
+    // Now ticket is deleted
+    isDeleted = true
+    liveClient.emitSignal({
+      event_id: 'sig-del',
+      organization_id: 1,
+      ticket_id: 'ticket-1',
+      change_type: 'deleted',
+      revision: 2,
+    })
+
+    // Detail replaces content with unavailable state
+    await waitFor(() => {
+      expect(screen.getByTestId('ticket-unavailable-state')).toBeInTheDocument()
+      expect(screen.getByTestId('ticket-unavailable-state')).toHaveTextContent('Ticket unavailable')
+    })
+
+    // Crucially: protected content MUST NOT be retained in view!
+    expect(screen.queryByText('Top Secret Subject')).not.toBeInTheDocument()
+    expect(screen.queryByText('Confidential conversation body')).not.toBeInTheDocument()
+    expect(screen.queryByText('secret@example.com')).not.toBeInTheDocument()
+    expect(screen.getByTestId('inspector-unavailable')).toHaveTextContent('Ticket unavailable')
+    expect(screen.queryByTestId('customer-name')).not.toBeInTheDocument()
+  })
+
+  it('displays disconnected status while live delivery is paused and preserves usable REST actions', async () => {
+    const user = userEvent.setup()
+    const liveClient = createMockLiveClient('disconnected')
+    let claimCalled = false
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/tickets?')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: [
+                {
+                  id: 'ticket-1',
+                  ticket_number: 1001,
+                  subject: 'Intake Ticket',
+                  status: 'new',
+                  priority: 'medium',
+                  revision: 1,
+                  assigned_member_id: null,
+                  customer: { id: 'c1', name: 'Alice', email: 'alice@example.com' },
+                },
+              ],
+            }),
+        })
+      }
+      if (url.includes('/api/tickets/ticket-1/claim')) {
+        claimCalled = true
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        })
+      }
+      if (url.includes('/api/tickets/ticket-1')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: {
+                id: 'ticket-1',
+                ticket_number: 1001,
+                subject: 'Intake Ticket',
+                status: 'new',
+                priority: 'medium',
+                revision: 1,
+                customer: { id: 'c1', name: 'Alice', email: 'alice@example.com' },
+                messages: [],
+              },
+            }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) })
+    })
+
+    render(
+      <TicketCockpit.Provider
+        apiUrl="http://localhost:8000"
+        token="valid-bearer-token"
+        liveClient={liveClient}
+        teams={MOCK_TEAMS}
+        members={MOCK_MEMBERS}
+        allTags={MOCK_TAGS_POOL}
+      >
+        <TicketCockpit.Frame>
+          <TicketCockpit.SubRail />
+          <TicketCockpit.Queue />
+          <TicketCockpit.Detail />
+          <TicketCockpit.Inspector />
+        </TicketCockpit.Frame>
+      </TicketCockpit.Provider>
+    )
+
+    // Verify small disconnected status is visible and ticket is loaded
+    await waitFor(() => {
+      expect(screen.getByTestId('live-status-indicator')).toBeInTheDocument()
+      expect(screen.getByTestId('live-status-indicator')).toHaveTextContent('Live delivery paused')
+      expect(screen.getByTestId('subrail-disconnected-badge')).toHaveTextContent('Paused')
+      expect(screen.getByTestId('claim-ticket-btn')).toBeInTheDocument()
+    })
+
+    // REST Ticket actions remain usable during paused live delivery
+    const claimBtn = screen.getByTestId('claim-ticket-btn')
+    expect(claimBtn).toBeEnabled()
+    await user.click(claimBtn)
+
+    await waitFor(() => {
+      expect(claimCalled).toBe(true)
+    })
   })
 })

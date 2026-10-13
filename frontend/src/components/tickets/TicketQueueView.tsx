@@ -4,6 +4,7 @@ import type {
   TicketCustomer,
   PresetFilter,
 } from './types'
+import type { ILiveClient } from '../../lib/live-client'
 import {
   MOCK_TEAMS,
   MOCK_MEMBERS,
@@ -16,6 +17,7 @@ export type { TicketCustomer }
 export interface TicketQueueViewProps {
   readonly apiUrl?: string
   readonly token?: string | null
+  readonly liveClient?: ILiveClient
   readonly userRole?: 'admin' | 'agent'
   readonly currentUserId?: number
   readonly tickets?: readonly TicketItem[]
@@ -26,6 +28,7 @@ export interface TicketQueueViewProps {
 export const TicketQueueView: React.FC<TicketQueueViewProps> = ({
   apiUrl,
   token,
+  liveClient,
   userRole = 'agent',
   currentUserId = 2,
   tickets,
@@ -41,6 +44,7 @@ export const TicketQueueView: React.FC<TicketQueueViewProps> = ({
       <TicketCockpit.Provider
         apiUrl={apiUrl}
         token={token}
+        liveClient={liveClient}
         tickets={tickets}
         teams={MOCK_TEAMS}
         members={MOCK_MEMBERS}

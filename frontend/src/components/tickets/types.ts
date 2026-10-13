@@ -69,6 +69,7 @@ export interface TicketItem {
   readonly assignments?: readonly TicketAssignmentAudit[]
   readonly created_at?: string
   readonly updated_at?: string
+  readonly revision?: number
 }
 
 export interface OrgTeamOption {
