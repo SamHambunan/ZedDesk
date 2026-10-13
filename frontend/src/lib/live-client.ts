@@ -38,6 +38,11 @@ export interface ILiveClient {
     ticketId: string,
     onViewersChange: (viewers: readonly PresenceMember[]) => void
   ) => () => void
+  readonly subscribeToTicketTyping?: (
+    ticketId: string,
+    onTypingChange: (typingMembers: readonly PresenceMember[]) => void
+  ) => () => void
+  readonly sendTicketTyping?: (ticketId: string, isTyping: boolean) => void
   readonly onStatusChange: (listener: (status: LiveStatus) => void) => () => void
   readonly onReconnect: (listener: () => void) => () => void
   readonly disconnect: () => void
@@ -82,6 +87,7 @@ export class LiveClient implements ILiveClient {
   private notificationSignalListeners = new Set<(signal: InboxSignalPayload) => void>()
   private orgPresenceListeners = new Set<(members: readonly PresenceMember[]) => void>()
   private ticketViewersListeners = new Map<string, Set<(viewers: readonly PresenceMember[]) => void>>()
+  private ticketTypingListeners = new Map<string, Set<(typingMembers: readonly PresenceMember[]) => void>>()
 
   private currentOrgChannel: string | null = null
   private currentTicketChannels = new Map<string, string>() // ticketId -> channelName
@@ -90,6 +96,8 @@ export class LiveClient implements ILiveClient {
   private currentOrgPresenceMembers = new Map<number, PresenceMember>()
   private currentTicketViewingChannels = new Map<string, string>() // ticketId -> channelName
   private currentTicketViewersMembers = new Map<string, Map<number, PresenceMember>>()
+  private currentTicketTypingMembers = new Map<string, Map<number, { member: PresenceMember; timer: ReturnType<typeof setTimeout> }>>()
+  private ticketTypingExpirySeconds = new Map<string, number>()
   private channelToTicketId = new Map<string, string>() // channelName -> ticketId
 
   private readonly apiUrl: string
@@ -226,6 +234,14 @@ export class LiveClient implements ILiveClient {
       } else if (eventName === 'pusher_internal:member_removed' || eventName === 'pusher:member_removed') {
         const data = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data
         this.dispatchPresenceMemberRemoved(parsed.channel, data)
+      } else if (eventName === 'client-typing') {
+        const rawData = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data
+        const isTyping = Boolean(rawData?.typing)
+        const memberId = Number(parsed.user_id)
+        const ticketId = this.channelToTicketId.get(parsed.channel)
+        if (ticketId && !Number.isNaN(memberId)) {
+          this.handleIncomingTyping(ticketId, memberId, isTyping)
+        }
       }
     } catch {
       // Ignore unparseable frames
@@ -321,6 +337,12 @@ export class LiveClient implements ILiveClient {
       if (membersMap && membersMap.has(id)) {
         membersMap.delete(id)
         this.dispatchTicketViewers(ticketId)
+      }
+      const typingMap = this.currentTicketTypingMembers.get(ticketId)
+      if (typingMap && typingMap.has(id)) {
+        clearTimeout(typingMap.get(id)!.timer)
+        typingMap.delete(id)
+        this.dispatchTicketTyping(ticketId)
       }
     }
   }
@@ -662,15 +684,131 @@ export class LiveClient implements ILiveClient {
         currentListeners.delete(onViewersChange)
         if (currentListeners.size === 0) {
           this.ticketViewersListeners.delete(ticketId)
-          const channelName = this.currentTicketViewingChannels.get(ticketId)
-          if (channelName) {
-            this.unsubscribeChannel(channelName)
-            this.currentTicketViewingChannels.delete(ticketId)
-            this.channelToTicketId.delete(channelName)
-            this.currentTicketViewersMembers.delete(ticketId)
+          if (!this.ticketTypingListeners.has(ticketId)) {
+            const channelName = this.currentTicketViewingChannels.get(ticketId)
+            if (channelName) {
+              this.unsubscribeChannel(channelName)
+              this.currentTicketViewingChannels.delete(ticketId)
+              this.channelToTicketId.delete(channelName)
+              this.currentTicketViewersMembers.delete(ticketId)
+              this.clearTicketTyping(ticketId)
+            }
           }
         }
       }
+    }
+  }
+
+  public subscribeToTicketTyping(
+    ticketId: string,
+    onTypingChange: (typingMembers: readonly PresenceMember[]) => void
+  ): () => void {
+    let listeners = this.ticketTypingListeners.get(ticketId)
+    if (!listeners) {
+      listeners = new Set()
+      this.ticketTypingListeners.set(ticketId, listeners)
+    }
+    listeners.add(onTypingChange)
+
+    const typingMap = this.currentTicketTypingMembers.get(ticketId)
+    const currentList = typingMap ? Array.from(typingMap.values()).map((e) => e.member) : []
+    onTypingChange(currentList)
+
+    this.discoverTicketViewingChannel(ticketId)
+
+    return () => {
+      const currentListeners = this.ticketTypingListeners.get(ticketId)
+      if (currentListeners) {
+        currentListeners.delete(onTypingChange)
+        if (currentListeners.size === 0) {
+          this.ticketTypingListeners.delete(ticketId)
+          this.clearTicketTyping(ticketId)
+          if (!this.ticketViewersListeners.has(ticketId)) {
+            const channelName = this.currentTicketViewingChannels.get(ticketId)
+            if (channelName) {
+              this.unsubscribeChannel(channelName)
+              this.currentTicketViewingChannels.delete(ticketId)
+              this.channelToTicketId.delete(channelName)
+              this.currentTicketViewersMembers.delete(ticketId)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  public sendTicketTyping(ticketId: string, isTyping: boolean): void {
+    const channelName = this.currentTicketViewingChannels.get(ticketId)
+    if (!channelName) return
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+
+    this.send({
+      event: 'client-typing',
+      channel: channelName,
+      data: {
+        typing: Boolean(isTyping),
+      },
+    })
+  }
+
+  private handleIncomingTyping(ticketId: string, memberId: number, isTyping: boolean): void {
+    let activeMap = this.currentTicketTypingMembers.get(ticketId)
+    if (!activeMap) {
+      activeMap = new Map()
+      this.currentTicketTypingMembers.set(ticketId, activeMap)
+    }
+
+    if (!isTyping) {
+      if (activeMap.has(memberId)) {
+        clearTimeout(activeMap.get(memberId)!.timer)
+        activeMap.delete(memberId)
+        this.dispatchTicketTyping(ticketId)
+      }
+      return
+    }
+
+    const existing = activeMap.get(memberId)
+    if (existing) {
+      clearTimeout(existing.timer)
+    }
+
+    const member: PresenceMember =
+      this.currentTicketViewersMembers.get(ticketId)?.get(memberId) ??
+      this.currentOrgPresenceMembers.get(memberId) ??
+      { member_id: memberId, name: `Member ${memberId}` }
+
+    const expirySeconds = this.ticketTypingExpirySeconds.get(ticketId) ?? 5
+    const timer = setTimeout(() => {
+      const currentMap = this.currentTicketTypingMembers.get(ticketId)
+      if (currentMap?.has(memberId)) {
+        currentMap.delete(memberId)
+        this.dispatchTicketTyping(ticketId)
+      }
+    }, expirySeconds * 1000)
+
+    activeMap.set(memberId, { member, timer })
+    this.dispatchTicketTyping(ticketId)
+  }
+
+  private dispatchTicketTyping(ticketId: string): void {
+    const activeMap = this.currentTicketTypingMembers.get(ticketId)
+    const list = activeMap ? Array.from(activeMap.values()).map((e) => e.member) : []
+    const listeners = this.ticketTypingListeners.get(ticketId)
+    if (listeners) {
+      for (const listener of listeners) {
+        listener(list)
+      }
+    }
+  }
+
+  private clearTicketTyping(ticketId: string): void {
+    const activeMap = this.currentTicketTypingMembers.get(ticketId)
+    if (activeMap) {
+      for (const entry of activeMap.values()) {
+        clearTimeout(entry.timer)
+      }
+      activeMap.clear()
+      this.dispatchTicketTyping(ticketId)
     }
   }
 
@@ -682,9 +820,13 @@ export class LiveClient implements ILiveClient {
       if (!res.ok) {
         this.currentTicketViewersMembers.get(ticketId)?.clear()
         this.dispatchTicketViewers(ticketId)
+        this.clearTicketTyping(ticketId)
         return
       }
       const data = await res.json()
+      if (typeof data.typing_expires_after_seconds === 'number') {
+        this.ticketTypingExpirySeconds.set(ticketId, data.typing_expires_after_seconds)
+      }
       if (data.channel) {
         const oldChannel = this.currentTicketViewingChannels.get(ticketId)
         if (oldChannel && oldChannel !== data.channel) {
@@ -698,6 +840,7 @@ export class LiveClient implements ILiveClient {
     } catch {
       this.currentTicketViewersMembers.get(ticketId)?.clear()
       this.dispatchTicketViewers(ticketId)
+      this.clearTicketTyping(ticketId)
     }
   }
 
@@ -725,7 +868,11 @@ export class LiveClient implements ILiveClient {
     }
 
     // Re-discover all active ticket viewing channels in parallel
-    for (const ticketId of this.ticketViewersListeners.keys()) {
+    const viewingTicketIds = new Set([
+      ...this.ticketViewersListeners.keys(),
+      ...this.ticketTypingListeners.keys(),
+    ])
+    for (const ticketId of viewingTicketIds) {
       promises.push(this.discoverTicketViewingChannel(ticketId))
     }
 
@@ -747,6 +894,9 @@ export class LiveClient implements ILiveClient {
       clearInterval(this.rotationTimer)
       this.rotationTimer = null
     }
+    for (const ticketId of this.currentTicketTypingMembers.keys()) {
+      this.clearTicketTyping(ticketId)
+    }
     if (this.socket) {
       this.socket.close()
       this.socket = null
@@ -764,8 +914,11 @@ export class MockLiveClient implements ILiveClient {
   private readonly notificationListeners = new Set<(signal: InboxSignalPayload) => void>()
   private readonly orgPresenceListeners = new Set<(members: readonly PresenceMember[]) => void>()
   private readonly ticketViewersListeners = new Map<string, Set<(viewers: readonly PresenceMember[]) => void>>()
+  private readonly ticketTypingListeners = new Map<string, Set<(typingMembers: readonly PresenceMember[]) => void>>()
   private currentOrgPresence: readonly PresenceMember[] = []
   private currentTicketViewers = new Map<string, readonly PresenceMember[]>()
+  private currentTicketTyping = new Map<string, readonly PresenceMember[]>()
+  public readonly sentTypingFrames: Array<{ ticketId: string; typing: boolean }> = []
 
   constructor(initialStatus: LiveStatus = 'connected') {
     this.status = initialStatus
@@ -848,6 +1001,42 @@ export class MockLiveClient implements ILiveClient {
         }
       }
     }
+  }
+
+  public subscribeToTicketTyping(
+    ticketId: string,
+    onTypingChange: (typingMembers: readonly PresenceMember[]) => void
+  ): () => void {
+    let set = this.ticketTypingListeners.get(ticketId)
+    if (!set) {
+      set = new Set()
+      this.ticketTypingListeners.set(ticketId, set)
+    }
+    set.add(onTypingChange)
+    onTypingChange(this.currentTicketTyping.get(ticketId) ?? [])
+    return () => {
+      const current = this.ticketTypingListeners.get(ticketId)
+      if (current) {
+        current.delete(onTypingChange)
+        if (current.size === 0) {
+          this.ticketTypingListeners.delete(ticketId)
+        }
+      }
+    }
+  }
+
+  public emitTicketTyping(ticketId: string, typingMembers: readonly PresenceMember[]): void {
+    this.currentTicketTyping.set(ticketId, typingMembers)
+    const listeners = this.ticketTypingListeners.get(ticketId)
+    if (listeners) {
+      for (const listener of listeners) {
+        listener(typingMembers)
+      }
+    }
+  }
+
+  public sendTicketTyping(ticketId: string, isTyping: boolean): void {
+    this.sentTypingFrames.push({ ticketId, typing: isTyping })
   }
 
   public emitSignal(signal: LiveSignalPayload): void {

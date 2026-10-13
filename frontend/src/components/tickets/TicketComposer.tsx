@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, use } from 'react'
+import React, { useState, useRef, useMemo, useEffect, use } from 'react'
 import {
   Send,
   Lock,
@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { formatFileSize } from './constants'
 import type { MessageType, TicketStatus, TicketAttachment } from './types'
+import type { PresenceMember } from '../../lib/live-client'
 
 export interface StagedAttachment {
   readonly id: string
@@ -35,6 +36,7 @@ export interface ComposerState {
   readonly fileError: string | null
   readonly isSubmitting: boolean
   readonly currentStatus: TicketStatus
+  readonly typingMembers?: readonly PresenceMember[]
 }
 
 export interface ComposerActions {
@@ -45,6 +47,7 @@ export interface ComposerActions {
   readonly removeFile: (id: string) => void
   readonly clearFiles: () => void
   readonly submit: (overrideType?: MessageType) => void | Promise<void>
+  readonly stopTyping?: () => void
 }
 
 export interface ComposerMeta {
@@ -112,6 +115,8 @@ export interface ComposerProviderProps {
   readonly value?: ComposerContextValue
   readonly currentStatus?: TicketStatus
   readonly onSubmit?: (payload: ComposerSubmitPayload) => void | Promise<void>
+  readonly onTypingChange?: (isTyping: boolean) => void
+  readonly typingMembers?: readonly PresenceMember[]
   readonly isSubmitting?: boolean
   readonly initialTab?: MessageType
   readonly className?: string
@@ -122,6 +127,8 @@ export const ComposerProvider: React.FC<ComposerProviderProps> = ({
   value: controlledValue,
   currentStatus = 'open',
   onSubmit,
+  onTypingChange,
+  typingMembers,
   isSubmitting = false,
   initialTab = 'public_reply',
 }) => {
@@ -137,6 +144,8 @@ export const ComposerProvider: React.FC<ComposerProviderProps> = ({
     <ComposerInternalProvider
       currentStatus={currentStatus}
       onSubmit={onSubmit}
+      onTypingChange={onTypingChange}
+      typingMembers={typingMembers}
       isSubmitting={isSubmitting}
       initialTab={initialTab}
     >
@@ -149,6 +158,8 @@ function ComposerInternalProvider({
   children,
   currentStatus = 'open',
   onSubmit,
+  onTypingChange,
+  typingMembers,
   isSubmitting = false,
   initialTab = 'public_reply',
 }: Omit<ComposerProviderProps, 'value'>) {
@@ -163,13 +174,67 @@ function ComposerInternalProvider({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
+  const isTypingRef = useRef(false)
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const onTypingChangeRef = useRef(onTypingChange)
+  onTypingChangeRef.current = onTypingChange
+
+  const stopTyping = () => {
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current)
+      typingTimerRef.current = null
+    }
+    if (isTypingRef.current) {
+      isTypingRef.current = false
+      onTypingChangeRef.current?.(false)
+    }
+  }
+
+  // Cleanup typing on unmount
+  useEffect(() => {
+    return () => {
+      stopTyping()
+    }
+  }, [])
+
+  // Cleanup typing when document is hidden
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        stopTyping()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [])
+
   // Stable action callbacks with refs
   const stateRef = useRef({ tab, body, nextStatus, stagedFiles, isSubmitting, onSubmit })
   stateRef.current = { tab, body, nextStatus, stagedFiles, isSubmitting, onSubmit }
 
   const actions: ComposerActions = useMemo(() => ({
     setTab: (newTab: MessageType) => setTab(newTab),
-    setBody: (newBody: string) => setBody(newBody),
+    setBody: (newBody: string) => {
+      setBody(newBody)
+      if (newBody.trim().length > 0) {
+        if (!isTypingRef.current) {
+          isTypingRef.current = true
+          onTypingChangeRef.current?.(true)
+        }
+        if (typingTimerRef.current) {
+          clearTimeout(typingTimerRef.current)
+        }
+        typingTimerRef.current = setTimeout(() => {
+          stopTyping()
+        }, 2500)
+      } else {
+        stopTyping()
+      }
+    },
+    stopTyping,
     setNextStatus: (status: TicketStatus) => setNextStatus(status),
     addFiles: (files: FileList | readonly File[]) => {
       setFileError(null)
@@ -208,6 +273,7 @@ function ComposerInternalProvider({
       if (fileInputRef.current) fileInputRef.current.value = ''
     },
     submit: (overrideType?: MessageType) => {
+      stopTyping()
       const current = stateRef.current
       if (!current.body.trim() || current.isSubmitting) return
 
@@ -240,7 +306,8 @@ function ComposerInternalProvider({
     fileError,
     isSubmitting,
     currentStatus,
-  }), [tab, body, nextStatus, stagedFiles, fileError, isSubmitting, currentStatus])
+    typingMembers,
+  }), [tab, body, nextStatus, stagedFiles, fileError, isSubmitting, currentStatus, typingMembers])
 
   const meta: ComposerMeta = useMemo(() => ({
     textareaRef,
@@ -375,6 +442,7 @@ export const ComposerInput: React.FC<ComposerInputProps> = ({
         data-testid="composer-textarea"
         value={state.body}
         onChange={(e) => actions.setBody(e.target.value)}
+        onBlur={() => actions.stopTyping?.()}
         rows={rows}
         placeholder={placeholder ?? defaultPlaceholder}
         className={`w-full bg-surface-container-low border rounded-lg p-3 text-body-default text-text-primary placeholder:text-text-muted focus:outline-none transition-colors resize-y min-h-[96px] ${
@@ -612,9 +680,54 @@ export const InternalNoteComposer: React.FC<{ readonly className?: string }> = (
   )
 }
 
+export function formatTypingText(members: readonly PresenceMember[]): string {
+  if (!members || members.length === 0) return ''
+  if (members.length === 1) {
+    return `${members[0].name} is typing...`
+  }
+  if (members.length === 2) {
+    return `${members[0].name} and ${members[1].name} are typing...`
+  }
+  return `${members[0].name}, ${members[1].name}, and ${members.length - 2} other${members.length - 2 > 1 ? 's' : ''} are typing...`
+}
+
+export const ComposerTypingIndicator: React.FC<{
+  readonly members?: readonly PresenceMember[]
+  readonly className?: string
+}> = ({ members: propMembers, className = '' }) => {
+  const { state } = useComposer()
+  const members = propMembers ?? state.typingMembers
+  if (!members || members.length === 0) return null
+
+  return (
+    <div
+      data-testid="ticket-typing-indicator"
+      role="status"
+      aria-live="polite"
+      className={`flex items-center gap-2 mb-2 text-xs text-text-muted transition-opacity duration-150 ${className}`}
+    >
+      <span className="flex items-center gap-1 text-amber-action" aria-hidden="true">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-action animate-pulse" />
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-action animate-pulse [animation-delay:150ms]" />
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-action animate-pulse [animation-delay:300ms]" />
+      </span>
+      <span data-testid="ticket-typing-text" className="font-mono text-[11px] text-text-secondary">
+        {formatTypingText(members)}
+      </span>
+      {members.map((m) => (
+        <span key={m.member_id} data-testid={`typing-member-${m.member_id}`} className="sr-only">
+          {m.name}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export interface TicketComposerProps {
   readonly currentStatus?: TicketStatus
   readonly onSubmit?: (payload: ComposerSubmitPayload) => void | Promise<void>
+  readonly onTypingChange?: (isTyping: boolean) => void
+  readonly typingMembers?: readonly PresenceMember[]
   readonly isSubmitting?: boolean
   readonly className?: string
 }
@@ -627,20 +740,27 @@ function TicketComposerView({ className = '' }: { readonly className?: string })
   const { state } = useComposer()
 
   return (
-    <ComposerFrame className={className}>
-      <ComposerHeader />
-      <ComposerInput />
-      <ComposerFooter>
-        {state.tab === 'public_reply' && <ComposerStatusSelector />}
-        <ComposerSubmit />
-      </ComposerFooter>
-    </ComposerFrame>
+    <div className="space-y-1.5">
+      {state.typingMembers && state.typingMembers.length > 0 && (
+        <ComposerTypingIndicator members={state.typingMembers} />
+      )}
+      <ComposerFrame className={className}>
+        <ComposerHeader />
+        <ComposerInput />
+        <ComposerFooter>
+          {state.tab === 'public_reply' && <ComposerStatusSelector />}
+          <ComposerSubmit />
+        </ComposerFooter>
+      </ComposerFrame>
+    </div>
   )
 }
 
 export const TicketComposer: React.FC<TicketComposerProps> = ({
   currentStatus = 'open',
   onSubmit,
+  onTypingChange,
+  typingMembers,
   isSubmitting = false,
   className = '',
 }) => {
@@ -648,6 +768,8 @@ export const TicketComposer: React.FC<TicketComposerProps> = ({
     <ComposerProvider
       currentStatus={currentStatus}
       onSubmit={onSubmit}
+      onTypingChange={onTypingChange}
+      typingMembers={typingMembers}
       isSubmitting={isSubmitting}
     >
       <TicketComposerView className={className} />
@@ -666,4 +788,5 @@ export const Composer = {
   Submit: ComposerSubmit,
   PublicReply: PublicReplyComposer,
   InternalNote: InternalNoteComposer,
+  TypingIndicator: ComposerTypingIndicator,
 }

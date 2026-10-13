@@ -177,9 +177,10 @@ describe('Organization Member Presence and Roster Integration (Issue #151)', () 
       </QueryClientProvider>
     )
 
-    // Staff presence is completely absent from customer portal
+    // Staff presence and typing cues are completely absent from customer portal
     expect(screen.queryByTestId('online-members-subsection')).not.toBeInTheDocument()
     expect(screen.queryByTestId('ticket-viewers')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('ticket-typing-indicator')).not.toBeInTheDocument()
     expect(screen.queryByTestId('on-duty-shift-roster')).not.toBeInTheDocument()
   })
 })

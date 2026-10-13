@@ -48,6 +48,7 @@ export interface TicketCockpitState {
   readonly isOutsidePreset?: boolean
   readonly isUnavailable?: boolean
   readonly ticketViewers?: readonly PresenceMember[]
+  readonly ticketTypingMembers?: readonly PresenceMember[]
 }
 
 export interface TicketCockpitActions {
@@ -67,6 +68,7 @@ export interface TicketCockpitActions {
   readonly restoreTicket?: (ticketId: string) => Promise<void> | void
   readonly submitComposer: (ticketId: string, payload: ComposerSubmitPayload) => void
   readonly applyPendingQueueOrder?: () => void
+  readonly sendTyping?: (ticketId: string, isTyping: boolean) => void
 }
 
 export interface TicketCockpitMeta {

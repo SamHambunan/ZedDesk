@@ -207,6 +207,7 @@ function TicketCockpitInternalProvider({
     () => initialTicket?.id ?? null
   )
   const [ticketViewers, setTicketViewers] = useState<readonly PresenceMember[]>([])
+  const [ticketTypingMembers, setTicketTypingMembers] = useState<readonly PresenceMember[]>([])
   const [activePreset, setActivePreset] = useState<PresetFilter>(() => {
     if (initialPreset) return initialPreset
     if (initialTicket && ['resolved', 'closed'].includes(initialTicket.status)) {
@@ -720,6 +721,84 @@ function TicketCockpitInternalProvider({
     }
   }, [liveClientInstance, targetTicketId])
 
+  // Ticket typing presence tracking (Issue #152)
+  const activeTypingTicketRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!liveClientInstance?.subscribeToTicketTyping || !targetTicketId) {
+      setTicketTypingMembers([])
+      return
+    }
+
+    let activeUnsubscribe: (() => void) | null = null
+
+    const subscribe = () => {
+      if (activeUnsubscribe) {
+        activeUnsubscribe()
+        activeUnsubscribe = null
+      }
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        setTicketTypingMembers([])
+        return
+      }
+      activeUnsubscribe = liveClientInstance.subscribeToTicketTyping!(
+        targetTicketId,
+        (typingMembers) => {
+          // Other verified Organization Members' typing appears; current member's own typing is strictly omitted
+          const otherMembers = typingMembers.filter((m) => m.member_id !== currentUserId)
+          const resolvedMembers = otherMembers.map((m) => {
+            if (m.name.startsWith('Member ')) {
+              const matched = members.find((om) => om.id === m.member_id)
+              if (matched) return { ...m, name: matched.name }
+            }
+            return m
+          })
+          setTicketTypingMembers(resolvedMembers)
+        }
+      )
+    }
+
+    subscribe()
+
+    const handleVisibilityChange = () => {
+      if (typeof document === 'undefined') return
+      if (document.visibilityState === 'hidden') {
+        if (activeUnsubscribe) {
+          activeUnsubscribe()
+          activeUnsubscribe = null
+        }
+        setTicketTypingMembers([])
+        // Hidden Ticket views stop sending typing state
+        if (activeTypingTicketRef.current) {
+          liveClientInstance?.sendTicketTyping?.(activeTypingTicketRef.current, false)
+          activeTypingTicketRef.current = null
+        }
+      } else {
+        subscribe()
+      }
+    }
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+    }
+
+    return () => {
+      if (activeUnsubscribe) {
+        activeUnsubscribe()
+        activeUnsubscribe = null
+      }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+      }
+      // Departed Ticket views stop sending typing state
+      if (activeTypingTicketRef.current) {
+        liveClientInstance?.sendTicketTyping?.(activeTypingTicketRef.current, false)
+        activeTypingTicketRef.current = null
+      }
+      setTicketTypingMembers([])
+    }
+  }, [liveClientInstance, targetTicketId, currentUserId, members])
+
   // Active Ticket: derives base ticket from queue, merging live server details if available
   const activeTicket = useMemo(() => {
     if (isUnavailable) return null
@@ -1121,12 +1200,25 @@ function TicketCockpitInternalProvider({
               console.error('Error submitting ticket message:', err)
             })
         }
+        if (activeTypingTicketRef.current === ticketId) {
+          activeTypingTicketRef.current = null
+          liveClientInstance?.sendTicketTyping?.(ticketId, false)
+        }
+      },
+      sendTyping: (ticketId: string, isTyping: boolean) => {
+        if (isTyping) {
+          activeTypingTicketRef.current = ticketId
+        } else if (activeTypingTicketRef.current === ticketId) {
+          activeTypingTicketRef.current = null
+        }
+        liveClientInstance?.sendTicketTyping?.(ticketId, isTyping)
       },
     }
   }, [
     controlledSelectedTicketId,
     currentUserId,
     internalSelectedTicketId,
+    liveClientInstance,
     members,
     onAddTag,
     onAssign,
@@ -1163,6 +1255,7 @@ function TicketCockpitInternalProvider({
     isOutsidePreset,
     isUnavailable,
     ticketViewers,
+    ticketTypingMembers,
   }), [
     effectiveTickets,
     filteredTickets,
@@ -1186,6 +1279,7 @@ function TicketCockpitInternalProvider({
     isOutsidePreset,
     isUnavailable,
     ticketViewers,
+    ticketTypingMembers,
   ])
 
   const meta: TicketCockpitMeta = useMemo(() => ({
@@ -1779,6 +1873,8 @@ export const TicketCockpitDetail: React.FC<TicketCockpitDetailProps> = ({
               <div className="p-4 border-t border-border-subtle bg-surface-panel/90 backdrop-blur-sm">
                 <TicketComposer
                   currentStatus={activeTicket.status}
+                  typingMembers={state.ticketTypingMembers}
+                  onTypingChange={(isTyping) => actions.sendTyping?.(activeTicket.id, isTyping)}
                   onSubmit={(payload) => actions.submitComposer(activeTicket.id, payload)}
                 />
               </div>

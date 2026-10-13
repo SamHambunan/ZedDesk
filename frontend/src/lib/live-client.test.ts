@@ -636,6 +636,203 @@ describe('LiveClient and MockLiveClient', () => {
     mock.emitTicketViewers('ticket-10', [{ member_id: 1, name: 'Alice' }])
     expect(ticketViewersSpy).toHaveBeenCalledWith([{ member_id: 1, name: 'Alice' }])
   })
+
+  it('MockLiveClient supports typing subscription, emission, and sendTicketTyping recording (Issue #152)', () => {
+    const mock = createMockLiveClient()
+    const typingSpy = vi.fn()
+
+    const unsub = mock.subscribeToTicketTyping?.('ticket-10', typingSpy)
+    expect(typingSpy).toHaveBeenCalledWith([])
+
+    mock.emitTicketTyping?.('ticket-10', [{ member_id: 2, name: 'Bob Admin' }])
+    expect(typingSpy).toHaveBeenCalledWith([{ member_id: 2, name: 'Bob Admin' }])
+
+    mock.sendTicketTyping?.('ticket-10', true)
+    mock.sendTicketTyping?.('ticket-10', false)
+    expect(mock.sentTypingFrames).toEqual([
+      { ticketId: 'ticket-10', typing: true },
+      { ticketId: 'ticket-10', typing: false },
+    ])
+
+    unsub?.()
+  })
+
+  it('LiveClient sends boolean client-typing frame over viewing channel without draft or user_id (Issue #152)', async () => {
+    const originalFetch = global.fetch
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/tickets/ticket-42/viewing-channel')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            channel: 'presence-ticket.ticket-42.viewers.gen100',
+            typing_expires_after_seconds: 5,
+          }),
+        })
+      }
+      if (url.includes('/api/broadcasting/auth')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ auth: 'signed-key:signed-sig' }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+    })
+
+    const client = new LiveClient({
+      apiUrl: 'http://localhost:8000',
+      token: 'test-token',
+      webSocketClass: MockWebSocket as any,
+    })
+
+    await vi.advanceTimersByTimeAsync(10)
+    const socket = MockWebSocket.instances[0]
+    socket.receive({
+      event: 'pusher:connection_established',
+      data: JSON.stringify({ socket_id: '123.456' }),
+    })
+
+    const typingSpy = vi.fn()
+    const unsubscribe = client.subscribeToTicketTyping?.('ticket-42', typingSpy)
+
+    await vi.advanceTimersByTimeAsync(50)
+
+    // Send typing true
+    client.sendTicketTyping?.('ticket-42', true)
+    const typingFrame1 = socket.sent.find((msg) => msg.includes('client-typing') && msg.includes('"typing":true'))
+    expect(typingFrame1).toBeDefined()
+    const parsed1 = JSON.parse(typingFrame1!)
+    expect(parsed1.event).toBe('client-typing')
+    expect(parsed1.channel).toBe('presence-ticket.ticket-42.viewers.gen100')
+    expect(parsed1.data).toEqual({ typing: true })
+    // Ensure draft text and claimed user_id are strictly NOT on the wire
+    expect(parsed1.user_id).toBeUndefined()
+    expect(parsed1.draft).toBeUndefined()
+
+    // Send typing false
+    client.sendTicketTyping?.('ticket-42', false)
+    const typingFrame2 = socket.sent.find((msg) => msg.includes('client-typing') && msg.includes('"typing":false'))
+    expect(typingFrame2).toBeDefined()
+    const parsed2 = JSON.parse(typingFrame2!)
+    expect(parsed2.data).toEqual({ typing: false })
+
+    unsubscribe?.()
+    client.disconnect()
+    global.fetch = originalFetch
+  })
+
+  it('LiveClient handles incoming client-typing, maps user_id to viewer name, and expires automatically (Issue #152)', async () => {
+    const originalFetch = global.fetch
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/tickets/ticket-42/viewing-channel')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            channel: 'presence-ticket.ticket-42.viewers.gen100',
+            typing_expires_after_seconds: 5,
+          }),
+        })
+      }
+      if (url.includes('/api/broadcasting/auth')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ auth: 'signed-key:signed-sig' }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+    })
+
+    const client = new LiveClient({
+      apiUrl: 'http://localhost:8000',
+      token: 'test-token',
+      webSocketClass: MockWebSocket as any,
+    })
+
+    await vi.advanceTimersByTimeAsync(10)
+    const socket = MockWebSocket.instances[0]
+    socket.receive({
+      event: 'pusher:connection_established',
+      data: JSON.stringify({ socket_id: '123.456' }),
+    })
+
+    const viewersSpy = vi.fn()
+    const typingSpy = vi.fn()
+    client.subscribeToTicketViewers?.('ticket-42', viewersSpy)
+    client.subscribeToTicketTyping?.('ticket-42', typingSpy)
+
+    await vi.advanceTimersByTimeAsync(50)
+
+    // Seed viewers so presence identity map knows member 10 is Alice
+    socket.receive({
+      event: 'pusher_internal:subscription_succeeded',
+      channel: 'presence-ticket.ticket-42.viewers.gen100',
+      data: JSON.stringify({
+        presence: {
+          ids: ['10'],
+          hash: {
+            '10': { member_id: 10, name: 'Alice Agent' },
+          },
+          count: 1,
+        },
+      }),
+    })
+
+    // Other member 10 begins typing
+    socket.receive({
+      event: 'client-typing',
+      channel: 'presence-ticket.ticket-42.viewers.gen100',
+      user_id: '10',
+      data: JSON.stringify({ typing: true }),
+    })
+
+    expect(typingSpy).toHaveBeenLastCalledWith([
+      { member_id: 10, name: 'Alice Agent' },
+    ])
+
+    // After 5 seconds without renewal, typing cue expires automatically
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(typingSpy).toHaveBeenLastCalledWith([])
+
+    // Member 10 types again then explicitly stops
+    socket.receive({
+      event: 'client-typing',
+      channel: 'presence-ticket.ticket-42.viewers.gen100',
+      user_id: '10',
+      data: JSON.stringify({ typing: true }),
+    })
+    expect(typingSpy).toHaveBeenLastCalledWith([
+      { member_id: 10, name: 'Alice Agent' },
+    ])
+
+    socket.receive({
+      event: 'client-typing',
+      channel: 'presence-ticket.ticket-42.viewers.gen100',
+      user_id: '10',
+      data: JSON.stringify({ typing: false }),
+    })
+    expect(typingSpy).toHaveBeenLastCalledWith([])
+
+    // Member 10 types again and then disconnects from presence
+    socket.receive({
+      event: 'client-typing',
+      channel: 'presence-ticket.ticket-42.viewers.gen100',
+      user_id: '10',
+      data: JSON.stringify({ typing: true }),
+    })
+    expect(typingSpy).toHaveBeenLastCalledWith([
+      { member_id: 10, name: 'Alice Agent' },
+    ])
+
+    socket.receive({
+      event: 'pusher_internal:member_removed',
+      channel: 'presence-ticket.ticket-42.viewers.gen100',
+      data: JSON.stringify({ user_id: '10' }),
+    })
+    expect(typingSpy).toHaveBeenLastCalledWith([])
+
+    client.disconnect()
+    global.fetch = originalFetch
+  })
 })
+
 
 

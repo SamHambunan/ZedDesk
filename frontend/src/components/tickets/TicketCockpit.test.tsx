@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { TicketCockpit } from './TicketCockpit'
@@ -1497,6 +1497,221 @@ describe('Live Signals and Authorized REST Refresh (Issue #149)', () => {
       await waitFor(() => {
         expect(subscribeSpy).toHaveBeenCalledWith('ticket-2', expect.any(Function))
       })
+    })
+  })
+
+  describe('Transient Organization Member Typing Presence (Issue #152)', () => {
+    it('displays other verified Organization Members typing cue near composer and clears on expiry or stop', async () => {
+      const liveClient = createMockLiveClient()
+
+      render(
+        <TicketCockpit.Provider
+          tickets={INITIAL_MOCK_TICKETS}
+          selectedTicketId="ticket-1"
+          currentUserId={2}
+          liveClient={liveClient}
+        >
+          <TicketCockpit.Frame>
+            <TicketCockpit.Detail />
+          </TicketCockpit.Frame>
+        </TicketCockpit.Provider>
+      )
+
+      // Initially no typing indicator
+      expect(screen.queryByTestId('ticket-typing-indicator')).not.toBeInTheDocument()
+
+      // Other member 10 (Alice Agent) begins typing
+      act(() => {
+        liveClient.emitTicketTyping('ticket-1', [{ member_id: 10, name: 'Alice Agent' }])
+      })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('ticket-typing-indicator')).toBeInTheDocument()
+        expect(screen.getByTestId('ticket-typing-text')).toHaveTextContent('Alice Agent is typing...')
+      })
+
+      // Multiple other members typing
+      act(() => {
+        liveClient.emitTicketTyping('ticket-1', [
+          { member_id: 10, name: 'Alice Agent' },
+          { member_id: 11, name: 'Bob Admin' },
+        ])
+      })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('ticket-typing-text')).toHaveTextContent('Alice Agent and Bob Admin are typing...')
+      })
+
+      // Typing cleared / stopped
+      act(() => {
+        liveClient.emitTicketTyping('ticket-1', [])
+      })
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('ticket-typing-indicator')).not.toBeInTheDocument()
+      })
+    })
+
+    it('strictly omits current member own typing from their view', async () => {
+      const liveClient = createMockLiveClient()
+
+      render(
+        <TicketCockpit.Provider
+          tickets={INITIAL_MOCK_TICKETS}
+          selectedTicketId="ticket-1"
+          currentUserId={2}
+          liveClient={liveClient}
+        >
+          <TicketCockpit.Frame>
+            <TicketCockpit.Detail />
+          </TicketCockpit.Frame>
+        </TicketCockpit.Provider>
+      )
+
+      // Current member (member_id 2) emitted as typing
+      act(() => {
+        liveClient.emitTicketTyping('ticket-1', [{ member_id: 2, name: 'Acme Agent' }])
+      })
+
+      // Own typing must strictly NOT be shown
+      expect(screen.queryByTestId('ticket-typing-indicator')).not.toBeInTheDocument()
+
+      // If both current member and another member are typing, only the other member is shown
+      act(() => {
+        liveClient.emitTicketTyping('ticket-1', [
+          { member_id: 2, name: 'Acme Agent' },
+          { member_id: 10, name: 'Alice Agent' },
+        ])
+      })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('ticket-typing-indicator')).toBeInTheDocument()
+        expect(screen.getByTestId('ticket-typing-text')).toHaveTextContent('Alice Agent is typing...')
+      })
+    })
+
+    it('sends boolean typing state while typing and stops sending when departing ticket or tab is hidden', async () => {
+      const liveClient = createMockLiveClient()
+      const sendTypingSpy = vi.spyOn(liveClient, 'sendTicketTyping')
+      const user = userEvent.setup()
+
+      render(
+        <TicketCockpit.Provider
+          tickets={INITIAL_MOCK_TICKETS}
+          initialTicketNumber={1001}
+          currentUserId={2}
+          liveClient={liveClient}
+        >
+          <TicketCockpit.Frame>
+            <TicketCockpit.Queue />
+            <TicketCockpit.Detail />
+          </TicketCockpit.Frame>
+        </TicketCockpit.Provider>
+      )
+
+      const textarea = screen.getByTestId('composer-textarea')
+      await user.type(textarea, 'Working on this issue now')
+
+      // Typing state true is sent
+      expect(sendTypingSpy).toHaveBeenCalledWith('ticket-1', true)
+
+      // Switch to ticket-2 (ticket departure)
+      const ticket2Row = screen.getByTestId('ticket-row-ticket-2')
+      await user.click(ticket2Row)
+
+      await waitFor(() => {
+        // Departed ticket sends typing false
+        expect(sendTypingSpy).toHaveBeenCalledWith('ticket-1', false)
+      })
+
+      // Tab hidden stops sending typing
+      await user.type(screen.getByTestId('composer-textarea'), 'Now typing on ticket 2')
+      expect(sendTypingSpy).toHaveBeenCalledWith('ticket-2', true)
+
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => 'hidden',
+      })
+      document.dispatchEvent(new Event('visibilitychange'))
+
+      await waitFor(() => {
+        expect(sendTypingSpy).toHaveBeenCalledWith('ticket-2', false)
+      })
+
+      // Restore visibilityState
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => 'visible',
+      })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+
+    it('stops sending typing state on composer submission', async () => {
+      const liveClient = createMockLiveClient()
+      const sendTypingSpy = vi.spyOn(liveClient, 'sendTicketTyping')
+      const user = userEvent.setup()
+
+      render(
+        <TicketCockpit.Provider
+          tickets={INITIAL_MOCK_TICKETS}
+          selectedTicketId="ticket-1"
+          currentUserId={2}
+          liveClient={liveClient}
+        >
+          <TicketCockpit.Frame>
+            <TicketCockpit.Detail />
+          </TicketCockpit.Frame>
+        </TicketCockpit.Provider>
+      )
+
+      const textarea = screen.getByTestId('composer-textarea')
+      await user.type(textarea, 'Ready for customer response')
+      expect(sendTypingSpy).toHaveBeenCalledWith('ticket-1', true)
+
+      // Submit composer
+      const submitBtn = screen.getByTestId('composer-submit-btn')
+      await user.click(submitBtn)
+
+      await waitFor(() => {
+        expect(sendTypingSpy).toHaveBeenCalledWith('ticket-1', false)
+      })
+    })
+
+    it('maintains quiet focus and accessible screen-reader role when typing cue appears', async () => {
+      const liveClient = createMockLiveClient()
+      const user = userEvent.setup()
+
+      render(
+        <TicketCockpit.Provider
+          tickets={INITIAL_MOCK_TICKETS}
+          selectedTicketId="ticket-1"
+          currentUserId={2}
+          liveClient={liveClient}
+        >
+          <TicketCockpit.Frame>
+            <TicketCockpit.Detail />
+          </TicketCockpit.Frame>
+        </TicketCockpit.Provider>
+      )
+
+      const textarea = screen.getByTestId('composer-textarea')
+      await user.click(textarea)
+      expect(document.activeElement).toBe(textarea)
+
+      // Incoming typing from another member
+      act(() => {
+        liveClient.emitTicketTyping('ticket-1', [{ member_id: 10, name: 'Alice Agent' }])
+      })
+
+      await waitFor(() => {
+        const indicator = screen.getByTestId('ticket-typing-indicator')
+        expect(indicator).toBeInTheDocument()
+        expect(indicator).toHaveAttribute('role', 'status')
+        expect(indicator).toHaveAttribute('aria-live', 'polite')
+      })
+
+      // Focus was NOT stolen or interrupted; remains quietly on the textarea
+      expect(document.activeElement).toBe(textarea)
     })
   })
 })
