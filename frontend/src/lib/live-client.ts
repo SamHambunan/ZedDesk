@@ -326,6 +326,10 @@ export class LiveClient implements ILiveClient {
       if (!res.ok) return
       const data = await res.json()
       if (data.channel) {
+        const oldChannel = this.currentOrgChannel
+        if (oldChannel && oldChannel !== data.channel) {
+          this.unsubscribeChannel(oldChannel)
+        }
         this.currentOrgChannel = data.channel
         await this.subscribeChannel(data.channel)
       }
@@ -429,30 +433,24 @@ export class LiveClient implements ILiveClient {
   }
 
   public async rotateChannels(): Promise<void> {
-    // Re-discover organization channel
+    const promises: Promise<void>[] = []
+
+    // Re-discover organization channel in parallel if active
     if (this.orgSignalListeners.size > 0) {
-      const oldOrgChannel = this.currentOrgChannel
-      await this.discoverOrgChannel()
-      if (oldOrgChannel && oldOrgChannel !== this.currentOrgChannel) {
-        this.unsubscribeChannel(oldOrgChannel)
-      }
+      promises.push(this.discoverOrgChannel())
     }
 
-    // Re-discover member notification channel
+    // Re-discover member notification channel in parallel if active
     if (this.notificationSignalListeners.size > 0) {
-      const oldNotificationChannel = this.currentNotificationChannel
-      await this.discoverNotificationChannel()
-      if (oldNotificationChannel && oldNotificationChannel !== this.currentNotificationChannel) {
-        this.unsubscribeChannel(oldNotificationChannel)
-      }
+      promises.push(this.discoverNotificationChannel())
     }
 
     // Re-discover all active ticket channels in parallel
-    await Promise.all(
-      Array.from(this.ticketSignalListeners.keys()).map((ticketId) =>
-        this.discoverTicketChannel(ticketId)
-      )
-    )
+    for (const ticketId of this.ticketSignalListeners.keys()) {
+      promises.push(this.discoverTicketChannel(ticketId))
+    }
+
+    await Promise.all(promises)
 
     // Notify reconnect listeners to refresh REST data
     for (const listener of this.reconnectListeners) {

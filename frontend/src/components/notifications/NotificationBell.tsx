@@ -1,16 +1,16 @@
 import React, { useState, useRef, useEffect, use } from 'react'
 import { Bell, Check, CheckCheck, ExternalLink, AlertCircle, Clock } from 'lucide-react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { getApiBaseUrl } from '../../utils/url'
 import { WorkspaceShellContext } from '../workspace/WorkspaceShellContext'
 import type { ILiveClient } from '../../lib/live-client'
 import {
   type NotificationItem,
   type NotificationFeedResponse,
-  type UnreadCountResponse,
   formatActivityDescription,
   formatRelativeTime,
 } from './types'
+import { useNotifications } from './useNotifications'
 
 export interface NotificationBellProps {
   readonly apiUrl?: string
@@ -30,7 +30,6 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
   className = '',
 }) => {
   const shellContext = use(WorkspaceShellContext)
-  const queryClient = useQueryClient()
 
   const resolvedApiUrl = (propApiUrl ?? shellContext?.apiUrl ?? getApiBaseUrl(null)).replace(/\/+$/, '')
   const token = propToken ?? shellContext?.token ?? (typeof window !== 'undefined' ? localStorage.getItem('zeddesk_token') : null)
@@ -42,30 +41,15 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
   const bellButtonRef = useRef<HTMLButtonElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
 
-  // 1. Unread count query
-  const { data: unreadData } = useQuery<UnreadCountResponse>({
-    queryKey: ['notifications', 'unread-count', activeOrgId, token],
-    queryFn: async () => {
-      if (!token) return { unread_count: 0 }
-      try {
-        const res = await fetch(`${resolvedApiUrl}/api/notifications/unread-count`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
-        })
-        if (!res.ok) return { unread_count: 0 }
-        return res.json()
-      } catch {
-        return { unread_count: 0 }
-      }
-    },
-    enabled: Boolean(token),
+  // 1. Shared notifications hook (unread count, quiet live listener, mark read mutations)
+  const { unreadCount, markRead, markAllRead } = useNotifications({
+    apiUrl: resolvedApiUrl,
+    token,
+    organizationId: activeOrgId,
+    liveClient,
   })
 
-  const unreadCount = unreadData?.unread_count ?? 0
-
-  // 2. Recent notifications query (5 newest)
+  // 2. Recent notifications query (5 newest, active when popover is open)
   const { data: recentFeed, isLoading: isLoadingRecent } = useQuery<NotificationFeedResponse>({
     queryKey: ['notifications', 'recent', activeOrgId, token],
     queryFn: async () => {
@@ -90,29 +74,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
 
   const recentItems: NotificationItem[] = recentFeed?.data ?? []
 
-  // 3. Quiet live signal listener (inbox.changed) without routine toasts
-  useEffect(() => {
-    if (!liveClient?.subscribeToNotifications) return
-
-    const unsubscribe = liveClient.subscribeToNotifications((signal) => {
-      // Guard against cross-organization leakage
-      if (Number(signal.organization_id) !== Number(activeOrgId)) {
-        return
-      }
-
-      // Quietly invalidate queries
-      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count', activeOrgId] })
-      if (isOpen) {
-        queryClient.invalidateQueries({ queryKey: ['notifications', 'recent', activeOrgId] })
-      }
-    })
-
-    return () => {
-      unsubscribe()
-    }
-  }, [liveClient, activeOrgId, isOpen, queryClient])
-
-  // 4. Handle Escape and outside click
+  // 3. Handle Escape and outside click
   useEffect(() => {
     if (!isOpen) return
 
@@ -144,81 +106,13 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
   }, [isOpen])
 
   // Mark single notification as read
-  const handleMarkRead = async (notificationId: string) => {
-    if (!token) return
-
-    // Optimistically update recent query cache so item is retained as read
-    queryClient.setQueryData<NotificationFeedResponse>(
-      ['notifications', 'recent', activeOrgId, token],
-      (prev) => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          data: prev.data.map((item) =>
-            item.id === notificationId ? { ...item, read_at: new Date().toISOString() } : item
-          ),
-        }
-      }
-    )
-
-    // Optimistically decrement unread count
-    queryClient.setQueryData<UnreadCountResponse>(
-      ['notifications', 'unread-count', activeOrgId, token],
-      (prev) => ({ unread_count: Math.max(0, (prev?.unread_count ?? 1) - 1) })
-    )
-
-    try {
-      await fetch(`${resolvedApiUrl}/api/notifications/${notificationId}/mark-read`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      })
-      queryClient.invalidateQueries({ queryKey: ['notifications', 'history'] })
-    } catch {
-      // Revert if network failed
-      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count', activeOrgId] })
-      queryClient.invalidateQueries({ queryKey: ['notifications', 'recent', activeOrgId] })
-    }
+  const handleMarkRead = (notificationId: string) => {
+    markRead(notificationId)
   }
 
   // Mark all notifications as read
-  const handleMarkAllRead = async () => {
-    if (!token) return
-
-    // Optimistically update recent query cache
-    queryClient.setQueryData<NotificationFeedResponse>(
-      ['notifications', 'recent', activeOrgId, token],
-      (prev) => {
-        if (!prev) return prev
-        const nowIso = new Date().toISOString()
-        return {
-          ...prev,
-          data: prev.data.map((item) => ({ ...item, read_at: item.read_at ?? nowIso })),
-        }
-      }
-    )
-
-    // Optimistically set unread count to 0
-    queryClient.setQueryData<UnreadCountResponse>(
-      ['notifications', 'unread-count', activeOrgId, token],
-      { unread_count: 0 }
-    )
-
-    try {
-      await fetch(`${resolvedApiUrl}/api/notifications/mark-all-read`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      })
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
-    } catch {
-      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count', activeOrgId] })
-      queryClient.invalidateQueries({ queryKey: ['notifications', 'recent', activeOrgId] })
-    }
+  const handleMarkAllRead = () => {
+    markAllRead()
   }
 
   const handleOpenItem = (item: NotificationItem) => {

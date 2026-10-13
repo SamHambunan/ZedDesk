@@ -1132,14 +1132,14 @@ function AppInner({
               />
             )}
 
-            {!loadingWorkspace && workspaceData && workspaceView === 'notifications' && (
+            {!loadingWorkspace && workspaceData && workspaceView === 'notifications' ? (
               <NotificationHistoryView
                 apiUrl={apiUrl}
                 token={token}
                 organizationId={workspaceData.organization?.id}
                 onNavigate={handleWorkspaceNavigate}
               />
-            )}
+            ) : null}
 
       </WorkspaceShell>
     )

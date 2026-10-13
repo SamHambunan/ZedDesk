@@ -1,4 +1,4 @@
-import React, { useState, useEffect, use } from 'react'
+import React, { useState, use } from 'react'
 import {
   Bell,
   Check,
@@ -9,19 +9,18 @@ import {
   ChevronRight,
   Filter,
 } from 'lucide-react'
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { getApiBaseUrl } from '../../utils/url'
 import { WorkspaceShellContext } from '../workspace/WorkspaceShellContext'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import type { ILiveClient } from '../../lib/live-client'
 import {
-  type NotificationItem,
   type NotificationFeedResponse,
-  type UnreadCountResponse,
   formatActivityDescription,
   formatRelativeTime,
 } from './types'
+import { useNotifications } from './useNotifications'
 
 export interface NotificationHistoryViewProps {
   readonly apiUrl?: string
@@ -41,7 +40,6 @@ export const NotificationHistoryView: React.FC<NotificationHistoryViewProps> = (
   className = '',
 }) => {
   const shellContext = use(WorkspaceShellContext)
-  const queryClient = useQueryClient()
 
   const resolvedApiUrl = (propApiUrl ?? shellContext?.apiUrl ?? getApiBaseUrl(null)).replace(/\/+$/, '')
   const token = propToken ?? shellContext?.token ?? (typeof window !== 'undefined' ? localStorage.getItem('zeddesk_token') : null)
@@ -52,28 +50,13 @@ export const NotificationHistoryView: React.FC<NotificationHistoryViewProps> = (
   const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all')
   const [currentPage, setCurrentPage] = useState(1)
 
-  // 1. Unread count query
-  const { data: unreadData } = useQuery<UnreadCountResponse>({
-    queryKey: ['notifications', 'unread-count', activeOrgId, token],
-    queryFn: async () => {
-      if (!token) return { unread_count: 0 }
-      try {
-        const res = await fetch(`${resolvedApiUrl}/api/notifications/unread-count`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
-        })
-        if (!res.ok) return { unread_count: 0 }
-        return res.json()
-      } catch {
-        return { unread_count: 0 }
-      }
-    },
-    enabled: Boolean(token),
+  // 1. Shared notifications hook (unread count, quiet live listener, mark read mutations)
+  const { unreadCount, markRead, markAllRead } = useNotifications({
+    apiUrl: resolvedApiUrl,
+    token,
+    organizationId: activeOrgId,
+    liveClient,
   })
-
-  const unreadCount = unreadData?.unread_count ?? 0
 
   // 2. Paginated notifications query
   const { data: feedData, isLoading: isLoadingFeed } = useQuery<NotificationFeedResponse>({
@@ -102,24 +85,6 @@ export const NotificationHistoryView: React.FC<NotificationHistoryViewProps> = (
     enabled: Boolean(token),
   })
 
-  // 3. Quiet live listener (inbox.changed) without routine toasts
-  useEffect(() => {
-    if (!liveClient?.subscribeToNotifications) return
-
-    const unsubscribe = liveClient.subscribeToNotifications((signal) => {
-      if (Number(signal.organization_id) !== Number(activeOrgId)) {
-        return
-      }
-
-      // Quietly invalidate queries
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
-    })
-
-    return () => {
-      unsubscribe()
-    }
-  }, [liveClient, activeOrgId, queryClient])
-
   // Reset to page 1 on tab change
   const handleTabChange = (tab: 'all' | 'unread') => {
     setActiveTab(tab)
@@ -127,76 +92,13 @@ export const NotificationHistoryView: React.FC<NotificationHistoryViewProps> = (
   }
 
   // Mark single notification as read
-  const handleMarkRead = async (notificationId: string) => {
-    if (!token) return
-
-    // Optimistically update current history query cache so item is retained as read
-    queryClient.setQueryData<NotificationFeedResponse>(
-      ['notifications', 'history', activeOrgId, activeTab, currentPage, token],
-      (prev) => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          data: prev.data.map((item) =>
-            item.id === notificationId ? { ...item, read_at: new Date().toISOString() } : item
-          ),
-        }
-      }
-    )
-
-    // Optimistically decrement unread count
-    queryClient.setQueryData<UnreadCountResponse>(
-      ['notifications', 'unread-count', activeOrgId, token],
-      (prev) => ({ unread_count: Math.max(0, (prev?.unread_count ?? 1) - 1) })
-    )
-
-    try {
-      await fetch(`${resolvedApiUrl}/api/notifications/${notificationId}/mark-read`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      })
-      queryClient.invalidateQueries({ queryKey: ['notifications', 'recent'] })
-    } catch {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
-    }
+  const handleMarkRead = (notificationId: string) => {
+    markRead(notificationId)
   }
 
   // Mark all notifications as read
-  const handleMarkAllRead = async () => {
-    if (!token) return
-
-    const nowIso = new Date().toISOString()
-    queryClient.setQueryData<NotificationFeedResponse>(
-      ['notifications', 'history', activeOrgId, activeTab, currentPage, token],
-      (prev) => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          data: prev.data.map((item) => ({ ...item, read_at: item.read_at ?? nowIso })),
-        }
-      }
-    )
-
-    queryClient.setQueryData<UnreadCountResponse>(
-      ['notifications', 'unread-count', activeOrgId, token],
-      { unread_count: 0 }
-    )
-
-    try {
-      await fetch(`${resolvedApiUrl}/api/notifications/mark-all-read`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      })
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
-    } catch {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
-    }
+  const handleMarkAllRead = () => {
+    markAllRead()
   }
 
   const items = feedData?.data ?? []
