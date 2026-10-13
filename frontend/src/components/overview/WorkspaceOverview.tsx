@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, use } from 'react'
+import React, { useState, useMemo, use } from 'react'
 import {
   QueryClientContext,
   QueryClientProvider,
@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-query'
 import { queryClient as defaultQueryClient } from '../../lib/query-client'
 import apiClient, { getAuthToken } from '../../lib/api-client'
-import type { PresenceMember } from '../../lib/live-client'
+import { useOrganizationPresence } from '../../hooks/useOrganizationPresence'
 import { WorkspaceShellContext } from '../workspace/WorkspaceShellContext'
 import { ContextRibbon } from './ContextRibbon'
 import { TeamCapacityLanes } from './TeamCapacityLanes'
@@ -57,23 +57,8 @@ const WorkspaceOverviewInner: React.FC<WorkspaceOverviewProps> = (props) => {
   const [claimedTicketIds, setClaimedTicketIds] = useState<readonly string[]>([])
 
   // Live organization presence tracking (Issue #151)
-  const [liveOnlineMembers, setLiveOnlineMembers] = useState<readonly PresenceMember[]>([])
   const effectiveLiveClient = props.liveClient ?? shellContext?.liveClient
-
-  useEffect(() => {
-    if (!effectiveLiveClient?.subscribeToOrganizationPresence) {
-      setLiveOnlineMembers([])
-      return
-    }
-    const unsub = effectiveLiveClient.subscribeToOrganizationPresence((members) => {
-      setLiveOnlineMembers(members)
-    })
-    return () => {
-      unsub()
-    }
-  }, [effectiveLiveClient])
-
-  const effectiveOnlineMembers = props.onlineMembers ?? liveOnlineMembers
+  const effectiveOnlineMembers = useOrganizationPresence(effectiveLiveClient, props.onlineMembers)
 
   const getRequestConfig = () => {
     return effectiveToken ? { headers: { Authorization: `Bearer ${effectiveToken}` } } : {}

@@ -12,10 +12,10 @@ import type { ComposerSubmitPayload } from './TicketComposer'
 import type { PresenceMember } from '../../lib/live-client'
 
 export interface CompoundFilters {
-  status: TicketStatus | 'all'
-  priority: TicketPriority | 'all'
-  teamId: number | 'all'
-  tagId: number | string | 'all'
+  readonly status: TicketStatus | 'all'
+  readonly priority: TicketPriority | 'all'
+  readonly teamId: number | 'all'
+  readonly tagId: number | string | 'all'
 }
 
 export const DEFAULT_COMPOUND_FILTERS: CompoundFilters = {

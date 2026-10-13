@@ -506,6 +506,116 @@ describe('LiveClient and MockLiveClient', () => {
     global.fetch = originalFetch
   })
 
+  it('clears presence when broadcasting auth is denied with 403', async () => {
+    const originalFetch = global.fetch
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/live/presence-channel')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            channel: 'presence-organization.1.members.gen100',
+            offline_grace_seconds: 30,
+          }),
+        })
+      }
+      if (url.includes('/api/broadcasting/auth')) {
+        return Promise.resolve({
+          ok: false,
+          status: 403,
+          json: () => Promise.resolve({ message: 'Forbidden' }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+    })
+
+    const client = new LiveClient({
+      apiUrl: 'http://localhost:8000',
+      token: 'some-token',
+      webSocketClass: MockWebSocket as any,
+    })
+
+    await vi.advanceTimersByTimeAsync(10)
+    const socket = MockWebSocket.instances[0]
+    socket.receive({
+      event: 'pusher:connection_established',
+      data: JSON.stringify({ socket_id: '123.456' }),
+    })
+
+    const presenceSpy = vi.fn()
+    client.subscribeToOrganizationPresence?.(presenceSpy)
+
+    await vi.advanceTimersByTimeAsync(50)
+
+    // Initially called with [] and after 403 auth denied cleared to []
+    expect(presenceSpy).toHaveBeenCalledWith([])
+
+    client.disconnect()
+    global.fetch = originalFetch
+  })
+
+  it('renews presence subscriptions via discovery endpoints upon reconnect', async () => {
+    const originalFetch = global.fetch
+    let discoveryCallCount = 0
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/live/presence-channel')) {
+        discoveryCallCount++
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            channel: `presence-organization.1.members.gen${discoveryCallCount * 100}`,
+            offline_grace_seconds: 30,
+          }),
+        })
+      }
+      if (url.includes('/api/broadcasting/auth')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            auth: 'auth-key:signature',
+            channel_data: JSON.stringify({ user_id: '1', user_info: { member_id: 1, name: 'Alice' } }),
+          }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+    })
+
+    const client = new LiveClient({
+      apiUrl: 'http://localhost:8000',
+      token: 'some-token',
+      webSocketClass: MockWebSocket as any,
+    })
+
+    await vi.advanceTimersByTimeAsync(10)
+    const socket1 = MockWebSocket.instances[0]
+    socket1.receive({
+      event: 'pusher:connection_established',
+      data: JSON.stringify({ socket_id: '123.456' }),
+    })
+
+    const presenceSpy = vi.fn()
+    client.subscribeToOrganizationPresence?.(presenceSpy)
+
+    await vi.advanceTimersByTimeAsync(50)
+    expect(discoveryCallCount).toBe(1)
+
+    // Simulate connection drop and reconnect
+    socket1.close()
+    await vi.advanceTimersByTimeAsync(3000)
+
+    const socket2 = MockWebSocket.instances[1]
+    socket2.receive({
+      event: 'pusher:connection_established',
+      data: JSON.stringify({ socket_id: '789.012' }),
+    })
+
+    await vi.advanceTimersByTimeAsync(50)
+    // Reconnect triggered second discovery for new generation
+    expect(discoveryCallCount).toBe(2)
+
+    client.disconnect()
+    global.fetch = originalFetch
+  })
+
   it('MockLiveClient supports presence and viewer emitting', () => {
     const mock = createMockLiveClient()
     const orgPresenceSpy = vi.fn()

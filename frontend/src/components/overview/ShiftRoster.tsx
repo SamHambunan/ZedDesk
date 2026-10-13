@@ -1,8 +1,18 @@
 import React from 'react'
 import { Radio } from 'lucide-react'
+import { Badge } from '../ui/Badge'
 import type { OverviewAgent } from './types'
 import { getInitials } from './types'
 import type { PresenceMember } from '../../lib/live-client'
+
+const EMPTY_ONLINE_MEMBERS_STATE = (
+  <div
+    data-testid="online-members-empty"
+    className="text-center py-4 text-text-muted text-xs font-mono-data border border-dashed border-border-subtle rounded-lg"
+  >
+    No members currently online.
+  </div>
+)
 
 export interface ShiftRosterProps {
   readonly agents: readonly OverviewAgent[]
@@ -132,12 +142,7 @@ export const ShiftRoster: React.FC<ShiftRosterProps> = ({ agents, onlineMembers 
           </p>
 
           {onlineMembers.length === 0 ? (
-            <div
-              data-testid="online-members-empty"
-              className="text-center py-4 text-text-muted text-xs font-mono-data border border-dashed border-border-subtle rounded-lg"
-            >
-              No members currently online.
-            </div>
+            EMPTY_ONLINE_MEMBERS_STATE
           ) : (
             <div className="space-y-2" data-testid="online-members-list">
               {onlineMembers.map((member) => {
@@ -162,12 +167,12 @@ export const ShiftRoster: React.FC<ShiftRosterProps> = ({ agents, onlineMembers 
                         {member.name}
                       </span>
                     </div>
-                    <span
+                    <Badge
+                      variant="positive"
                       data-testid={`online-member-badge-${member.member_id}`}
-                      className="text-[10px] font-mono-data font-semibold text-sentiment-positive bg-sentiment-positive/10 border border-sentiment-positive/20 px-2 py-0.5 rounded-full shrink-0"
                     >
                       Connected
-                    </span>
+                    </Badge>
                   </div>
                 )
               })}

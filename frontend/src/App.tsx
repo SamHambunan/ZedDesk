@@ -13,7 +13,8 @@ import { TicketQueueView } from './components/tickets/TicketQueueView'
 import type { PresetFilter } from './components/tickets/types'
 import { parseTicketNumberFromPath } from './components/tickets/constants'
 import { NotificationHistoryView } from './components/notifications/NotificationHistoryView'
-import { createLiveClient, type PresenceMember } from './lib/live-client'
+import { createLiveClient } from './lib/live-client'
+import { useOrganizationPresence } from './hooks/useOrganizationPresence'
 import { useWorkspace } from './hooks/useWorkspace'
 import { getApiBaseUrl, getCentralHubUrl, getOrganizationUrl, getSubdomain } from './utils/url'
 
@@ -229,20 +230,7 @@ function AppInner({
     }
   }, [liveClient])
 
-  const [onlineMembers, setOnlineMembers] = useState<readonly PresenceMember[]>([])
-
-  useEffect(() => {
-    if (!liveClient?.subscribeToOrganizationPresence) {
-      setOnlineMembers([])
-      return
-    }
-    const unsub = liveClient.subscribeToOrganizationPresence((members) => {
-      setOnlineMembers(members)
-    })
-    return () => {
-      unsub()
-    }
-  }, [liveClient])
+  const onlineMembers = useOrganizationPresence(liveClient)
 
   // Public Invitation fetch effect
   useEffect(() => {
@@ -496,10 +484,7 @@ function AppInner({
       const memberTeams = teams
         .filter((t) => t.members?.some((tm) => tm.user_id === m.user_id))
         .map((t) => t.name)
-      const isOnline =
-        onlineMemberIds.size > 0
-          ? onlineMemberIds.has(m.id) || (m.user_id ? onlineMemberIds.has(m.user_id) : false)
-          : m.user_id === user?.id
+      const isOnline = onlineMemberIds.has(m.id) || (m.user_id ? onlineMemberIds.has(m.user_id) : false)
       return {
         id: m.id,
         organization_id: m.organization_id,

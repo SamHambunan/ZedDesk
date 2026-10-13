@@ -246,19 +246,28 @@ export class LiveClient implements ILiveClient {
     return { member_id: memberId, name }
   }
 
+  private extractPresenceMembersFromPayload(data: any): PresenceMember[] {
+    const result: PresenceMember[] = []
+    if (data?.presence?.hash) {
+      for (const [idStr, info] of Object.entries(data.presence.hash)) {
+        const m = this.parsePresenceMember({ ...(info as object), user_id: idStr })
+        if (m) result.push(m)
+      }
+    } else if (Array.isArray(data?.presence?.ids)) {
+      for (const id of data.presence.ids) {
+        const m = this.parsePresenceMember({ user_id: id })
+        if (m) result.push(m)
+      }
+    }
+    return result
+  }
+
   private dispatchPresenceSubscriptionSucceeded(channel: string, data: any): void {
+    const members = this.extractPresenceMembersFromPayload(data)
     if (channel === this.currentOrgPresenceChannel) {
       this.currentOrgPresenceMembers.clear()
-      if (data?.presence?.hash) {
-        for (const [idStr, info] of Object.entries(data.presence.hash)) {
-          const m = this.parsePresenceMember({ ...(info as object), user_id: idStr })
-          if (m) this.currentOrgPresenceMembers.set(m.member_id, m)
-        }
-      } else if (Array.isArray(data?.presence?.ids)) {
-        for (const id of data.presence.ids) {
-          const m = this.parsePresenceMember({ user_id: id })
-          if (m) this.currentOrgPresenceMembers.set(m.member_id, m)
-        }
+      for (const m of members) {
+        this.currentOrgPresenceMembers.set(m.member_id, m)
       }
       this.dispatchOrgPresence()
     } else if (this.channelToTicketId.has(channel)) {
@@ -269,16 +278,8 @@ export class LiveClient implements ILiveClient {
         this.currentTicketViewersMembers.set(ticketId, membersMap)
       }
       membersMap.clear()
-      if (data?.presence?.hash) {
-        for (const [idStr, info] of Object.entries(data.presence.hash)) {
-          const m = this.parsePresenceMember({ ...(info as object), user_id: idStr })
-          if (m) membersMap.set(m.member_id, m)
-        }
-      } else if (Array.isArray(data?.presence?.ids)) {
-        for (const id of data.presence.ids) {
-          const m = this.parsePresenceMember({ user_id: id })
-          if (m) membersMap.set(m.member_id, m)
-        }
+      for (const m of members) {
+        membersMap.set(m.member_id, m)
       }
       this.dispatchTicketViewers(ticketId)
     }
@@ -402,7 +403,23 @@ export class LiveClient implements ILiveClient {
   private async subscribeChannel(channelName: string): Promise<void> {
     if (!this.socketId || !this.socket || this.socket.readyState !== WebSocket.OPEN) return
     const authData = await this.authorizeChannel(channelName)
-    if (!authData) return
+    if (!authData) {
+      if (
+        channelName === this.currentOrgPresenceChannel ||
+        (channelName.startsWith('presence-organization.') && channelName.includes('.members.'))
+      ) {
+        this.currentOrgPresenceMembers.clear()
+        this.dispatchOrgPresence()
+      } else if (this.channelToTicketId.has(channelName)) {
+        const ticketId = this.channelToTicketId.get(channelName)!
+        const membersMap = this.currentTicketViewersMembers.get(ticketId)
+        if (membersMap) {
+          membersMap.clear()
+          this.dispatchTicketViewers(ticketId)
+        }
+      }
+      return
+    }
     const data: Record<string, any> = {
       channel: channelName,
       auth: authData.auth,
@@ -427,20 +444,20 @@ export class LiveClient implements ILiveClient {
 
   private async resubscribeAllChannels(): Promise<void> {
     const promises: Promise<void>[] = []
-    if (this.currentOrgChannel) {
-      promises.push(this.subscribeChannel(this.currentOrgChannel))
+    if (this.orgSignalListeners.size > 0) {
+      promises.push(this.discoverOrgChannel())
     }
-    if (this.currentNotificationChannel) {
-      promises.push(this.subscribeChannel(this.currentNotificationChannel))
+    if (this.notificationSignalListeners.size > 0) {
+      promises.push(this.discoverNotificationChannel())
     }
-    if (this.currentOrgPresenceChannel) {
-      promises.push(this.subscribeChannel(this.currentOrgPresenceChannel))
+    if (this.orgPresenceListeners.size > 0) {
+      promises.push(this.discoverOrgPresenceChannel())
     }
-    for (const channelName of this.currentTicketChannels.values()) {
-      promises.push(this.subscribeChannel(channelName))
+    for (const ticketId of this.ticketSignalListeners.keys()) {
+      promises.push(this.discoverTicketChannel(ticketId))
     }
-    for (const channelName of this.currentTicketViewingChannels.values()) {
-      promises.push(this.subscribeChannel(channelName))
+    for (const ticketId of this.ticketViewersListeners.keys()) {
+      promises.push(this.discoverTicketViewingChannel(ticketId))
     }
     await Promise.all(promises)
   }

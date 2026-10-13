@@ -14,6 +14,7 @@ import {
   Share2,
   Eye,
 } from 'lucide-react'
+import { getInitials } from '../../lib/utils'
 import type {
   TicketItem,
   TicketMessage,
@@ -24,13 +25,6 @@ import type {
   OrgMemberOption,
   TicketTag,
 } from './types'
-
-function getViewerInitials(name?: string): string {
-  if (!name) return '?'
-  const parts = name.trim().split(/\s+/)
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-}
 import {
   TicketCockpitContext,
   useTicketCockpit,
@@ -1727,7 +1721,7 @@ export const TicketCockpitDetail: React.FC<TicketCockpitDetailProps> = ({
                   </span>
                   <div className="flex items-center -space-x-1.5 overflow-hidden">
                     {state.ticketViewers.map((viewer) => {
-                      const initials = getViewerInitials(viewer.name)
+                      const initials = getInitials(viewer.name)
                       return (
                         <div
                           key={viewer.member_id}

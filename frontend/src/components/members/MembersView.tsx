@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useEffect, useContext } from 'react'
+import React, { useState, useMemo, use } from 'react'
 import { Plus, Search, Filter } from 'lucide-react'
 import { Button } from '../ui/Button'
+import { Badge } from '../ui/Badge'
 import { Toast } from '../ui/Toast'
 import { MemberRosterTable } from './MemberRosterTable'
 import { PendingInvitationsTable } from './PendingInvitationsTable'
@@ -8,8 +9,18 @@ import { InviteMemberModal } from './InviteMemberModal'
 import { membersContentData } from '../../data/mockData'
 import { WorkspaceShellContext } from '../workspace/WorkspaceShellContext'
 import { getCentralHubUrl } from '../../utils/url'
+import { useOrganizationPresence } from '../../hooks/useOrganizationPresence'
 import type { Member, PendingInvitation } from './types'
 import type { ILiveClient, PresenceMember } from '../../lib/live-client'
+
+const EMPTY_ONLINE_MEMBERS_STATE = (
+  <div
+    data-testid="online-members-empty"
+    className="text-center py-3 text-text-muted text-xs font-mono-data border border-dashed border-border-subtle rounded-lg"
+  >
+    No members currently online.
+  </div>
+)
 
 export interface MembersViewProps {
   readonly members: readonly Member[]
@@ -48,7 +59,7 @@ export const MembersView: React.FC<MembersViewProps> = ({
   liveClient,
   className = '',
 }) => {
-  const shellContext = useContext(WorkspaceShellContext)
+  const shellContext = use(WorkspaceShellContext)
   const effectiveIsAdmin =
     isAdmin !== undefined
       ? isAdmin
@@ -64,26 +75,11 @@ export const MembersView: React.FC<MembersViewProps> = ({
   const effectiveCopiedId = copiedId ?? internalCopiedId
 
   // Live organization presence tracking (Issue #151)
-  const [liveOnlineMembers, setLiveOnlineMembers] = useState<readonly PresenceMember[]>([])
   const effectiveLiveClient = liveClient ?? shellContext?.liveClient
-
-  useEffect(() => {
-    if (!effectiveLiveClient?.subscribeToOrganizationPresence) {
-      setLiveOnlineMembers([])
-      return
-    }
-    const unsub = effectiveLiveClient.subscribeToOrganizationPresence((members) => {
-      setLiveOnlineMembers(members)
-    })
-    return () => {
-      unsub()
-    }
-  }, [effectiveLiveClient])
-
-  const effectiveOnlineMembers = onlineMembers ?? (effectiveLiveClient ? liveOnlineMembers : undefined)
+  const effectiveOnlineMembers = useOrganizationPresence(effectiveLiveClient, onlineMembers)
 
   const effectiveOnlineMemberIds = useMemo(() => {
-    return new Set((effectiveOnlineMembers ?? []).map((m) => m.member_id))
+    return new Set(effectiveOnlineMembers.map((m) => m.member_id))
   }, [effectiveOnlineMembers])
 
   const displayedInvitations = useMemo(() => {
@@ -110,14 +106,16 @@ export const MembersView: React.FC<MembersViewProps> = ({
   }, [members, searchQuery, selectedRole])
 
   const displayMembers = useMemo(() => {
-    if (effectiveOnlineMembers === undefined) {
+    if (onlineMembers === undefined && !effectiveLiveClient) {
       return filteredMembers
     }
     return filteredMembers.map((m) => ({
       ...m,
-      status: (effectiveOnlineMemberIds.has(m.id) ? 'online' : 'offline') as 'online' | 'offline',
+      status: ((effectiveOnlineMemberIds.has(m.id) || (m.user_id && effectiveOnlineMemberIds.has(m.user_id)))
+        ? 'online'
+        : 'offline') as 'online' | 'offline',
     }))
-  }, [filteredMembers, effectiveOnlineMembers, effectiveOnlineMemberIds])
+  }, [filteredMembers, onlineMembers, effectiveLiveClient, effectiveOnlineMemberIds])
 
   // Collect all existing emails for duplicate validation in modal
   const existingEmails = useMemo(() => {
@@ -279,12 +277,7 @@ export const MembersView: React.FC<MembersViewProps> = ({
           </p>
 
           {effectiveOnlineMembers.length === 0 ? (
-            <div
-              data-testid="online-members-empty"
-              className="text-center py-3 text-text-muted text-xs font-mono-data border border-dashed border-border-subtle rounded-lg"
-            >
-              No members currently online.
-            </div>
+            EMPTY_ONLINE_MEMBERS_STATE
           ) : (
             <div className="flex items-center gap-2 flex-wrap" data-testid="online-members-list">
               {effectiveOnlineMembers.map((member) => (
@@ -299,12 +292,12 @@ export const MembersView: React.FC<MembersViewProps> = ({
                   >
                     {member.name}
                   </span>
-                  <span
+                  <Badge
+                    variant="positive"
                     data-testid={`online-member-badge-${member.member_id}`}
-                    className="text-[10px] font-mono-data font-semibold text-sentiment-positive bg-sentiment-positive/10 border border-sentiment-positive/20 px-1.5 py-0.5 rounded"
                   >
                     Connected
-                  </span>
+                  </Badge>
                 </div>
               ))}
             </div>
