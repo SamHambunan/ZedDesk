@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { TicketCockpit } from './TicketCockpit'
 import { useTicketCockpit, DEFAULT_COMPOUND_FILTERS } from './TicketCockpitContext'
 import { TicketQueueView } from './TicketQueueView'
