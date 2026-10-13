@@ -167,10 +167,15 @@ function TicketCockpitInternalProvider({
 
   // Queue holding state for in-place updates & deliberate reordering
   const [heldTickets, setHeldTickets] = useState<readonly TicketItem[] | null>(null)
-  const [hasPendingQueueReorder, setHasPendingQueueReorder] = useState(false)
   const [pendingServerTickets, setPendingServerTickets] = useState<readonly TicketItem[] | null>(null)
   const pendingServerTicketsRef = useRef(pendingServerTickets)
   pendingServerTicketsRef.current = pendingServerTickets
+  const hasPendingQueueReorder = Boolean(pendingServerTickets && pendingServerTickets.length > 0)
+
+  const resetQueueHold = () => {
+    setHeldTickets(null)
+    setPendingServerTickets(null)
+  }
 
   // Initial fallback data if no tickets are passed and no API URL is configured
   const effectivePropTickets = propTickets ?? (apiUrl ? [] : INITIAL_MOCK_TICKETS)
@@ -212,9 +217,7 @@ function TicketCockpitInternalProvider({
     setPrevInitialPreset(initialPreset)
     if (activePreset !== initialPreset) {
       setActivePreset(initialPreset)
-      setHeldTickets(null)
-      setPendingServerTickets(null)
-      setHasPendingQueueReorder(false)
+      resetQueueHold()
     }
   }
   const [filters, setFiltersState] = useState<CompoundFilters>(DEFAULT_COMPOUND_FILTERS)
@@ -295,7 +298,6 @@ function TicketCockpitInternalProvider({
       if (!heldTickets || heldTickets.length === 0) {
         setHeldTickets(serverTickets)
         setPendingServerTickets(null)
-        setHasPendingQueueReorder(false)
       } else {
         const currentIds = heldTickets.map((t) => t.id)
         const incomingIds = serverTickets.map((t) => t.id)
@@ -314,17 +316,14 @@ function TicketCockpitInternalProvider({
             })
           )
           setPendingServerTickets(serverTickets)
-          setHasPendingQueueReorder(true)
         } else {
           setHeldTickets(serverTickets)
           setPendingServerTickets(null)
-          setHasPendingQueueReorder(false)
         }
       }
     } else if (serverTickets && serverTickets.length === 0) {
       setHeldTickets([])
       setPendingServerTickets(null)
-      setHasPendingQueueReorder(false)
     }
   }
 
@@ -562,6 +561,11 @@ function TicketCockpitInternalProvider({
     staleTime: 10_000,
   })
 
+  const targetTicketIdRef = useRef(targetTicketId)
+  targetTicketIdRef.current = targetTicketId
+  const selectedTicketIdRef = useRef(selectedTicketId)
+  selectedTicketIdRef.current = selectedTicketId
+
   // Live channel subscriptions and signal processing
   useEffect(() => {
     if (!liveClientInstance) return
@@ -572,12 +576,13 @@ function TicketCockpitInternalProvider({
 
     const unsubReconnect = liveClientInstance.onReconnect(() => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] })
-      if (targetTicketId) {
-        queryClient.invalidateQueries({ queryKey: ['ticket', targetTicketId] })
+      const currentTarget = targetTicketIdRef.current
+      if (currentTarget) {
+        queryClient.invalidateQueries({ queryKey: ['ticket', currentTarget] })
       }
     })
 
-    const handleOrgSignal = (signal: LiveSignalPayload) => {
+    const processSignal = (signal: LiveSignalPayload, isTicketSpecific = false) => {
       // 1. Deduplicate by event_id
       if (seenEventIdsRef.current.has(signal.event_id)) {
         return
@@ -595,9 +600,12 @@ function TicketCockpitInternalProvider({
       }
       knownRevisionsRef.current.set(signal.ticket_id, signal.revision)
 
+      const currentTarget = targetTicketIdRef.current
+      const currentSelected = selectedTicketIdRef.current
+
       // 3. Deletion check for active ticket
       if (signal.change_type === 'deleted') {
-        if (signal.ticket_id === targetTicketId || signal.ticket_id === selectedTicketId) {
+        if (isTicketSpecific || signal.ticket_id === currentTarget || signal.ticket_id === currentSelected) {
           setIsUnavailable(true)
         }
         setHeldTickets((prev) => (prev ? prev.filter((t) => t.id !== signal.ticket_id) : []))
@@ -606,12 +614,12 @@ function TicketCockpitInternalProvider({
 
       // 4. Invalidate authoritative REST queries
       queryClient.invalidateQueries({ queryKey: ['tickets'] })
-      if (signal.ticket_id === targetTicketId) {
-        queryClient.invalidateQueries({ queryKey: ['ticket', targetTicketId] })
+      if (isTicketSpecific || signal.ticket_id === currentTarget) {
+        queryClient.invalidateQueries({ queryKey: ['ticket', signal.ticket_id] })
       }
     }
 
-    const unsubOrg = liveClientInstance.subscribeToOrganization(handleOrgSignal)
+    const unsubOrg = liveClientInstance.subscribeToOrganization((sig) => processSignal(sig, false))
 
     return () => {
       unsubStatus()
@@ -621,12 +629,12 @@ function TicketCockpitInternalProvider({
         liveClientInstance.disconnect()
       }
     }
-  }, [liveClientInstance, propLiveClient, queryClient, targetTicketId, selectedTicketId])
+  }, [liveClientInstance, propLiveClient, queryClient])
 
   useEffect(() => {
     if (!liveClientInstance || !targetTicketId) return
 
-    const handleTicketSignal = (signal: LiveSignalPayload) => {
+    const unsubTicket = liveClientInstance.subscribeToTicket(targetTicketId, (signal) => {
       if (seenEventIdsRef.current.has(signal.event_id)) {
         return
       }
@@ -645,9 +653,8 @@ function TicketCockpitInternalProvider({
 
       queryClient.invalidateQueries({ queryKey: ['tickets'] })
       queryClient.invalidateQueries({ queryKey: ['ticket', targetTicketId] })
-    }
+    })
 
-    const unsubTicket = liveClientInstance.subscribeToTicket(targetTicketId, handleTicketSignal)
     return () => {
       unsubTicket()
     }
@@ -744,30 +751,23 @@ function TicketCockpitInternalProvider({
       },
       setActivePreset: (preset: PresetFilter) => {
         setActivePreset(preset)
-        setHeldTickets(null)
-        setPendingServerTickets(null)
-        setHasPendingQueueReorder(false)
+        resetQueueHold()
       },
       setSearchQuery: (query: string) => {
         setSearchQuery(query)
       },
       setFilters: (newFilters: Partial<CompoundFilters>) => {
         setFiltersState((prev) => ({ ...prev, ...newFilters }))
-        setHeldTickets(null)
-        setPendingServerTickets(null)
-        setHasPendingQueueReorder(false)
+        resetQueueHold()
       },
       resetFilters: () => {
         setFiltersState(DEFAULT_COMPOUND_FILTERS)
-        setHeldTickets(null)
-        setPendingServerTickets(null)
-        setHasPendingQueueReorder(false)
+        resetQueueHold()
       },
       applyPendingQueueOrder: () => {
         if (pendingServerTicketsRef.current) {
           setHeldTickets(pendingServerTicketsRef.current)
           setPendingServerTickets(null)
-          setHasPendingQueueReorder(false)
         }
       },
       setMobilePane: (pane: 'queue' | 'detail') => {
@@ -1273,6 +1273,20 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [searchInputRef])
 
+  const queueScrollRef = useRef<HTMLDivElement | null>(null)
+  const lastScrollTopRef = useRef<number>(0)
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    lastScrollTopRef.current = e.currentTarget.scrollTop
+  }
+
+  // Preserve scroll position when tickets update in place
+  useEffect(() => {
+    if (queueScrollRef.current && lastScrollTopRef.current > 0) {
+      queueScrollRef.current.scrollTop = lastScrollTopRef.current
+    }
+  }, [state.filteredTickets, state.hasPendingQueueReorder])
+
   const filters = state.filters
   const hasActiveFilters =
     filters.status !== 'all' ||
@@ -1386,7 +1400,7 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
       </div>
 
       {/* Disconnected Status Warning */}
-      {state.liveStatus === 'disconnected' && (
+      {state.liveStatus === 'disconnected' ? (
         <div
           data-testid="live-status-indicator"
           className="px-3 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-amber-400 text-[10px] font-mono flex items-center justify-between"
@@ -1398,10 +1412,10 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
           </div>
           <span className="text-text-muted text-[9px]">REST actions active</span>
         </div>
-      )}
+      ) : null}
 
       {/* New Activity Banner */}
-      {state.hasPendingQueueReorder && (
+      {state.hasPendingQueueReorder ? (
         <div
           data-testid="new-activity-banner"
           className="p-2 bg-amber-action/10 border-b border-amber-action/20 text-center"
@@ -1415,10 +1429,14 @@ export const TicketCockpitQueue: React.FC<TicketCockpitQueueProps> = ({
             New activity • Apply changed queue order
           </button>
         </div>
-      )}
+      ) : null}
 
       {/* Tickets List */}
-      <div className="flex-1 overflow-y-auto divide-y divide-border-subtle">
+      <div
+        ref={queueScrollRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto divide-y divide-border-subtle"
+      >
         {children ?? (
           state.filteredTickets.length === 0 ? (
             <div className="p-8 text-center text-text-muted text-xs font-mono">
@@ -1640,7 +1658,7 @@ export const TicketCockpitDetail: React.FC<TicketCockpitDetailProps> = ({
           </div>
 
           {/* Outside this queue notice */}
-          {isOutsidePreset && (
+          {isOutsidePreset ? (
             <div
               data-testid="outside-queue-notice"
               className="bg-amber-action/10 border-b border-amber-action/30 px-4 py-2 text-xs font-mono text-amber-action flex items-center justify-between"
@@ -1650,7 +1668,7 @@ export const TicketCockpitDetail: React.FC<TicketCockpitDetailProps> = ({
                 <span className="text-text-muted text-[10px]">• This ticket does not match the active preset filter</span>
               </div>
             </div>
-          )}
+          ) : null}
 
           {children ?? (
             <>

@@ -206,7 +206,7 @@ export class LiveClient implements ILiveClient {
 
     // Check if channel matches any ticket channel
     for (const [ticketId, ticketChannel] of this.currentTicketChannels.entries()) {
-      if (ticketChannel === channel || payload.ticket_id === ticketId) {
+      if (ticketChannel === channel) {
         const listeners = this.ticketSignalListeners.get(ticketId)
         if (listeners) {
           for (const listener of listeners) {
@@ -264,12 +264,14 @@ export class LiveClient implements ILiveClient {
   }
 
   private async resubscribeAllChannels(): Promise<void> {
+    const promises: Promise<void>[] = []
     if (this.currentOrgChannel) {
-      await this.subscribeChannel(this.currentOrgChannel)
+      promises.push(this.subscribeChannel(this.currentOrgChannel))
     }
     for (const channelName of this.currentTicketChannels.values()) {
-      await this.subscribeChannel(channelName)
+      promises.push(this.subscribeChannel(channelName))
     }
+    await Promise.all(promises)
   }
 
   public subscribeToOrganization(
@@ -373,10 +375,12 @@ export class LiveClient implements ILiveClient {
       }
     }
 
-    // Re-discover all active ticket channels
-    for (const ticketId of this.ticketSignalListeners.keys()) {
-      await this.discoverTicketChannel(ticketId)
-    }
+    // Re-discover all active ticket channels in parallel
+    await Promise.all(
+      Array.from(this.ticketSignalListeners.keys()).map((ticketId) =>
+        this.discoverTicketChannel(ticketId)
+      )
+    )
 
     // Notify reconnect listeners to refresh REST data
     for (const listener of this.reconnectListeners) {
