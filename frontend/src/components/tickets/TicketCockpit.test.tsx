@@ -860,6 +860,161 @@ describe('Ticket field conflict recovery', () => {
   })
 })
 
+describe('Assignment conflict recovery', () => {
+  beforeEach(() => {
+    window.history.pushState({}, '', '/')
+    queryClient.clear()
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('compares both Assignment values and retries the intended pair only after a click', async () => {
+    const user = userEvent.setup()
+    const requests: Array<{ url: string; body?: Record<string, unknown> }> = []
+    const ticket = { ...INITIAL_MOCK_TICKETS[0], assignment_revision: 2 }
+    let currentTeamId: number | null = null
+    let currentMemberId: number | null = null
+    let assignmentRevision = 2
+
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const body = init?.body && typeof init.body === 'string' ? JSON.parse(init.body) : undefined
+      requests.push({ url, body })
+      if (url.endsWith('/assign') && init?.method === 'POST') {
+        if (assignmentRevision === 2) {
+          currentTeamId = 2
+          currentMemberId = 4
+          assignmentRevision = 3
+          return { ok: false, status: 409, json: async () => ({
+            message: 'Ticket assignment has changed since it was read.',
+            current: { assigned_team_id: 2, assigned_member_id: 4, assignment_revision: 3 },
+          }) }
+        }
+        currentTeamId = body.team_id
+        currentMemberId = body.member_id
+        assignmentRevision = 4
+        return { ok: true, json: async () => ({ data: { ...ticket, assigned_team_id: currentTeamId, assigned_member_id: currentMemberId, assignment_revision: 4 } }) }
+      }
+      const current = { ...ticket, assigned_team_id: currentTeamId, assigned_member_id: currentMemberId, assignment_revision: assignmentRevision }
+      if (url.endsWith('/tickets/ticket-1')) return { ok: true, json: async () => ({ data: current }) }
+      if (url.includes('/tickets?')) return { ok: true, json: async () => ({ data: [current] }) }
+      return { ok: true, json: async () => ({ data: [] }) }
+    }))
+
+    render(<TicketCockpit.Provider apiUrl="http://zeddesk.test/api" token="test-token" tickets={[ticket]} teams={MOCK_TEAMS} members={MOCK_MEMBERS}>
+      <TicketCockpit.Inspector />
+      <TicketCockpit.Detail />
+    </TicketCockpit.Provider>)
+    await waitFor(() => expect(requests.some((request) => request.url.endsWith('/tickets/ticket-1'))).toBe(true))
+    await user.type(screen.getByTestId('composer-textarea'), 'Keep this draft')
+    await user.upload(screen.getByTestId('composer-hidden-file-input'), new File(['log'], 'error.txt', { type: 'text/plain' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Assigned Team' }), '1')
+
+    await waitFor(() => expect(screen.getByText('Current assignment: Team: Billing Support; Organization Member: Marcus Brody')).toBeInTheDocument())
+    expect(screen.getByText('My choice: Team: Support Tier 1; Organization Member: Unassigned')).toBeInTheDocument()
+    expect((screen.getByRole('combobox', { name: 'Assigned Team' }) as HTMLSelectElement).value).toBe('1')
+    expect(requests.filter((request) => request.url.endsWith('/assign'))).toHaveLength(1)
+    expect(requests.find((request) => request.url.endsWith('/assign'))?.body).toMatchObject({ team_id: 1, member_id: null, expected_assignment_revision: 2 })
+    expect(screen.getByTestId('composer-textarea')).toHaveValue('Keep this draft')
+    expect(screen.getByText('error.txt')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Retry my change' }))
+    await waitFor(() => expect(requests.filter((request) => request.url.endsWith('/assign'))).toHaveLength(2))
+    expect(requests.filter((request) => request.url.endsWith('/assign'))[1].body).toMatchObject({ team_id: 1, member_id: null, expected_assignment_revision: 3 })
+    await waitFor(() => expect(screen.queryByText('Current assignment: Team: Billing Support; Organization Member: Marcus Brody')).not.toBeInTheDocument())
+    expect(screen.getByTestId('composer-textarea')).toHaveValue('Keep this draft')
+    expect(screen.getByText('error.txt')).toBeInTheDocument()
+  })
+
+  it('keeps a stale Claim deliberate and accepts the current Assignment without another mutation', async () => {
+    const user = userEvent.setup()
+    const requests: Array<{ url: string; body?: Record<string, unknown> }> = []
+    const ticket = { ...INITIAL_MOCK_TICKETS[0], assignment_revision: 2 }
+    let currentTeamId: number | null = null
+    let assignmentRevision = 2
+
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const body = init?.body && typeof init.body === 'string' ? JSON.parse(init.body) : undefined
+      requests.push({ url, body })
+      if (url.endsWith('/claim') && init?.method === 'POST') {
+        currentTeamId = 1
+        assignmentRevision = 3
+        return { ok: false, status: 409, json: async () => ({
+          message: 'Ticket assignment has changed since it was read.',
+          current: { assigned_team_id: 1, assigned_member_id: null, assignment_revision: 3 },
+        }) }
+      }
+      const current = { ...ticket, assigned_team_id: currentTeamId, assignment_revision: assignmentRevision }
+      if (url.endsWith('/tickets/ticket-1')) return { ok: true, json: async () => ({ data: current }) }
+      if (url.includes('/tickets?')) return { ok: true, json: async () => ({ data: [current] }) }
+      return { ok: true, json: async () => ({ data: [] }) }
+    }))
+
+    render(<TicketCockpit.Provider apiUrl="http://zeddesk.test/api" token="test-token" tickets={[ticket]} teams={MOCK_TEAMS} members={MOCK_MEMBERS}>
+      <TicketCockpit.Inspector />
+      <TicketCockpit.Detail />
+    </TicketCockpit.Provider>)
+    await waitFor(() => expect(requests.some((request) => request.url.endsWith('/tickets/ticket-1'))).toBe(true))
+    await user.type(screen.getByTestId('composer-textarea'), 'Claim draft')
+    await user.click(screen.getByRole('button', { name: 'Claim Ticket' }))
+
+    await waitFor(() => expect(screen.getByText('Current assignment: Team: Support Tier 1; Organization Member: Unassigned')).toBeInTheDocument())
+    expect(screen.getByText('My choice: Team: No team assigned; Organization Member: Acme Agent')).toBeInTheDocument()
+    expect(screen.getByText('Retrying Claim keeps the current Team.')).toBeInTheDocument()
+    expect(requests.filter((request) => request.url.endsWith('/claim'))).toHaveLength(1)
+    expect(requests.find((request) => request.url.endsWith('/claim'))?.body).toEqual({ expected_assignment_revision: 2 })
+    expect(screen.getByTestId('composer-textarea')).toHaveValue('Claim draft')
+    expect(screen.queryByRole('button', { name: 'Claim Ticket' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Use current value' }))
+    await waitFor(() => expect(screen.queryByText('Current assignment: Team: Support Tier 1; Organization Member: Unassigned')).not.toBeInTheDocument())
+    expect((screen.getByRole('combobox', { name: 'Assigned Team' }) as HTMLSelectElement).value).toBe('1')
+    expect(requests.filter((request) => request.url.endsWith('/claim'))).toHaveLength(1)
+    expect(screen.getByTestId('composer-textarea')).toHaveValue('Claim draft')
+  })
+
+  it('retries a stale Claim with a fresh Assignment revision only after choosing Retry', async () => {
+    const user = userEvent.setup()
+    const claimBodies: Array<Record<string, unknown>> = []
+    const ticket = { ...INITIAL_MOCK_TICKETS[0], assignment_revision: 2 }
+    let teamId: number | null = null
+    let memberId: number | null = null
+    let revision = 2
+
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/claim') && init?.method === 'POST') {
+        claimBodies.push(JSON.parse(init.body as string))
+        if (claimBodies.length === 1) {
+          teamId = 1
+          revision = 3
+          return { ok: false, status: 409, json: async () => ({
+            message: 'Ticket assignment has changed since it was read.',
+            current: { assigned_team_id: 1, assigned_member_id: null, assignment_revision: 3 },
+          }) }
+        }
+        memberId = 2
+        revision = 4
+        return { ok: true, json: async () => ({ data: { ...ticket, assigned_team_id: teamId, assigned_member_id: memberId, assignment_revision: revision } }) }
+      }
+      const current = { ...ticket, assigned_team_id: teamId, assigned_member_id: memberId, assignment_revision: revision }
+      if (url.endsWith('/tickets/ticket-1')) return { ok: true, json: async () => ({ data: current }) }
+      if (url.includes('/tickets?')) return { ok: true, json: async () => ({ data: [current] }) }
+      return { ok: true, json: async () => ({ data: [] }) }
+    }))
+
+    render(<TicketCockpit.Provider apiUrl="http://zeddesk.test/api" token="test-token" tickets={[ticket]} teams={MOCK_TEAMS} members={MOCK_MEMBERS}>
+      <TicketCockpit.Inspector />
+    </TicketCockpit.Provider>)
+    await user.click(screen.getByRole('button', { name: 'Claim Ticket' }))
+    await waitFor(() => expect(screen.getByText('Current assignment: Team: Support Tier 1; Organization Member: Unassigned')).toBeInTheDocument())
+    expect(claimBodies).toEqual([{ expected_assignment_revision: 2 }])
+
+    await user.click(screen.getByRole('button', { name: 'Retry my change' }))
+    await waitFor(() => expect(claimBodies).toHaveLength(2))
+    expect(claimBodies[1]).toEqual({ expected_assignment_revision: 3 })
+    await waitFor(() => expect(screen.queryByText('Current assignment: Team: Support Tier 1; Organization Member: Unassigned')).not.toBeInTheDocument())
+  })
+})
+
 describe('Live Signals and Authorized REST Refresh (Issue #149)', () => {
   const originalFetch = global.fetch
 

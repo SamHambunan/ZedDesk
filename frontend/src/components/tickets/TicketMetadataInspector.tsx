@@ -24,7 +24,7 @@ import type {
   TicketTag,
 } from './types'
 import { TicketCockpitContext } from './TicketCockpitContext'
-import type { TicketFieldConflict } from './TicketCockpitContext'
+import type { AssignmentPair } from './TicketCockpitContext'
 import { Toast } from '../ui/Toast'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
@@ -106,7 +106,7 @@ export const InspectorClaimCta: React.FC<InspectorClaimCtaProps> = ({
   const ticket = propTicket ?? context?.state.activeTicket
   const onClaimTicket = propOnClaim ?? context?.actions.claimTicket
 
-  if (!ticket || ticket.assigned_member_id) return null
+  if (!ticket || ticket.assigned_member_id || context?.state.assignmentConflicts?.[ticket.id]) return null
 
   const handleClaim = async () => {
     try {
@@ -146,13 +146,19 @@ InspectorClaimCta.displayName = 'TicketCockpit.Inspector.ClaimCta'
 
 // --- Compound Subcomponent 3: Lifecycle ---
 function InspectorFieldConflict({
-  conflict,
+  currentValue,
+  intendedValue,
+  currentLabel = 'Current value',
+  note,
   onUseCurrent,
   onRetry,
   onError,
   onActionSettled,
 }: {
-  readonly conflict: TicketFieldConflict
+  readonly currentValue: React.ReactNode
+  readonly intendedValue: React.ReactNode
+  readonly currentLabel?: string
+  readonly note?: React.ReactNode
   readonly onUseCurrent?: () => Promise<void>
   readonly onRetry?: () => Promise<void>
   readonly onError?: (error: Error) => void
@@ -175,8 +181,9 @@ function InspectorFieldConflict({
 
   return (
     <div role="status" className="mt-2 rounded border border-amber-action/50 bg-amber-action/10 p-2 text-xs text-text-primary">
-      <p>Current value: {conflict.currentValue}</p>
-      <p>My choice: {conflict.intendedValue}</p>
+      <p>{currentLabel}: {currentValue}</p>
+      <p>My choice: {intendedValue}</p>
+      {note ? <p className="mt-1 text-text-secondary">{note}</p> : null}
       <div className="mt-2 flex flex-wrap gap-2">
         <Button type="button" size="compact" variant="secondary" disabled={isResolving} onClick={() => resolve(onUseCurrent)}>
           Use current value
@@ -274,7 +281,8 @@ export const InspectorLifecycle: React.FC<InspectorLifecycleProps> = ({
           </select>
           {statusConflict ? (
             <InspectorFieldConflict
-              conflict={statusConflict}
+              currentValue={statusConflict.currentValue}
+              intendedValue={statusConflict.intendedValue}
               onUseCurrent={useCurrentFieldValue ? () => useCurrentFieldValue(ticket.id, 'status') : undefined}
               onRetry={retryFieldChange ? () => retryFieldChange(ticket.id, 'status') : undefined}
               onError={onError}
@@ -302,7 +310,8 @@ export const InspectorLifecycle: React.FC<InspectorLifecycleProps> = ({
           </select>
           {priorityConflict ? (
             <InspectorFieldConflict
-              conflict={priorityConflict}
+              currentValue={priorityConflict.currentValue}
+              intendedValue={priorityConflict.intendedValue}
               onUseCurrent={useCurrentFieldValue ? () => useCurrentFieldValue(ticket.id, 'priority') : undefined}
               onRetry={retryFieldChange ? () => retryFieldChange(ticket.id, 'priority') : undefined}
               onError={onError}
@@ -341,18 +350,30 @@ export const InspectorAssignment: React.FC<InspectorAssignmentProps> = ({
   const teams = propTeams ?? context?.state.teams ?? []
   const members = propMembers ?? context?.state.members ?? []
   const onAssign = propOnAssign ?? context?.actions.assign
+  const assignmentConflict = ticket ? context?.state.assignmentConflicts?.[ticket.id] : undefined
+  const setConflictedAssignmentIntent = context?.actions.setConflictedAssignmentIntent
+  const useCurrentAssignment = context?.actions.useCurrentAssignment
+  const retryAssignment = context?.actions.retryAssignment
+  const teamSelectRef = useRef<HTMLSelectElement>(null)
 
   if (!ticket) return null
 
   // Team and cascading member resolution derived directly in render (no effect sync)
-  const assignedTeam = teams.find((t) => t.id === ticket.assigned_team_id)
+  const selectedTeamId = assignmentConflict ? assignmentConflict.intended.teamId : ticket.assigned_team_id ?? null
+  const selectedMemberId = assignmentConflict ? assignmentConflict.intended.memberId : ticket.assigned_member_id ?? null
+  const assignedTeam = teams.find((t) => t.id === selectedTeamId)
   const eligibleMembers = assignedTeam
     ? members.filter((m) => assignedTeam.memberIds?.includes(m.id) || m.teamIds?.includes(assignedTeam.id))
     : members
+  const describeAssignment = (pair: AssignmentPair) => {
+    const team = pair.teamId === null ? 'No team assigned' : teams.find((item) => item.id === pair.teamId)?.name ?? `Team #${pair.teamId}`
+    const member = pair.memberId === null ? 'Unassigned' : members.find((item) => item.id === pair.memberId)?.name ?? `Organization Member #${pair.memberId}`
+    return `Team: ${team}; Organization Member: ${member}`
+  }
 
   const handleTeamChange = async (teamIdStr: string) => {
     const nextTeamId = teamIdStr ? Number(teamIdStr) : null
-    let nextMemberId = ticket.assigned_member_id
+    let nextMemberId = selectedMemberId
 
     // Incompatible team check: reset member if not in new team
     if (nextTeamId) {
@@ -368,6 +389,10 @@ export const InspectorAssignment: React.FC<InspectorAssignmentProps> = ({
       }
     }
 
+    if (assignmentConflict) {
+      setConflictedAssignmentIntent?.(ticket.id, nextTeamId, nextMemberId ?? null)
+      return
+    }
     try {
       await onAssign?.(ticket.id, nextTeamId, nextMemberId ?? null)
     } catch (err) {
@@ -377,7 +402,7 @@ export const InspectorAssignment: React.FC<InspectorAssignmentProps> = ({
 
   const handleMemberChange = async (memberIdStr: string) => {
     const nextMemberId = memberIdStr ? Number(memberIdStr) : null
-    let nextTeamId = ticket.assigned_team_id
+    let nextTeamId = selectedTeamId
 
     // Auto-populate primary team when selecting a member
     if (nextMemberId) {
@@ -389,6 +414,10 @@ export const InspectorAssignment: React.FC<InspectorAssignmentProps> = ({
       }
     }
 
+    if (assignmentConflict) {
+      setConflictedAssignmentIntent?.(ticket.id, nextTeamId ?? null, nextMemberId)
+      return
+    }
     try {
       await onAssign?.(ticket.id, nextTeamId ?? null, nextMemberId)
     } catch (err) {
@@ -411,7 +440,8 @@ export const InspectorAssignment: React.FC<InspectorAssignmentProps> = ({
           <select
             id="inspector-team"
             data-testid="inspector-team-select"
-            value={ticket.assigned_team_id ?? ''}
+            ref={teamSelectRef}
+            value={selectedTeamId ?? ''}
             onChange={(e) => handleTeamChange(e.target.value)}
             className="w-full h-8 px-2.5 bg-surface-panel border border-border-subtle rounded text-xs font-mono text-text-primary focus:outline-none focus:border-amber-action focus-visible:ring-1 focus-visible:ring-focus-amber cursor-pointer"
           >
@@ -431,7 +461,7 @@ export const InspectorAssignment: React.FC<InspectorAssignmentProps> = ({
           <select
             id="inspector-member"
             data-testid="inspector-member-select"
-            value={ticket.assigned_member_id ?? ''}
+            value={selectedMemberId ?? ''}
             onChange={(e) => handleMemberChange(e.target.value)}
             className="w-full h-8 px-2.5 bg-surface-panel border border-border-subtle rounded text-xs font-mono text-text-primary focus:outline-none focus:border-amber-action focus-visible:ring-1 focus-visible:ring-focus-amber cursor-pointer"
           >
@@ -444,6 +474,18 @@ export const InspectorAssignment: React.FC<InspectorAssignmentProps> = ({
           </select>
         </div>
       </div>
+      {assignmentConflict ? (
+        <InspectorFieldConflict
+          currentLabel="Current assignment"
+          currentValue={describeAssignment(assignmentConflict.current)}
+          intendedValue={describeAssignment(assignmentConflict.intended)}
+          note={assignmentConflict.action === 'claim' ? 'Retrying Claim keeps the current Team.' : undefined}
+          onUseCurrent={useCurrentAssignment ? () => useCurrentAssignment(ticket.id) : undefined}
+          onRetry={retryAssignment ? () => retryAssignment(ticket.id) : undefined}
+          onError={onError}
+          onActionSettled={() => teamSelectRef.current?.focus()}
+        />
+      ) : null}
     </div>
   )
 }
