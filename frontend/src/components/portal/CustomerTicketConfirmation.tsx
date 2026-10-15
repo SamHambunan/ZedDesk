@@ -68,7 +68,7 @@ export const CustomerTicketConfirmation: React.FC<CustomerTicketConfirmationProp
           <span className="text-xs uppercase font-semibold tracking-wider text-text-muted">Ticket Number</span>
           <span
             data-testid="portal-submitted-ticket-number"
-            className="text-headline-sm font-bold text-accent-indigo-glow font-mono"
+            className="text-headline-sm font-bold text-amber-action font-mono"
           >
             #{ticketNumber}
           </span>
@@ -119,7 +119,7 @@ export const CustomerTicketConfirmation: React.FC<CustomerTicketConfirmationProp
             <span className="text-text-muted text-xs">Customer Access Token:</span>
             <code
               data-testid="portal-access-token"
-              className="text-xs bg-surface-canvas p-2 rounded break-all text-accent-indigo-glow font-mono select-all"
+              className="text-xs bg-surface-canvas p-2 rounded break-all text-amber-action font-mono select-all"
             >
               {token}
             </code>

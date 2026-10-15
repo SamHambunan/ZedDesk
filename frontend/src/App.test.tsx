@@ -14,7 +14,7 @@ describe('ZedDesk Frontend Baseline Shell', () => {
     localStorage.clear()
   })
 
-  it('scopes internal authentication without applying a theme to the existing Customer Portal', () => {
+  it('scopes internal authentication and applies customer theme to Customer Portal', () => {
     localStorage.clear()
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'ok' }) } as Response)
 
@@ -22,7 +22,7 @@ describe('ZedDesk Frontend Baseline Shell', () => {
     expect(screen.getByRole('tablist', { name: /authentication mode/i }).closest('[data-theme]')).toHaveAttribute('data-theme', 'internal')
 
     rerender(<App hostname="acme.localhost" pathname="/portal" />)
-    expect(container.querySelector('[data-theme]')).toBeNull()
+    expect(container.querySelector('[data-theme="customer"]')).toBeInTheDocument()
   })
 
   it('renders ZedDesk branding and system baseline status', async () => {

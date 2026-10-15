@@ -7,6 +7,7 @@ import {
   User,
   Paperclip,
 } from 'lucide-react'
+import { Badge } from '../ui/Badge'
 import { formatFileSize, formatRelativeTime } from '../tickets/constants'
 import type { PortalMessage, PortalAttachment } from './types'
 
@@ -17,6 +18,31 @@ export interface PortalTicketActiveThreadProps {
   readonly apiUrl?: string
   readonly className?: string
   readonly ref?: React.Ref<HTMLDivElement>
+}
+
+interface AuthorMeta {
+  readonly icon: React.ReactNode
+  readonly avatarClass: string
+  readonly roleBadgeVariant: 'neutral' | 'positive'
+  readonly roleLabel: string
+}
+
+function getAuthorMeta(isCustomer: boolean): AuthorMeta {
+  if (isCustomer) {
+    return {
+      icon: <User className="w-3.5 h-3.5" />,
+      avatarClass: 'bg-surface-subpanel text-text-secondary border-border-subtle',
+      roleBadgeVariant: 'neutral',
+      roleLabel: 'Customer',
+    }
+  }
+
+  return {
+    icon: <ShieldCheck className="w-3.5 h-3.5" />,
+    avatarClass: 'bg-sentiment-positive/12 text-sentiment-positive border-sentiment-positive/25',
+    roleBadgeVariant: 'positive',
+    roleLabel: 'Support Team',
+  }
 }
 
 /**
@@ -47,7 +73,7 @@ function AttachmentItem({ attachment, ticketUuid, apiUrl }: AttachmentItemProps)
       data-testid={`portal-attachment-${attachment.id}`}
       className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-surface-subpanel/80 border border-border-subtle hover:border-border-prominent transition-colors text-xs text-text-secondary group"
     >
-      <FileText className="w-3.5 h-3.5 text-[#F59E0B] shrink-0" />
+      <FileText className="w-3.5 h-3.5 text-amber-action shrink-0" />
       <span className="font-mono text-text-primary text-[11px] max-w-[200px] truncate">
         {attachment.file_name}
       </span>
@@ -61,7 +87,7 @@ function AttachmentItem({ attachment, ticketUuid, apiUrl }: AttachmentItemProps)
         rel="noopener noreferrer"
         data-testid={`attachment-download-link-${attachment.id}`}
         title={`Download ${attachment.file_name}`}
-        className="p-1 text-text-muted hover:text-[#F59E0B] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#F59E0B] rounded"
+        className="p-1 text-text-muted hover:text-amber-action transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber rounded"
       >
         <Download className="w-3.5 h-3.5" />
       </a>
@@ -106,6 +132,8 @@ export const PortalTicketActiveThread: React.FC<PortalTicketActiveThreadProps> =
           ? msg.author_name || customerName || 'You'
           : msg.author_name || 'Support Agent'
 
+        const authorMeta = getAuthorMeta(isCustomer)
+
         return (
           <article
             key={msg.id}
@@ -113,16 +141,12 @@ export const PortalTicketActiveThread: React.FC<PortalTicketActiveThreadProps> =
             className="rounded-xl transition-colors p-4 sm:p-5 bg-surface-subpanel/50 border border-border-subtle shadow-card"
           >
             {/* Message Header */}
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-white/5">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-border-subtle">
               <div className="flex items-center gap-2.5">
                 <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${
-                    isCustomer
-                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                      : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  }`}
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 border ${authorMeta.avatarClass}`}
                 >
-                  {isCustomer ? <User className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                  {authorMeta.icon}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -130,15 +154,9 @@ export const PortalTicketActiveThread: React.FC<PortalTicketActiveThreadProps> =
                     {displayName}
                   </span>
 
-                  <span
-                    className={`text-[10px] uppercase font-mono px-1.5 py-0.5 rounded border ${
-                      isCustomer
-                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                    }`}
-                  >
-                    {isCustomer ? 'Customer' : 'Support Team'}
-                  </span>
+                  <Badge variant={authorMeta.roleBadgeVariant}>
+                    {authorMeta.roleLabel}
+                  </Badge>
                 </div>
               </div>
 
@@ -157,9 +175,9 @@ export const PortalTicketActiveThread: React.FC<PortalTicketActiveThreadProps> =
 
             {/* Attachments Tray */}
             {msg.attachments && msg.attachments.length > 0 && (
-              <div className="mt-3.5 pt-3 border-t border-white/5 space-y-2">
+              <div className="mt-3.5 pt-3 border-t border-border-subtle space-y-2">
                 <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono">
-                  <Paperclip className="w-3.5 h-3.5 text-[#F59E0B]" />
+                  <Paperclip className="w-3.5 h-3.5 text-amber-action" />
                   <span>Attachments ({msg.attachments.length})</span>
                 </div>
 
