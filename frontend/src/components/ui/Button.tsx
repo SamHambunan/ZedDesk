@@ -30,7 +30,9 @@ export const Button = (
       ...props
     }: ButtonProps
   ) => {
-    const ringClass = 'focus-visible:ring-focus-amber'
+    const ringClass = focusRing === 'amber'
+      ? 'focus-visible:ring-focus-amber'
+      : 'focus-visible:ring-focus-amber'
 
     const baseStyles =
       'inline-flex items-center justify-center font-semibold rounded select-none transition-colors duration-150 relative ' +

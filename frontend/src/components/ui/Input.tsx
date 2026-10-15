@@ -28,7 +28,9 @@ export const Input = (
   ) => {
     const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined)
 
-    const focusStyles = 'focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber'
+    const focusStyles = focusRing === 'amber'
+      ? 'focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber'
+      : 'focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber'
 
     return (
       <div className="w-full flex flex-col gap-1.5 text-left">

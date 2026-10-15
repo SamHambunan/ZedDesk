@@ -22,6 +22,13 @@ function renderWithQuery(ui: React.ReactElement) {
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
 }
 
+function expectNoRetiredTokens(container: HTMLElement) {
+  expect(container.innerHTML).not.toContain('accent-indigo-glow')
+  expect(container.innerHTML).not.toContain('luminous-indigo')
+  expect(container.innerHTML).not.toContain('inverse-primary')
+  expect(container.innerHTML).not.toContain('text-accent-glow')
+}
+
 describe('Theme Tokens Retirement & Scoped Theme Consistency (#157)', () => {
   describe('UI Primitives (Button & Input)', () => {
     it('Button uses Cadmium Amber focus ring by default and does not accept or apply legacy indigo focus ring', () => {
@@ -77,9 +84,7 @@ describe('Theme Tokens Retirement & Scoped Theme Consistency (#157)', () => {
       )
 
       expect(container.querySelector('[data-theme="internal"]')).toBeInTheDocument()
-      expect(container.innerHTML).not.toContain('accent-indigo-glow')
-      expect(container.innerHTML).not.toContain('luminous-indigo')
-      expect(container.innerHTML).not.toContain('inverse-primary')
+      expectNoRetiredTokens(container)
     })
 
     it('Public Invitation views render under internal theme scope with no legacy indigo glow', () => {
@@ -101,9 +106,7 @@ describe('Theme Tokens Retirement & Scoped Theme Consistency (#157)', () => {
 
       const view = screen.getByTestId('public-invitation-view')
       expect(view).toHaveAttribute('data-theme', 'internal')
-      expect(container.innerHTML).not.toContain('accent-indigo-glow')
-      expect(container.innerHTML).not.toContain('luminous-indigo')
-      expect(container.innerHTML).not.toContain('text-accent-glow')
+      expectNoRetiredTokens(container)
     })
 
     it('Central Hub switchboard renders without legacy indigo tokens or shadows', () => {
@@ -121,24 +124,24 @@ describe('Theme Tokens Retirement & Scoped Theme Consistency (#157)', () => {
         </div>
       )
 
-      expect(container.innerHTML).not.toContain('accent-indigo-glow')
-      expect(container.innerHTML).not.toContain('luminous-indigo')
+      expectNoRetiredTokens(container)
     })
 
     it('Overview command deck renders without legacy indigo glow classes', () => {
       const { container } = render(
         <div data-theme="internal">
           <GuidedCommandDeck
-            role="admin"
-            onNavigate={vi.fn()}
-            subdomain="acme"
-            organizationName="Acme Corp"
+            teamsCount={0}
+            membersCount={1}
+            ticketsCount={0}
+            onCreateTeamClick={vi.fn()}
+            onInviteMemberClick={vi.fn()}
+            onVerifyIntakeClick={vi.fn()}
           />
         </div>
       )
 
-      expect(container.innerHTML).not.toContain('accent-indigo-glow')
-      expect(container.innerHTML).not.toContain('luminous-indigo')
+      expectNoRetiredTokens(container)
     })
 
     it('Members roster table renders without legacy indigo glow classes', () => {
@@ -165,18 +168,32 @@ describe('Theme Tokens Retirement & Scoped Theme Consistency (#157)', () => {
         </div>
       )
 
-      expect(container.innerHTML).not.toContain('accent-indigo-glow')
-      expect(container.innerHTML).not.toContain('luminous-indigo')
+      expectNoRetiredTokens(container)
     })
 
     it('Teams ledger renders without legacy indigo glow classes', () => {
       const mockTeams = [
         {
           id: 1,
+          organization_id: 1,
           name: 'Tier 1 Support',
           description: 'Frontline agents',
-          agentsCount: 4,
-          memberAvatars: ['A', 'B'],
+          members: [
+            {
+              id: 1,
+              organization_id: 1,
+              user_id: 1,
+              role: 'admin',
+              user: { id: 1, name: 'Alice Admin', email: 'alice@acme.corp' },
+            },
+            {
+              id: 2,
+              organization_id: 1,
+              user_id: 2,
+              role: 'agent',
+              user: { id: 2, name: 'Bob Agent', email: 'bob@acme.corp' },
+            },
+          ],
         },
       ]
 
@@ -185,16 +202,14 @@ describe('Theme Tokens Retirement & Scoped Theme Consistency (#157)', () => {
           <TeamsTabularLedger
             teams={mockTeams}
             isAdmin={true}
-            onStartEdit={vi.fn()}
-            onDelete={vi.fn()}
-            onAddMember={vi.fn()}
-            onInspect={vi.fn()}
+            onInspectTeam={vi.fn()}
+            onEditTeam={vi.fn()}
+            onDeleteTeam={vi.fn()}
           />
         </div>
       )
 
-      expect(container.innerHTML).not.toContain('accent-indigo-glow')
-      expect(container.innerHTML).not.toContain('luminous-indigo')
+      expectNoRetiredTokens(container)
     })
 
     it('Ticket cockpit renders with graphite and amber internal theme and without legacy indigo glow classes', () => {
@@ -217,8 +232,7 @@ describe('Theme Tokens Retirement & Scoped Theme Consistency (#157)', () => {
 
       const frame = screen.getByTestId('ticket-cockpit-frame')
       expect(frame).toHaveAttribute('data-theme', 'internal')
-      expect(container.innerHTML).not.toContain('accent-indigo-glow')
-      expect(container.innerHTML).not.toContain('luminous-indigo')
+      expectNoRetiredTokens(container)
     })
 
     it('Customer Portal views render under customer theme scope with Warm Alabaster styling and no navy/indigo leakage', () => {
@@ -230,9 +244,7 @@ describe('Theme Tokens Retirement & Scoped Theme Consistency (#157)', () => {
 
       const layout = screen.getByTestId('customer-portal-layout')
       expect(layout).toHaveAttribute('data-theme', 'customer')
-      expect(container.innerHTML).not.toContain('accent-indigo-glow')
-      expect(container.innerHTML).not.toContain('luminous-indigo')
-      expect(container.innerHTML).not.toContain('text-accent-glow')
+      expectNoRetiredTokens(container)
     })
   })
 })
