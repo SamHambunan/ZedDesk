@@ -12,7 +12,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   isLoading?: boolean
   leftIcon?: React.ReactNode
   rightIcon?: React.ReactNode
-  focusRing?: 'amber' | 'indigo'
+  focusRing?: 'amber'
 }
 
 export const Button = (
@@ -30,10 +30,7 @@ export const Button = (
       ...props
     }: ButtonProps
   ) => {
-    const isAmberFocus = focusRing !== 'indigo'
-    const ringClass = isAmberFocus
-      ? 'focus-visible:ring-focus-amber'
-      : 'focus-visible:ring-accent-indigo-glow'
+    const ringClass = 'focus-visible:ring-focus-amber'
 
     const baseStyles =
       'inline-flex items-center justify-center font-semibold rounded select-none transition-colors duration-150 relative ' +
@@ -50,7 +47,7 @@ export const Button = (
       ghost:
         'bg-transparent hover:bg-surface-subpanel text-on-surface-variant hover:text-on-surface border border-transparent',
       ai:
-        'bg-gradient-to-b from-accent-indigo-glow to-primary-container hover:brightness-110 text-on-primary border border-secondary/40 shadow-keylight-primary',
+        'bg-gradient-to-b from-primary-highlight to-primary-container hover:brightness-110 text-on-primary border border-secondary/40 shadow-keylight-primary',
       danger:
         'bg-sentiment-negative hover:bg-rose-600 text-white shadow-keylight-primary border border-transparent',
       amber:

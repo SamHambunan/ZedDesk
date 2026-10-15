@@ -8,7 +8,7 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   helperText?: string
   leadingIcon?: React.ReactNode
   trailingBadge?: React.ReactNode
-  focusRing?: 'amber' | 'indigo'
+  focusRing?: 'amber'
 }
 
 export const Input = (
@@ -28,10 +28,7 @@ export const Input = (
   ) => {
     const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined)
 
-    const focusStyles =
-      focusRing === 'indigo'
-        ? 'focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-accent-indigo-glow/30'
-        : 'focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber'
+    const focusStyles = 'focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber'
 
     return (
       <div className="w-full flex flex-col gap-1.5 text-left">
