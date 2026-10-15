@@ -78,10 +78,11 @@ describe('Button Primitive', () => {
     expect(button).toHaveFocus()
   })
 
-  it('supports explicit indigo focus ring when requested', () => {
-    render(<Button focusRing="indigo">Indigo Action</Button>)
-    const button = screen.getByRole('button', { name: 'Indigo Action' })
-    expect(button.className).toContain('focus-visible:ring-accent-indigo-glow')
+  it('supports explicit amber focus ring when requested', () => {
+    render(<Button focusRing="amber">Amber Action</Button>)
+    const button = screen.getByRole('button', { name: 'Amber Action' })
+    expect(button.className).toContain('focus-visible:ring-focus-amber')
+    expect(button.className).not.toContain('accent-indigo-glow')
     button.focus()
     expect(button).toHaveFocus()
   })

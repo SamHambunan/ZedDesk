@@ -65,11 +65,12 @@ describe('Input Primitive', () => {
     expect(input.className).toContain('focus:ring-focus-amber')
   })
 
-  it('supports indigo focus styling when explicitly requested', () => {
-    render(<Input placeholder="Indigo focus" focusRing="indigo" />)
-    const input = screen.getByPlaceholderText('Indigo focus')
-    expect(input.className).toContain('focus:border-primary-container')
-    expect(input.className).toContain('focus:ring-accent-indigo-glow/30')
+  it('supports explicit amber focus styling when requested', () => {
+    render(<Input placeholder="Amber focus" focusRing="amber" />)
+    const input = screen.getByPlaceholderText('Amber focus')
+    expect(input.className).toContain('focus:border-focus-amber')
+    expect(input.className).toContain('focus:ring-focus-amber')
+    expect(input.className).not.toContain('accent-indigo-glow')
   })
 
   it.each(['internal', 'customer'] as const)('keeps labeled input usable in the %s theme', async (theme) => {
