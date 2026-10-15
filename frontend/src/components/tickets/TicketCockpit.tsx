@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, use } from 'react'
+import React, { useState, useMemo, useRef, useEffect, useCallback, use } from 'react'
 import { useQuery, useQueryClient, QueryClientContext, QueryClientProvider } from '@tanstack/react-query'
 import { queryClient as defaultQueryClient } from '../../lib/query-client'
 import {
@@ -180,7 +180,7 @@ function TicketCockpitInternalProvider({
   const seenEventIdsRef = useRef<Set<string>>(new Set())
   const knownRevisionsRef = useRef<Map<string, number>>(new Map())
   const [isUnavailable, setIsUnavailable] = useState(false)
-  const [fieldConflicts, setFieldConflicts] = useState<Partial<Record<ConflictedTicketField, TicketFieldConflict>>>({})
+  const [fieldConflicts, setFieldConflicts] = useState<Record<string, Partial<Record<ConflictedTicketField, TicketFieldConflict>>>>({})
 
   // Queue holding state for in-place updates & deliberate reordering
   const [heldTickets, setHeldTickets] = useState<readonly TicketItem[] | null>(null)
@@ -887,9 +887,10 @@ function TicketCockpitInternalProvider({
     return res.json().catch(() => null)
   }
 
-  const currentTicketForMutation = (ticketId: string) =>
-    queryClient.getQueryData<TicketItem>(['ticket', ticketId])
+  const currentTicketForMutation = useCallback((ticketId: string) => {
+    return queryClient.getQueryData<TicketItem>(['ticket', ticketId])
       ?? effectiveTicketsRef.current.find((ticket) => ticket.id === ticketId)
+  }, [queryClient])
 
   const recordFieldConflict = (
     field: ConflictedTicketField,
@@ -902,13 +903,19 @@ function TicketCockpitInternalProvider({
     if (typeof currentValue !== 'string') return false
     setFieldConflicts((previous) => ({
       ...previous,
-      [field]: { ticketId, currentValue, intendedValue },
+      [ticketId]: {
+        ...previous[ticketId],
+        [field]: { ticketId, currentValue, intendedValue },
+      },
     }))
     return true
   }
 
-  const clearFieldConflict = (field: ConflictedTicketField) => {
-    setFieldConflicts((previous) => ({ ...previous, [field]: undefined }))
+  const clearFieldConflict = (ticketId: string, field: ConflictedTicketField) => {
+    setFieldConflicts((previous) => ({
+      ...previous,
+      [ticketId]: { ...previous[ticketId], [field]: undefined },
+    }))
   }
 
   // Stable Actions with functional state updates & ref lookups
@@ -1020,7 +1027,7 @@ function TicketCockpitInternalProvider({
             ...(targetTicket.status_revision !== undefined
               ? { expected_status_revision: targetTicket.status_revision } : {}),
           }, ticketId)
-          clearFieldConflict('status')
+          clearFieldConflict(ticketId, 'status')
         } catch (err) {
           setInternalTickets((prev) =>
             prev.map((t) => (t.id === ticketId ? { ...t, status: previousStatus } : t))
@@ -1044,7 +1051,7 @@ function TicketCockpitInternalProvider({
             ...(targetTicket.priority_revision !== undefined
               ? { expected_priority_revision: targetTicket.priority_revision } : {}),
           }, ticketId)
-          clearFieldConflict('priority')
+          clearFieldConflict(ticketId, 'priority')
         } catch (err) {
           setInternalTickets((prev) =>
             prev.map((t) => (t.id === ticketId ? { ...t, priority: previousPriority } : t))
@@ -1052,17 +1059,30 @@ function TicketCockpitInternalProvider({
           if (!recordFieldConflict('priority', ticketId, priority, err)) throw err
         }
       },
-      useCurrentFieldValue: async (field: ConflictedTicketField) => {
-        const conflict = fieldConflicts[field]
+      setConflictedFieldIntent: (ticketId: string, field: ConflictedTicketField, value: TicketStatus | TicketPriority) => {
+        setFieldConflicts((previous) => {
+          const conflict = previous[ticketId]?.[field]
+          if (!conflict) return previous
+          return {
+            ...previous,
+            [ticketId]: {
+              ...previous[ticketId],
+              [field]: { ...conflict, intendedValue: value },
+            },
+          }
+        })
+      },
+      useCurrentFieldValue: async (ticketId: string, field: ConflictedTicketField) => {
+        const conflict = fieldConflicts[ticketId]?.[field]
         if (!conflict) return
         await queryClient.refetchQueries(
           { queryKey: ['ticket', conflict.ticketId], exact: true, type: 'active' },
           { throwOnError: true }
         )
-        clearFieldConflict(field)
+        clearFieldConflict(ticketId, field)
       },
-      retryFieldChange: async (field: ConflictedTicketField) => {
-        const conflict = fieldConflicts[field]
+      retryFieldChange: async (ticketId: string, field: ConflictedTicketField) => {
+        const conflict = fieldConflicts[ticketId]?.[field]
         if (!conflict) return
         await queryClient.refetchQueries(
           { queryKey: ['ticket', conflict.ticketId], exact: true, type: 'active' },
@@ -1076,7 +1096,7 @@ function TicketCockpitInternalProvider({
             [field]: conflict.intendedValue,
             [`expected_${field}_revision`]: revision,
           }, conflict.ticketId)
-          clearFieldConflict(field)
+          clearFieldConflict(ticketId, field)
         } catch (error) {
           if (!recordFieldConflict(field, conflict.ticketId, conflict.intendedValue, error)) throw error
         }
@@ -1307,6 +1327,7 @@ function TicketCockpitInternalProvider({
     }
   }, [
     controlledSelectedTicketId,
+    currentTicketForMutation,
     currentUserId,
     fieldConflicts,
     internalSelectedTicketId,

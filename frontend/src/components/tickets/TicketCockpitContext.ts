@@ -57,7 +57,7 @@ export interface TicketCockpitState {
   readonly isUnavailable?: boolean
   readonly ticketViewers?: readonly PresenceMember[]
   readonly ticketTypingMembers?: readonly PresenceMember[]
-  readonly fieldConflicts?: Partial<Record<ConflictedTicketField, TicketFieldConflict>>
+  readonly fieldConflicts?: Record<string, Partial<Record<ConflictedTicketField, TicketFieldConflict>>>
 }
 
 export interface TicketCockpitActions {
@@ -70,8 +70,9 @@ export interface TicketCockpitActions {
   readonly claimTicket: (ticketId: string) => Promise<void> | void
   readonly updateStatus: (ticketId: string, status: TicketStatus) => Promise<void> | void
   readonly updatePriority: (ticketId: string, priority: TicketPriority) => Promise<void> | void
-  readonly useCurrentFieldValue?: (field: ConflictedTicketField) => Promise<void>
-  readonly retryFieldChange?: (field: ConflictedTicketField) => Promise<void>
+  readonly setConflictedFieldIntent?: (ticketId: string, field: ConflictedTicketField, value: TicketStatus | TicketPriority) => void
+  readonly useCurrentFieldValue?: (ticketId: string, field: ConflictedTicketField) => Promise<void>
+  readonly retryFieldChange?: (ticketId: string, field: ConflictedTicketField) => Promise<void>
   readonly assign: (ticketId: string, teamId: number | null, memberId: number | null) => Promise<void> | void
   readonly addTag: (ticketId: string, tag: TicketTag) => Promise<void> | void
   readonly removeTag: (ticketId: string, tagId: number | string) => Promise<void> | void

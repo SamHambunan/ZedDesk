@@ -699,7 +699,14 @@ describe('Ticket field conflict recovery', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: 'Ticket Status' }), 'pending')
 
     await waitFor(() => expect(screen.getByText(/Current value: open/i)).toBeInTheDocument())
-    expect((screen.getByRole('combobox', { name: 'Ticket Status' }) as HTMLSelectElement).value).toBe('pending')
+    const statusSelect = screen.getByRole('combobox', { name: 'Ticket Status' }) as HTMLSelectElement
+    expect(statusSelect.value).toBe('pending')
+    expect(statusSelect).toHaveFocus()
+    await user.selectOptions(statusSelect, 'resolved')
+    expect(statusSelect.value).toBe('resolved')
+    await user.selectOptions(statusSelect, 'pending')
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'Use current value' })).toHaveFocus()
     expect(screen.getByTestId('composer-textarea')).toHaveValue('Please check the attached logs.')
     expect(screen.getByText('error.txt')).toBeInTheDocument()
     expect(requests.filter((request) => request.url.endsWith('/status') && request.method === 'PATCH')).toHaveLength(1)
@@ -711,6 +718,7 @@ describe('Ticket field conflict recovery', () => {
     expect(screen.getByTestId('composer-textarea')).toHaveValue('Please check the attached logs.')
     expect(screen.getByText('error.txt')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByText(/Current value: open/i)).not.toBeInTheDocument())
+    expect(statusSelect).toHaveFocus()
   })
 
   it('uses the Priority revision despite an unrelated Ticket Status change and can accept a same-field conflict', async () => {
@@ -758,6 +766,51 @@ describe('Ticket field conflict recovery', () => {
     await user.click(screen.getByRole('button', { name: 'Use current value' }))
     await waitFor(() => expect((screen.getByRole('combobox', { name: 'Priority' }) as HTMLSelectElement).value).toBe('high'))
     expect(screen.queryByText(/Current value: high/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Priority' })).toHaveFocus()
+  })
+
+  it('keeps unresolved choices on their own Tickets while switching between them', async () => {
+    const user = userEvent.setup()
+    const first = { ...INITIAL_MOCK_TICKETS[0], status: 'new' as const, status_revision: 3 }
+    const second = { ...INITIAL_MOCK_TICKETS[1], status: 'new' as const, status_revision: 5 }
+    const tickets = [first, second]
+
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PATCH' && url.endsWith('/status')) {
+        const isFirst = url.includes('/ticket-1/')
+        return { ok: false, status: 409, json: async () => ({
+          message: 'Ticket status has changed since it was read.',
+          current: { status: isFirst ? 'open' : 'pending', status_revision: isFirst ? 4 : 6 },
+        }) }
+      }
+      if (url.endsWith('/tickets/ticket-1')) return { ok: true, json: async () => ({ data: first }) }
+      if (url.endsWith('/tickets/ticket-2')) return { ok: true, json: async () => ({ data: second }) }
+      if (url.includes('/tickets?')) return { ok: true, json: async () => ({ data: tickets }) }
+      return { ok: true, json: async () => ({ data: [] }) }
+    }))
+
+    render(
+      <TicketCockpit.Provider apiUrl="http://zeddesk.test/api" token="test-token" tickets={tickets}>
+        <TicketCockpit.Queue />
+        <TicketCockpit.Inspector />
+      </TicketCockpit.Provider>
+    )
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Ticket Status' }), 'resolved')
+    await waitFor(() => expect(screen.getByText('Current value: open')).toBeInTheDocument())
+    await user.click(screen.getByTestId('ticket-row-ticket-2'))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Ticket Status' }), 'open')
+    await waitFor(() => expect(screen.getByText('Current value: pending')).toBeInTheDocument())
+
+    await user.click(screen.getByTestId('ticket-row-ticket-1'))
+    expect((screen.getByRole('combobox', { name: 'Ticket Status' }) as HTMLSelectElement).value).toBe('resolved')
+    expect(screen.getByText('Current value: open')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Use current value' }))
+    await waitFor(() => expect(screen.queryByText('Current value: open')).not.toBeInTheDocument())
+
+    await user.click(screen.getByTestId('ticket-row-ticket-2'))
+    expect((screen.getByRole('combobox', { name: 'Ticket Status' }) as HTMLSelectElement).value).toBe('open')
+    expect(screen.getByText('Current value: pending')).toBeInTheDocument()
   })
 
   it('sends the Assignment revision for claim and Assignment without treating a lifecycle rejection as a conflict', async () => {
