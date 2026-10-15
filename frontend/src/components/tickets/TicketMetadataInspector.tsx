@@ -24,6 +24,7 @@ import type {
   TicketTag,
 } from './types'
 import { TicketCockpitContext } from './TicketCockpitContext'
+import type { TicketFieldConflict } from './TicketCockpitContext'
 import { Toast } from '../ui/Toast'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
@@ -144,6 +145,47 @@ export const InspectorClaimCta: React.FC<InspectorClaimCtaProps> = ({
 InspectorClaimCta.displayName = 'TicketCockpit.Inspector.ClaimCta'
 
 // --- Compound Subcomponent 3: Lifecycle ---
+function InspectorFieldConflict({
+  conflict,
+  onUseCurrent,
+  onRetry,
+  onError,
+}: {
+  readonly conflict: TicketFieldConflict
+  readonly onUseCurrent?: () => Promise<void>
+  readonly onRetry?: () => Promise<void>
+  readonly onError?: (error: Error) => void
+}) {
+  const [isResolving, setIsResolving] = useState(false)
+
+  const resolve = async (action?: () => Promise<void>) => {
+    if (!action) return
+    setIsResolving(true)
+    try {
+      await action()
+    } catch (error) {
+      if (error instanceof Error) onError?.(error)
+    } finally {
+      setIsResolving(false)
+    }
+  }
+
+  return (
+    <div role="status" className="mt-2 rounded border border-amber-action/50 bg-amber-action/10 p-2 text-xs text-text-primary">
+      <p>Current value: {conflict.currentValue}</p>
+      <p>My choice: {conflict.intendedValue}</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button type="button" disabled={isResolving} onClick={() => resolve(onUseCurrent)} className="rounded border border-border-subtle px-2 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber disabled:opacity-50">
+          Use current value
+        </button>
+        <button type="button" disabled={isResolving} onClick={() => resolve(onRetry)} className="rounded bg-amber-action px-2 py-1 text-on-amber-action focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-amber disabled:opacity-50">
+          Retry my change
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export interface InspectorLifecycleProps {
   readonly ticket?: TicketItem
   readonly onUpdateStatus?: (ticketId: string, status: TicketStatus) => Promise<void> | void
@@ -163,8 +205,15 @@ export const InspectorLifecycle: React.FC<InspectorLifecycleProps> = ({
   const ticket = propTicket ?? context?.state.activeTicket
   const onUpdateStatus = propOnStatus ?? context?.actions.updateStatus
   const onUpdatePriority = propOnPriority ?? context?.actions.updatePriority
+  const useCurrentFieldValue = context?.actions.useCurrentFieldValue
+  const retryFieldChange = context?.actions.retryFieldChange
 
   if (!ticket) return null
+
+  const statusConflict = context?.state.fieldConflicts?.status?.ticketId === ticket.id
+    ? context.state.fieldConflicts.status : undefined
+  const priorityConflict = context?.state.fieldConflicts?.priority?.ticketId === ticket.id
+    ? context.state.fieldConflicts.priority : undefined
 
   const handleStatusChange = async (nextStatus: TicketStatus) => {
     try {
@@ -200,7 +249,8 @@ export const InspectorLifecycle: React.FC<InspectorLifecycleProps> = ({
           <select
             id="inspector-status"
             data-testid="inspector-status-select"
-            value={ticket.status}
+            value={statusConflict?.intendedValue ?? ticket.status}
+            disabled={Boolean(statusConflict)}
             onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
             className="w-full h-8 px-2.5 bg-surface-panel border border-border-subtle rounded text-xs font-mono text-text-primary focus:outline-none focus:border-amber-action focus-visible:ring-1 focus-visible:ring-focus-amber cursor-pointer"
           >
@@ -210,6 +260,14 @@ export const InspectorLifecycle: React.FC<InspectorLifecycleProps> = ({
             <option value="resolved">resolved (Completed)</option>
             <option value="closed">closed (Finalized)</option>
           </select>
+          {statusConflict ? (
+            <InspectorFieldConflict
+              conflict={statusConflict}
+              onUseCurrent={useCurrentFieldValue ? () => useCurrentFieldValue('status') : undefined}
+              onRetry={retryFieldChange ? () => retryFieldChange('status') : undefined}
+              onError={onError}
+            />
+          ) : null}
         </div>
 
         <div>
@@ -219,7 +277,8 @@ export const InspectorLifecycle: React.FC<InspectorLifecycleProps> = ({
           <select
             id="inspector-priority"
             data-testid="inspector-priority-select"
-            value={ticket.priority}
+            value={priorityConflict?.intendedValue ?? ticket.priority}
+            disabled={Boolean(priorityConflict)}
             onChange={(e) => handlePriorityChange(e.target.value as TicketPriority)}
             className="w-full h-8 px-2.5 bg-surface-panel border border-border-subtle rounded text-xs font-mono text-text-primary focus:outline-none focus:border-amber-action focus-visible:ring-1 focus-visible:ring-focus-amber cursor-pointer"
           >
@@ -228,6 +287,14 @@ export const InspectorLifecycle: React.FC<InspectorLifecycleProps> = ({
             <option value="medium">Medium</option>
             <option value="low">Low</option>
           </select>
+          {priorityConflict ? (
+            <InspectorFieldConflict
+              conflict={priorityConflict}
+              onUseCurrent={useCurrentFieldValue ? () => useCurrentFieldValue('priority') : undefined}
+              onRetry={retryFieldChange ? () => retryFieldChange('priority') : undefined}
+              onError={onError}
+            />
+          ) : null}
         </div>
       </div>
     </div>

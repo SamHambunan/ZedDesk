@@ -70,6 +70,9 @@ export interface TicketItem {
   readonly created_at?: string
   readonly updated_at?: string
   readonly revision?: number
+  readonly status_revision?: number
+  readonly priority_revision?: number
+  readonly assignment_revision?: number
 }
 
 export interface OrgTeamOption {
