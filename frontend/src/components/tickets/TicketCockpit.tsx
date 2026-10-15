@@ -87,6 +87,14 @@ class ApiMutationError extends Error {
   }
 }
 
+function assignmentRevisionForMutation(ticket: TicketItem | null | undefined, apiUrl?: string): number | undefined {
+  const revision = ticket?.assignment_revision
+  if (apiUrl && typeof revision !== 'number') {
+    throw new Error('Assignment revision unavailable. Refresh the Ticket and try again.')
+  }
+  return revision
+}
+
 export function SafeQueryProvider({ children }: { readonly children: React.ReactNode }) {
   const client = use(QueryClientContext)
   if (client) {
@@ -921,6 +929,14 @@ function TicketCockpitInternalProvider({
     }))
   }
 
+  const refreshTicketForConflict = useCallback(async (ticketId: string) => {
+    await queryClient.refetchQueries(
+      { queryKey: ['ticket', ticketId], exact: true, type: 'active' },
+      { throwOnError: true }
+    )
+    return queryClient.getQueryData<TicketItem>(['ticket', ticketId])
+  }, [queryClient])
+
   const recordAssignmentConflict = (
     ticketId: string,
     action: 'assign' | 'claim',
@@ -929,13 +945,20 @@ function TicketCockpitInternalProvider({
   ): boolean => {
     if (!(error instanceof ApiMutationError) || error.status !== 409) return false
     const current = error.current
-    if (!current || typeof current.assignment_revision !== 'number') return false
+    const currentRevision = current?.assignment_revision
+    if (!current || typeof currentRevision !== 'number') return false
     const teamId = current.assigned_team_id
     const memberId = current.assigned_member_id
     if ((teamId !== null && typeof teamId !== 'number') || (memberId !== null && typeof memberId !== 'number')) return false
     setAssignmentConflicts((previous) => ({
       ...previous,
-      [ticketId]: { ticketId, action, intended, current: { teamId, memberId } },
+      [ticketId]: {
+        ticketId,
+        action,
+        currentRevision,
+        intended: action === 'claim' ? { teamId, memberId: intended.memberId } : intended,
+        current: { teamId, memberId },
+      },
     }))
     return true
   }
@@ -994,6 +1017,7 @@ function TicketCockpitInternalProvider({
       claimTicket: async (ticketId: string) => {
         const targetTicket = currentTicketForMutation(ticketId)
         if (!targetTicket) return
+        const assignmentRevision = assignmentRevisionForMutation(targetTicket, configRef.current.apiUrl)
         const previousTicket = targetTicket
 
         const currentMember = members.find((m) => m.id === currentUserId)
@@ -1028,8 +1052,7 @@ function TicketCockpitInternalProvider({
         try {
           if (onClaimTicket) await onClaimTicket(ticketId)
           await executeApiMutation(`tickets/${ticketId}/claim`, 'POST',
-            targetTicket.assignment_revision !== undefined
-              ? { expected_assignment_revision: targetTicket.assignment_revision } : undefined, ticketId)
+            { expected_assignment_revision: assignmentRevision }, ticketId)
           clearAssignmentConflict(ticketId)
         } catch (err) {
           setInternalTickets((prev) =>
@@ -1105,20 +1128,13 @@ function TicketCockpitInternalProvider({
       useCurrentFieldValue: async (ticketId: string, field: ConflictedTicketField) => {
         const conflict = fieldConflicts[ticketId]?.[field]
         if (!conflict) return
-        await queryClient.refetchQueries(
-          { queryKey: ['ticket', conflict.ticketId], exact: true, type: 'active' },
-          { throwOnError: true }
-        )
+        await refreshTicketForConflict(conflict.ticketId)
         clearFieldConflict(ticketId, field)
       },
       retryFieldChange: async (ticketId: string, field: ConflictedTicketField) => {
         const conflict = fieldConflicts[ticketId]?.[field]
         if (!conflict) return
-        await queryClient.refetchQueries(
-          { queryKey: ['ticket', conflict.ticketId], exact: true, type: 'active' },
-          { throwOnError: true }
-        )
-        const freshTicket = queryClient.getQueryData<TicketItem>(['ticket', conflict.ticketId])
+        const freshTicket = await refreshTicketForConflict(conflict.ticketId)
         const revision = freshTicket?.[`${field}_revision`]
         if (revision === undefined) throw new Error('Could not refresh Ticket revision. Try again.')
         try {
@@ -1141,22 +1157,37 @@ function TicketCockpitInternalProvider({
       useCurrentAssignment: async (ticketId: string) => {
         const conflict = assignmentConflicts[ticketId]
         if (!conflict) return
-        await queryClient.refetchQueries(
-          { queryKey: ['ticket', ticketId], exact: true, type: 'active' },
-          { throwOnError: true }
-        )
+        await refreshTicketForConflict(ticketId)
         clearAssignmentConflict(ticketId)
       },
       retryAssignment: async (ticketId: string) => {
         const conflict = assignmentConflicts[ticketId]
         if (!conflict) return
-        await queryClient.refetchQueries(
-          { queryKey: ['ticket', ticketId], exact: true, type: 'active' },
-          { throwOnError: true }
-        )
-        const freshTicket = queryClient.getQueryData<TicketItem>(['ticket', ticketId])
+        const freshTicket = await refreshTicketForConflict(ticketId)
         const revision = freshTicket?.assignment_revision
         if (revision === undefined) throw new Error('Could not refresh Assignment revision. Try again.')
+        if (revision !== conflict.currentRevision) {
+          const current = {
+            teamId: freshTicket?.assigned_team_id ?? null,
+            memberId: freshTicket?.assigned_member_id ?? null,
+          }
+          setAssignmentConflicts((previous) => {
+            const pending = previous[ticketId]
+            if (!pending) return previous
+            return {
+              ...previous,
+              [ticketId]: {
+                ...pending,
+                currentRevision: revision,
+                current,
+                intended: pending.action === 'claim'
+                  ? { teamId: current.teamId, memberId: pending.intended.memberId }
+                  : pending.intended,
+              },
+            }
+          })
+          return
+        }
         const endpoint = conflict.action === 'claim' ? 'claim' : 'assign'
         const body = conflict.action === 'claim'
           ? { expected_assignment_revision: revision }
@@ -1174,6 +1205,7 @@ function TicketCockpitInternalProvider({
       },
       assign: async (ticketId: string, teamId: number | null, memberId: number | null) => {
         const targetTicket = currentTicketForMutation(ticketId)
+        const assignmentRevision = assignmentRevisionForMutation(targetTicket, configRef.current.apiUrl)
         const previousTicket = targetTicket ? { ...targetTicket } : null
 
         const team = teams.find((tm) => tm.id === teamId)
@@ -1209,8 +1241,7 @@ function TicketCockpitInternalProvider({
           if (onAssign) await onAssign(ticketId, teamId, memberId)
           await executeApiMutation(`tickets/${ticketId}/assign`, 'POST', {
             team_id: teamId, member_id: memberId,
-            ...(previousTicket?.assignment_revision !== undefined
-              ? { expected_assignment_revision: previousTicket.assignment_revision } : {}),
+            expected_assignment_revision: assignmentRevision,
           }, ticketId)
           clearAssignmentConflict(ticketId)
         } catch (err) {
@@ -1414,7 +1445,7 @@ function TicketCockpitInternalProvider({
     onSelectTicket,
     onUpdatePriority,
     onUpdateStatus,
-    queryClient,
+    refreshTicketForConflict,
     teams,
     userRole,
   ])

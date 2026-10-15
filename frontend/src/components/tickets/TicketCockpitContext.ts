@@ -41,6 +41,7 @@ export interface AssignmentPair {
 export interface AssignmentConflict {
   readonly ticketId: string
   readonly action: 'assign' | 'claim'
+  readonly currentRevision: number
   readonly current: AssignmentPair
   readonly intended: AssignmentPair
 }

@@ -958,7 +958,7 @@ describe('Assignment conflict recovery', () => {
     await user.click(screen.getByRole('button', { name: 'Claim Ticket' }))
 
     await waitFor(() => expect(screen.getByText('Current assignment: Team: Support Tier 1; Organization Member: Unassigned')).toBeInTheDocument())
-    expect(screen.getByText('My choice: Team: No team assigned; Organization Member: Acme Agent')).toBeInTheDocument()
+    expect(screen.getByText('My choice: Team: Support Tier 1; Organization Member: Acme Agent')).toBeInTheDocument()
     expect(screen.getByText('Retrying Claim keeps the current Team.')).toBeInTheDocument()
     expect(requests.filter((request) => request.url.endsWith('/claim'))).toHaveLength(1)
     expect(requests.find((request) => request.url.endsWith('/claim'))?.body).toEqual({ expected_assignment_revision: 2 })
@@ -972,13 +972,14 @@ describe('Assignment conflict recovery', () => {
     expect(screen.getByTestId('composer-textarea')).toHaveValue('Claim draft')
   })
 
-  it('retries a stale Claim with a fresh Assignment revision only after choosing Retry', async () => {
+  it('shows a second Assignment change before retrying Claim and requires another click', async () => {
     const user = userEvent.setup()
     const claimBodies: Array<Record<string, unknown>> = []
     const ticket = { ...INITIAL_MOCK_TICKETS[0], assignment_revision: 2 }
     let teamId: number | null = null
     let memberId: number | null = null
     let revision = 2
+    let nextReadHasAnotherTeam = false
 
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       if (url.endsWith('/claim') && init?.method === 'POST') {
@@ -986,14 +987,20 @@ describe('Assignment conflict recovery', () => {
         if (claimBodies.length === 1) {
           teamId = 1
           revision = 3
+          nextReadHasAnotherTeam = true
           return { ok: false, status: 409, json: async () => ({
             message: 'Ticket assignment has changed since it was read.',
             current: { assigned_team_id: 1, assigned_member_id: null, assignment_revision: 3 },
           }) }
         }
-        memberId = 2
-        revision = 4
+        memberId = 1
+        revision = 5
         return { ok: true, json: async () => ({ data: { ...ticket, assigned_team_id: teamId, assigned_member_id: memberId, assignment_revision: revision } }) }
+      }
+      if (url.endsWith('/tickets/ticket-1') && nextReadHasAnotherTeam) {
+        teamId = 2
+        revision = 4
+        nextReadHasAnotherTeam = false
       }
       const current = { ...ticket, assigned_team_id: teamId, assigned_member_id: memberId, assignment_revision: revision }
       if (url.endsWith('/tickets/ticket-1')) return { ok: true, json: async () => ({ data: current }) }
@@ -1001,7 +1008,7 @@ describe('Assignment conflict recovery', () => {
       return { ok: true, json: async () => ({ data: [] }) }
     }))
 
-    render(<TicketCockpit.Provider apiUrl="http://zeddesk.test/api" token="test-token" tickets={[ticket]} teams={MOCK_TEAMS} members={MOCK_MEMBERS}>
+    render(<TicketCockpit.Provider apiUrl="http://zeddesk.test/api" token="test-token" tickets={[ticket]} teams={MOCK_TEAMS} members={MOCK_MEMBERS} currentUserId={1}>
       <TicketCockpit.Inspector />
     </TicketCockpit.Provider>)
     await user.click(screen.getByRole('button', { name: 'Claim Ticket' }))
@@ -1009,9 +1016,34 @@ describe('Assignment conflict recovery', () => {
     expect(claimBodies).toEqual([{ expected_assignment_revision: 2 }])
 
     await user.click(screen.getByRole('button', { name: 'Retry my change' }))
+    await waitFor(() => expect(screen.getByText('Current assignment: Team: Billing Support; Organization Member: Unassigned')).toBeInTheDocument())
+    expect(screen.getByText('My choice: Team: Billing Support; Organization Member: Acme Admin')).toBeInTheDocument()
+    expect(claimBodies).toHaveLength(1)
+
+    await user.click(screen.getByRole('button', { name: 'Retry my change' }))
     await waitFor(() => expect(claimBodies).toHaveLength(2))
-    expect(claimBodies[1]).toEqual({ expected_assignment_revision: 3 })
-    await waitFor(() => expect(screen.queryByText('Current assignment: Team: Support Tier 1; Organization Member: Unassigned')).not.toBeInTheDocument())
+    expect(claimBodies[1]).toEqual({ expected_assignment_revision: 4 })
+    await waitFor(() => expect(screen.queryByText('Current assignment: Team: Billing Support; Organization Member: Unassigned')).not.toBeInTheDocument())
+  })
+
+  it('does not send an unchecked Assignment or Claim when the Assignment revision is unavailable', async () => {
+    const user = userEvent.setup()
+    const mutations: string[] = []
+    const ticket = { ...INITIAL_MOCK_TICKETS[0] }
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') mutations.push(url)
+      if (url.endsWith('/tickets/ticket-1')) return { ok: true, json: async () => ({ data: ticket }) }
+      if (url.includes('/tickets?')) return { ok: true, json: async () => ({ data: [ticket] }) }
+      return { ok: true, json: async () => ({ data: [] }) }
+    }))
+
+    render(<TicketCockpit.Provider apiUrl="http://zeddesk.test/api" token="test-token" tickets={[ticket]} teams={MOCK_TEAMS} members={MOCK_MEMBERS}>
+      <TicketCockpit.Inspector />
+    </TicketCockpit.Provider>)
+    await user.click(screen.getByRole('button', { name: 'Claim Ticket' }))
+    await waitFor(() => expect(screen.getByText('Assignment revision unavailable. Refresh the Ticket and try again.')).toBeInTheDocument())
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Assigned Team' }), '1')
+    expect(mutations).toEqual([])
   })
 })
 
@@ -1688,6 +1720,7 @@ describe('Live Signals and Authorized REST Refresh (Issue #149)', () => {
                   status: 'new',
                   priority: 'medium',
                   revision: 1,
+                  assignment_revision: 1,
                   assigned_member_id: null,
                   customer: { id: 'c1', name: 'Alice', email: 'alice@example.com' },
                 },
@@ -1714,6 +1747,7 @@ describe('Live Signals and Authorized REST Refresh (Issue #149)', () => {
                 status: 'new',
                 priority: 'medium',
                 revision: 1,
+                assignment_revision: 1,
                 customer: { id: 'c1', name: 'Alice', email: 'alice@example.com' },
                 messages: [],
               },
