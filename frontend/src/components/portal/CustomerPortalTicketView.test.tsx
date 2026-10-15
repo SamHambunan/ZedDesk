@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -6,6 +6,7 @@ import { CustomerPortalView } from './CustomerPortalView'
 import { CustomerPortalReplyComposer } from './CustomerPortalReplyComposer'
 import { PortalTicketClosedBanner } from './PortalTicketClosedBanner'
 import { PortalTicketActiveThread } from './PortalTicketActiveThread'
+import { createMockLiveClient } from '../../lib/live-client'
 import type { PortalMessage } from './types'
 
 function renderWithClient(ui: React.ReactElement) {
@@ -495,5 +496,432 @@ describe('Customer Portal Conversation Thread, Composed Replies & Closed Lockout
     expect(screen.queryByTestId('ticket-typing-indicator')).not.toBeInTheDocument()
     expect(screen.queryByTestId('ticket-viewers')).not.toBeInTheDocument()
     expect(screen.queryByTestId('online-members')).not.toBeInTheDocument()
+  })
+
+  describe('Customer Ticket Live Signals, Reading Position, and Access Recovery (#156)', () => {
+    it('signed Customer token authorizes only Customer Ticket channel and updates thread on live public reply', async () => {
+      sessionStorage.setItem('portal_token_ticket-uuid-1001', 'signed-token-xyz')
+      const mockLiveClient = createMockLiveClient()
+      const subscribeSpy = vi.spyOn(mockLiveClient, 'subscribeToCustomerTicket')
+
+      let ticketData = {
+        ticket: {
+          id: 'ticket-uuid-1001',
+          ticket_number: 1001,
+          subject: 'Billing discrepancy on invoice #502',
+          status: 'open',
+          created_at: '2026-10-01T10:00:00.000000Z',
+        },
+        customer: { id: 'cust-1', name: 'Alice Freeman' },
+        messages: [
+          {
+            id: 'msg-1',
+            ticket_id: 'ticket-uuid-1001',
+            message_type: 'public_reply',
+            author_name: 'Alice Freeman',
+            body: 'Initial query',
+            created_at: '2026-10-01T10:00:00.000000Z',
+          },
+        ],
+      }
+
+      global.fetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/portal/tickets/ticket-uuid-1001')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ticketData,
+          })
+        }
+        return Promise.resolve({ ok: false, status: 404 })
+      })
+
+      renderWithClient(
+        <CustomerPortalView
+          apiUrl="http://acme.localhost:8000"
+          subdomain="acme"
+          pathname="/portal/tickets/ticket-uuid-1001"
+          liveClient={mockLiveClient}
+        />
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Initial query')).toBeInTheDocument()
+      })
+
+      // Verify signed Customer token authorizes only that Customer's ticket channel
+      expect(subscribeSpy).toHaveBeenCalledWith(
+        'ticket-uuid-1001',
+        'signed-token-xyz',
+        expect.any(Function),
+        expect.any(Function)
+      )
+
+      // Next, a support staff adds a public reply
+      ticketData = {
+        ...ticketData,
+        messages: [
+          ...ticketData.messages,
+          {
+            id: 'msg-2',
+            ticket_id: 'ticket-uuid-1001',
+            message_type: 'public_reply',
+            author_name: 'Support Agent',
+            body: 'We resolved the discrepancy for you.',
+            created_at: '2026-10-01T10:05:00.000000Z',
+          },
+        ],
+      }
+
+      // Live signal arrives
+      act(() => {
+        mockLiveClient.emitSignal({
+          event_id: 'sig-1',
+          organization_id: 1,
+          ticket_id: 'ticket-uuid-1001',
+          change_type: 'message_created',
+          revision: 2,
+        })
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('We resolved the discrepancy for you.')).toBeInTheDocument()
+      })
+    })
+
+    it('shows "New reply — jump to latest" when reading older content and jumps when clicked', async () => {
+      const user = userEvent.setup()
+      sessionStorage.setItem('portal_token_ticket-uuid-1001', 'signed-token-xyz')
+      const mockLiveClient = createMockLiveClient()
+
+      let ticketData = {
+        ticket: {
+          id: 'ticket-uuid-1001',
+          ticket_number: 1001,
+          subject: 'Billing discrepancy on invoice #502',
+          status: 'open',
+          created_at: '2026-10-01T10:00:00.000000Z',
+        },
+        customer: { id: 'cust-1', name: 'Alice Freeman' },
+        messages: [
+          {
+            id: 'msg-1',
+            ticket_id: 'ticket-uuid-1001',
+            message_type: 'public_reply',
+            author_name: 'Alice Freeman',
+            body: 'Original issue message',
+            created_at: '2026-10-01T10:00:00.000000Z',
+          },
+        ],
+      }
+
+      global.fetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/portal/tickets/ticket-uuid-1001')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ticketData,
+          })
+        }
+        return Promise.resolve({ ok: false, status: 404 })
+      })
+
+      // Simulate user scrolled up (reading older content)
+      Object.defineProperty(window, 'scrollY', { value: 100, writable: true })
+      Object.defineProperty(window, 'innerHeight', { value: 400, writable: true })
+      Object.defineProperty(document.documentElement, 'scrollHeight', { value: 1500, writable: true })
+
+      renderWithClient(
+        <CustomerPortalView
+          apiUrl="http://acme.localhost:8000"
+          subdomain="acme"
+          pathname="/portal/tickets/ticket-uuid-1001"
+          liveClient={mockLiveClient}
+        />
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Original issue message')).toBeInTheDocument()
+      })
+
+      // Simulate scroll event to trigger isNearBottom calculation
+      window.dispatchEvent(new Event('scroll'))
+
+      // Support sends a new reply
+      ticketData = {
+        ...ticketData,
+        messages: [
+          ...ticketData.messages,
+          {
+            id: 'msg-new-reply',
+            ticket_id: 'ticket-uuid-1001',
+            message_type: 'public_reply',
+            author_name: 'Support Agent',
+            body: 'Fresh update while user was reading older text.',
+            created_at: '2026-10-01T10:10:00.000000Z',
+          },
+        ],
+      }
+
+      act(() => {
+        mockLiveClient.emitSignal({
+          event_id: 'sig-2',
+          organization_id: 1,
+          ticket_id: 'ticket-uuid-1001',
+          change_type: 'message_created',
+          revision: 3,
+        })
+      })
+
+      // "New reply — jump to latest" button must appear
+      await waitFor(() => {
+        expect(screen.getByTestId('portal-jump-to-latest')).toBeInTheDocument()
+      })
+      expect(screen.getByTestId('portal-jump-to-latest')).toHaveTextContent('New reply — jump to latest')
+
+      // Scroll position was preserved at 100
+      expect(window.scrollY).toBe(100)
+
+      // Clicking jump to latest removes the cue
+      await user.click(screen.getByTestId('portal-jump-to-latest'))
+      expect(screen.queryByTestId('portal-jump-to-latest')).not.toBeInTheDocument()
+    })
+
+    it('closed Ticket removes active composer according to existing lifecycle behavior', async () => {
+      sessionStorage.setItem('portal_token_ticket-uuid-1001', 'signed-token-xyz')
+      const mockLiveClient = createMockLiveClient()
+
+      let ticketData = {
+        ticket: {
+          id: 'ticket-uuid-1001',
+          ticket_number: 1001,
+          subject: 'Billing discrepancy',
+          status: 'open',
+          created_at: '2026-10-01T10:00:00.000000Z',
+        },
+        customer: { id: 'cust-1', name: 'Alice Freeman' },
+        messages: [
+          {
+            id: 'msg-1',
+            ticket_id: 'ticket-uuid-1001',
+            message_type: 'public_reply',
+            author_name: 'Alice Freeman',
+            body: 'Please close this inquiry',
+            created_at: '2026-10-01T10:00:00.000000Z',
+          },
+        ],
+      }
+
+      global.fetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/portal/tickets/ticket-uuid-1001')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ticketData,
+          })
+        }
+        return Promise.resolve({ ok: false, status: 404 })
+      })
+
+      renderWithClient(
+        <CustomerPortalView
+          apiUrl="http://acme.localhost:8000"
+          subdomain="acme"
+          pathname="/portal/tickets/ticket-uuid-1001"
+          liveClient={mockLiveClient}
+        />
+      )
+
+      await waitFor(() => {
+        expect(screen.getByTestId('customer-portal-reply-composer')).toBeInTheDocument()
+      })
+
+      // Ticket is closed by staff
+      ticketData = {
+        ...ticketData,
+        ticket: {
+          ...ticketData.ticket,
+          status: 'closed',
+        },
+      }
+
+      act(() => {
+        mockLiveClient.emitSignal({
+          event_id: 'sig-3',
+          organization_id: 1,
+          ticket_id: 'ticket-uuid-1001',
+          change_type: 'status_changed',
+          revision: 4,
+        })
+      })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('portal-ticket-closed-banner')).toBeInTheDocument()
+      })
+      expect(screen.queryByTestId('customer-portal-reply-composer')).not.toBeInTheDocument()
+    })
+
+    it('soft deletion or denied access clears protected content and shows generic unavailable state', async () => {
+      sessionStorage.setItem('portal_token_ticket-uuid-1001', 'signed-token-xyz')
+      const mockLiveClient = createMockLiveClient()
+
+      global.fetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/portal/tickets/ticket-uuid-1001')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              ticket: {
+                id: 'ticket-uuid-1001',
+                ticket_number: 1001,
+                subject: 'Confidential subject',
+                status: 'open',
+              },
+              customer: { id: 'cust-1', name: 'Alice Freeman' },
+              messages: [
+                {
+                  id: 'msg-1',
+                  ticket_id: 'ticket-uuid-1001',
+                  message_type: 'public_reply',
+                  author_name: 'Alice Freeman',
+                  body: 'Confidential body message',
+                  created_at: '2026-10-01T10:00:00.000000Z',
+                },
+              ],
+            }),
+          })
+        }
+        return Promise.resolve({ ok: false, status: 404 })
+      })
+
+      renderWithClient(
+        <CustomerPortalView
+          apiUrl="http://acme.localhost:8000"
+          subdomain="acme"
+          pathname="/portal/tickets/ticket-uuid-1001"
+          liveClient={mockLiveClient}
+        />
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Confidential subject')).toBeInTheDocument()
+        expect(screen.getByText('Confidential body message')).toBeInTheDocument()
+      })
+
+      // Soft deletion signal arrives via WebSocket
+      act(() => {
+        mockLiveClient.emitTicketUnavailable('ticket-uuid-1001', 'unavailable')
+      })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('portal-ticket-unavailable')).toBeInTheDocument()
+      })
+
+      // Protected content MUST BE CLEARED from DOM
+      expect(screen.queryByText('Confidential subject')).not.toBeInTheDocument()
+      expect(screen.queryByText('Confidential body message')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('portal-ticket-active-thread')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('customer-portal-reply-composer')).not.toBeInTheDocument()
+    })
+
+    it('expired customer token clears protected content and offers "Request a new link"', async () => {
+      const user = userEvent.setup()
+      sessionStorage.setItem('portal_token_ticket-uuid-1001', 'signed-token-xyz')
+      const mockLiveClient = createMockLiveClient()
+
+      global.fetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/portal/tickets/ticket-uuid-1001')) {
+          return Promise.resolve({
+            ok: false,
+            status: 401,
+            json: async () => ({ message: 'Customer access token has expired.' }),
+          })
+        }
+        return Promise.resolve({ ok: false, status: 404 })
+      })
+
+      renderWithClient(
+        <CustomerPortalView
+          apiUrl="http://acme.localhost:8000"
+          subdomain="acme"
+          pathname="/portal/tickets/ticket-uuid-1001"
+          liveClient={mockLiveClient}
+        />
+      )
+
+      await waitFor(() => {
+        expect(screen.getByTestId('portal-ticket-expired')).toBeInTheDocument()
+      })
+
+      const requestLinkBtn = screen.getByTestId('portal-request-link-btn')
+      expect(requestLinkBtn).toHaveTextContent('Request a new link')
+
+      // Clicking opens Find My Tickets modal to request a new magic link
+      await user.click(requestLinkBtn)
+      expect(screen.getByRole('heading', { name: /Find My Tickets/i })).toBeInTheDocument()
+    })
+
+    it('reconnect reauthorizes and refetches without leaking Internal Notes or staff Presence', async () => {
+      sessionStorage.setItem('portal_token_ticket-uuid-1001', 'signed-token-xyz')
+      const mockLiveClient = createMockLiveClient()
+
+      let fetchCount = 0
+      global.fetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/portal/tickets/ticket-uuid-1001')) {
+          fetchCount++
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              ticket: {
+                id: 'ticket-uuid-1001',
+                ticket_number: 1001,
+                subject: 'Live ticket refetch',
+                status: 'open',
+              },
+              customer: { id: 'cust-1', name: 'Alice Freeman' },
+              messages: [
+                {
+                  id: 'msg-1',
+                  ticket_id: 'ticket-uuid-1001',
+                  message_type: 'public_reply',
+                  author_name: 'Alice Freeman',
+                  body: `Public body fetch #${fetchCount}`,
+                  created_at: '2026-10-01T10:00:00.000000Z',
+                },
+              ],
+            }),
+          })
+        }
+        return Promise.resolve({ ok: false, status: 404 })
+      })
+
+      renderWithClient(
+        <CustomerPortalView
+          apiUrl="http://acme.localhost:8000"
+          subdomain="acme"
+          pathname="/portal/tickets/ticket-uuid-1001"
+          liveClient={mockLiveClient}
+        />
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Public body fetch #1')).toBeInTheDocument()
+      })
+
+      // Simulate network disconnect and reconnect
+      act(() => {
+        mockLiveClient.simulateDisconnect()
+        mockLiveClient.simulateReconnect()
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('Public body fetch #2')).toBeInTheDocument()
+      })
+
+      // Staff presence and internal notes never present
+      expect(screen.queryByTestId('ticket-typing-indicator')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('ticket-viewers')).not.toBeInTheDocument()
+    })
   })
 })

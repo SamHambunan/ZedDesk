@@ -9,6 +9,7 @@ import {
   parsePortalTicketUuidFromPath,
   type CreateTicketPayload,
 } from '../../hooks/useCustomerPortal'
+import type { ILiveClient } from '../../lib/live-client'
 
 export interface CustomerPortalViewProps {
   readonly apiUrl: string
@@ -17,6 +18,7 @@ export interface CustomerPortalViewProps {
   readonly search?: string
   readonly organizationName?: string | null
   readonly isLoading?: boolean
+  readonly liveClient?: ILiveClient
 }
 
 export interface TicketSuccessState {
@@ -34,6 +36,7 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({
   search,
   organizationName,
   isLoading = false,
+  liveClient,
 }) => {
   const [successData, setSuccessData] = useState<TicketSuccessState | null>(null)
   const [historyModalOverride, setHistoryModalOverride] = useState<boolean | null>(null)
@@ -95,6 +98,7 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({
           apiUrl={apiUrl}
           ticketUuid={ticketUuid}
           initialToken={urlToken}
+          liveClient={liveClient}
           onOpenHistory={() => setHistoryModalOverride(true)}
           onNewInquiry={() => {
             if (typeof window !== 'undefined') {
