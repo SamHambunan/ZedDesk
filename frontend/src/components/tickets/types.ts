@@ -47,9 +47,12 @@ export interface TicketAssignmentAudit {
   readonly team_name?: string | null
   readonly member_id: number | null
   readonly member_name?: string | null
-  readonly assigned_by_name: string
+  readonly assigned_by_name?: string
   readonly created_at: string
   readonly note?: string
+  readonly member?: { readonly user?: { readonly name?: string }; readonly name?: string } | null
+  readonly team?: { readonly name?: string } | null
+  readonly assigned_by?: { readonly user?: { readonly name?: string }; readonly name?: string } | null
 }
 
 export interface TicketItem {

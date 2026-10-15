@@ -29,6 +29,7 @@ import { Toast } from '../ui/Toast'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
+import { formatAssignmentAuditTitle, formatAuditTime } from './constants'
 
 // --- Compound Subcomponent 1: CustomerCard ---
 export interface InspectorCustomerCardProps {
@@ -764,54 +765,23 @@ export const InspectorAuditLog: React.FC<InspectorAuditLogProps> = ({
       {isAuditExpanded ? (
         <div data-testid="assignment-history-body" className="space-y-2 max-h-40 overflow-y-auto pt-1">
           {ticket.assignments && ticket.assignments.length > 0 ? (
-            ticket.assignments.map((asg) => {
-              const memberName = asg.member_name || (asg as any).member?.user?.name || (asg as any).member?.name
-              const teamName = asg.team_name || (asg as any).team?.name
-              const assignedByName =
-                asg.assigned_by_name ||
-                (asg as any).assigned_by?.user?.name ||
-                (asg as any).assigned_by?.name ||
-                'System'
-
-              let title = asg.note
-              if (!title) {
-                if (memberName && teamName) {
-                  title = `Assigned to ${memberName} (${teamName})`
-                } else if (memberName) {
-                  title = `Assigned to ${memberName}`
-                } else if (teamName) {
-                  title = `Assigned to ${teamName}`
-                } else {
-                  title = 'Unassigned'
-                }
-              }
-
-              return (
-                <div
-                  key={asg.id}
-                  data-testid={`assignment-audit-item-${asg.id}`}
-                  className="text-[11px] text-text-secondary font-mono border-l border-white/10 pl-2 space-y-0.5"
-                >
-                  <div className="text-text-primary font-medium">
-                    {title}
-                  </div>
-                  <div className="text-text-muted text-[10px] flex items-center justify-between">
-                    <span>By {assignedByName}</span>
-                    <span className="tabular-nums">
-                      {(() => {
-                        try {
-                          return asg.created_at
-                            ? new Date(asg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                            : ''
-                        } catch {
-                          return ''
-                        }
-                      })()}
-                    </span>
-                  </div>
+            ticket.assignments.map((asg) => (
+              <div
+                key={asg.id}
+                data-testid={`assignment-audit-item-${asg.id}`}
+                className="text-[11px] text-text-secondary font-mono border-l border-white/10 pl-2 space-y-0.5"
+              >
+                <div className="text-text-primary font-medium">
+                  {formatAssignmentAuditTitle(asg)}
                 </div>
-              )
-            })
+                <div className="text-text-muted text-[10px] flex items-center justify-between">
+                  <span>By {asg.assigned_by_name || 'System'}</span>
+                  <span className="tabular-nums">
+                    {formatAuditTime(asg.created_at)}
+                  </span>
+                </div>
+              </div>
+            ))
           ) : (
             <div className="text-[11px] text-text-muted italic py-1">
               No assignment history recorded.
