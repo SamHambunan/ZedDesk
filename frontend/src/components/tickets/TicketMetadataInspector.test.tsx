@@ -465,6 +465,7 @@ describe('TicketCockpit.Inspector & TicketMetadataInspector (Issue #105)', () =>
   it('dispatches API requests for claim, assign, status, priority, and delete when apiUrl is configured', async () => {
     const user = userEvent.setup()
     const fetchCalls: { url: string; method: string; body?: any }[] = []
+    const ticket = { ...INITIAL_MOCK_TICKETS[0], assignment_revision: 1 }
 
     const mockFetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
       fetchCalls.push({
@@ -503,6 +504,8 @@ describe('TicketCockpit.Inspector & TicketMetadataInspector (Issue #105)', () =>
           json: async () => ({ message: 'Deleted' }),
         }
       }
+      if (url.endsWith('/tickets/ticket-1')) return { ok: true, json: async () => ({ data: ticket }) }
+      if (url.includes('/tickets?')) return { ok: true, json: async () => ({ data: [ticket] }) }
       return { ok: true, json: async () => ({ data: [] }) }
     })
 
@@ -513,7 +516,7 @@ describe('TicketCockpit.Inspector & TicketMetadataInspector (Issue #105)', () =>
         <TicketCockpit.Provider
           apiUrl="http://zeddesk.test/api"
           token="test-token-auth"
-          tickets={INITIAL_MOCK_TICKETS}
+          tickets={[ticket]}
           teams={MOCK_TEAMS}
           members={MOCK_MEMBERS}
           allTags={MOCK_TAGS_POOL}

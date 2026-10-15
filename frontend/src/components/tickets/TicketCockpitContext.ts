@@ -33,6 +33,19 @@ export interface TicketFieldConflict {
   readonly intendedValue: TicketStatus | TicketPriority
 }
 
+export interface AssignmentPair {
+  readonly teamId: number | null
+  readonly memberId: number | null
+}
+
+export interface AssignmentConflict {
+  readonly ticketId: string
+  readonly action: 'assign' | 'claim'
+  readonly currentRevision: number
+  readonly current: AssignmentPair
+  readonly intended: AssignmentPair
+}
+
 export interface TicketCockpitState {
   readonly tickets: readonly TicketItem[]
   readonly filteredTickets: readonly TicketItem[]
@@ -58,6 +71,7 @@ export interface TicketCockpitState {
   readonly ticketViewers?: readonly PresenceMember[]
   readonly ticketTypingMembers?: readonly PresenceMember[]
   readonly fieldConflicts?: Record<string, Partial<Record<ConflictedTicketField, TicketFieldConflict>>>
+  readonly assignmentConflicts?: Record<string, AssignmentConflict | undefined>
 }
 
 export interface TicketCockpitActions {
@@ -73,6 +87,9 @@ export interface TicketCockpitActions {
   readonly setConflictedFieldIntent?: (ticketId: string, field: ConflictedTicketField, value: TicketStatus | TicketPriority) => void
   readonly useCurrentFieldValue?: (ticketId: string, field: ConflictedTicketField) => Promise<void>
   readonly retryFieldChange?: (ticketId: string, field: ConflictedTicketField) => Promise<void>
+  readonly setConflictedAssignmentIntent?: (ticketId: string, teamId: number | null, memberId: number | null) => void
+  readonly useCurrentAssignment?: (ticketId: string) => Promise<void>
+  readonly retryAssignment?: (ticketId: string) => Promise<void>
   readonly assign: (ticketId: string, teamId: number | null, memberId: number | null) => Promise<void> | void
   readonly addTag: (ticketId: string, tag: TicketTag) => Promise<void> | void
   readonly removeTag: (ticketId: string, tagId: number | string) => Promise<void> | void
