@@ -47,7 +47,7 @@ function AttachmentItem({ attachment, ticketUuid, apiUrl }: AttachmentItemProps)
       data-testid={`portal-attachment-${attachment.id}`}
       className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-surface-subpanel/80 border border-border-subtle hover:border-border-prominent transition-colors text-xs text-text-secondary group"
     >
-      <FileText className="w-3.5 h-3.5 text-[#F59E0B] shrink-0" />
+      <FileText className="w-3.5 h-3.5 text-amber-action shrink-0" />
       <span className="font-mono text-text-primary text-[11px] max-w-[200px] truncate">
         {attachment.file_name}
       </span>
@@ -61,7 +61,7 @@ function AttachmentItem({ attachment, ticketUuid, apiUrl }: AttachmentItemProps)
         rel="noopener noreferrer"
         data-testid={`attachment-download-link-${attachment.id}`}
         title={`Download ${attachment.file_name}`}
-        className="p-1 text-text-muted hover:text-[#F59E0B] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#F59E0B] rounded"
+        className="p-1 text-text-muted hover:text-amber-action transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-amber rounded"
       >
         <Download className="w-3.5 h-3.5" />
       </a>
@@ -113,13 +113,13 @@ export const PortalTicketActiveThread: React.FC<PortalTicketActiveThreadProps> =
             className="rounded-xl transition-colors p-4 sm:p-5 bg-surface-subpanel/50 border border-border-subtle shadow-card"
           >
             {/* Message Header */}
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-white/5">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-border-subtle">
               <div className="flex items-center gap-2.5">
                 <div
                   className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${
                     isCustomer
-                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                      : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      ? 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20'
+                      : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
                   }`}
                 >
                   {isCustomer ? <User className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
@@ -133,8 +133,8 @@ export const PortalTicketActiveThread: React.FC<PortalTicketActiveThreadProps> =
                   <span
                     className={`text-[10px] uppercase font-mono px-1.5 py-0.5 rounded border ${
                       isCustomer
-                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        ? 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20'
+                        : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
                     }`}
                   >
                     {isCustomer ? 'Customer' : 'Support Team'}
@@ -157,9 +157,9 @@ export const PortalTicketActiveThread: React.FC<PortalTicketActiveThreadProps> =
 
             {/* Attachments Tray */}
             {msg.attachments && msg.attachments.length > 0 && (
-              <div className="mt-3.5 pt-3 border-t border-white/5 space-y-2">
+              <div className="mt-3.5 pt-3 border-t border-border-subtle space-y-2">
                 <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono">
-                  <Paperclip className="w-3.5 h-3.5 text-[#F59E0B]" />
+                  <Paperclip className="w-3.5 h-3.5 text-amber-action" />
                   <span>Attachments ({msg.attachments.length})</span>
                 </div>
 

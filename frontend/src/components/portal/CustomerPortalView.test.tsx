@@ -62,6 +62,29 @@ describe('Customer Support Portal Shell & Public Ticket Intake', () => {
     expect(screen.getByTestId('portal-find-tickets-btn')).toBeInTheDocument()
   })
 
+  it('renders Warm Alabaster theme scope and restrained amber actions without graphite or navy leakage', () => {
+    renderWithClient(
+      <CustomerPortalView apiUrl="http://acme.localhost:8000" subdomain="acme" />
+    )
+
+    const layout = screen.getByTestId('customer-portal-layout')
+    expect(layout).toHaveAttribute('data-theme', 'customer')
+
+    // Brand icon uses restrained amber treatment
+    const brandIconBox = screen.getByTestId('portal-brand-icon')
+    expect(brandIconBox.className).toContain('text-amber-action')
+    expect(brandIconBox.className).not.toContain('accent-indigo-glow')
+
+    // Form inputs use amber focus tokens
+    const nameInput = screen.getByTestId('portal-customer-name')
+    expect(nameInput.className).toContain('focus:border-focus-amber')
+    expect(nameInput.className).not.toContain('accent-indigo-glow')
+
+    // Dropzone uses amber tokens
+    const dropzone = screen.getByTestId('portal-dropzone')
+    expect(dropzone.className).not.toContain('accent-indigo-glow')
+  })
+
   it('validates required fields before submitting the intake form', async () => {
     const user = userEvent.setup()
     renderWithClient(<CustomerPortalView apiUrl="http://acme.localhost:8000" subdomain="acme" />)
@@ -203,11 +226,15 @@ describe('Customer Support Portal Shell & Public Ticket Intake', () => {
     })
 
     expect(screen.getByTestId('portal-submitted-ticket-number')).toHaveTextContent('#1001')
+    expect(screen.getByTestId('portal-submitted-ticket-number').className).toContain('text-amber-action')
+    expect(screen.getByTestId('portal-submitted-ticket-number').className).not.toContain('accent-indigo-glow')
     expect(screen.getByTestId('portal-confirmed-subject')).toHaveTextContent('Unable to connect to database')
     expect(screen.getByTestId('portal-access-link-input')).toHaveValue(
       'http://acme.localhost:8000/portal/tickets/1001?token=hmac-signed-token-456'
     )
     expect(screen.getByTestId('portal-access-token')).toHaveTextContent('hmac-signed-token-456')
+    expect(screen.getByTestId('portal-access-token').className).toContain('text-amber-action')
+    expect(screen.getByTestId('portal-access-token').className).not.toContain('accent-indigo-glow')
 
     // Test Copy link functionality and visual feedback
     const copyBtn = screen.getByTestId('portal-copy-link-btn')

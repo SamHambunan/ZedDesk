@@ -127,7 +127,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
                 if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: undefined }))
               }}
               placeholder="e.g. Alice Freeman"
-              className={`w-full h-10 px-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-accent-indigo-glow transition-colors ${
+              className={`w-full h-10 px-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber transition-colors ${
                 fieldErrors.name ? 'border-sentiment-negative' : 'border-border-subtle'
               }`}
             />
@@ -157,7 +157,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
                 if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }))
               }}
               placeholder="e.g. alice@example.com"
-              className={`w-full h-10 px-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-accent-indigo-glow transition-colors ${
+              className={`w-full h-10 px-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber transition-colors ${
                 fieldErrors.email ? 'border-sentiment-negative' : 'border-border-subtle'
               }`}
             />
@@ -190,7 +190,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
                 if (fieldErrors.subject) setFieldErrors((prev) => ({ ...prev, subject: undefined }))
               }}
               placeholder="Brief summary of your inquiry"
-              className={`w-full h-10 px-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-accent-indigo-glow transition-colors ${
+              className={`w-full h-10 px-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber transition-colors ${
                 fieldErrors.subject ? 'border-sentiment-negative' : 'border-border-subtle'
               }`}
             />
@@ -214,7 +214,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
               disabled={isSubmitting}
               value={priority}
               onChange={(e) => setPriority(e.target.value as TicketPriorityType)}
-              className="w-full h-10 px-3 bg-surface-canvas border border-border-subtle rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-accent-indigo-glow transition-colors"
+              className="w-full h-10 px-3 bg-surface-canvas border border-border-subtle rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber transition-colors"
             >
               <option value="low">Low</option>
               <option value="medium">Medium</option>
@@ -244,7 +244,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
               if (fieldErrors.message) setFieldErrors((prev) => ({ ...prev, message: undefined }))
             }}
             placeholder="Describe your inquiry in detail..."
-            className={`w-full p-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-accent-indigo-glow transition-colors ${
+            className={`w-full p-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber transition-colors ${
               fieldErrors.message ? 'border-sentiment-negative' : 'border-border-subtle'
             }`}
           />

@@ -23,11 +23,18 @@ export const CustomerPortalLayout: React.FC<CustomerPortalLayoutProps> = ({
     (subdomain ? `${subdomain.charAt(0).toUpperCase() + subdomain.slice(1)}` : 'ZedDesk')
 
   return (
-    <div className="min-h-screen bg-surface-canvas text-text-primary flex flex-col font-sans selection:bg-accent-indigo-glow selection:text-white">
+    <div
+      data-theme="customer"
+      data-testid="customer-portal-layout"
+      className="min-h-screen bg-surface-canvas text-text-primary flex flex-col font-sans selection:bg-amber-action/20 selection:text-text-primary"
+    >
       {/* Top Header */}
       <header className="h-16 border-b border-border-subtle bg-surface-panel/80 backdrop-blur-md sticky top-0 z-30 px-4 sm:px-8 flex items-center justify-between">
         <div className="flex items-center gap-3" data-testid="portal-org-branding">
-          <div className="w-8 h-8 rounded-lg bg-primary-container/20 border border-primary-container/40 flex items-center justify-center text-accent-indigo-glow shadow-keylight">
+          <div
+            data-testid="portal-brand-icon"
+            className="w-8 h-8 rounded-lg bg-amber-action/10 border border-amber-action/30 flex items-center justify-center text-amber-action shadow-keylight"
+          >
             <LifeBuoy className="w-4 h-4" />
           </div>
           <div className="flex items-center gap-2">
@@ -52,7 +59,7 @@ export const CustomerPortalLayout: React.FC<CustomerPortalLayoutProps> = ({
             size="compact"
             data-testid="portal-find-tickets-btn"
             onClick={onOpenHistory}
-            leftIcon={<History className="w-3.5 h-3.5 text-accent-indigo-glow" />}
+            leftIcon={<History className="w-3.5 h-3.5 text-amber-action" />}
           >
             View all my tickets
           </Button>

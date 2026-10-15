@@ -101,8 +101,8 @@ export const CustomerFileDropzone: React.FC<CustomerFileDropzoneProps> = ({
         onClick={() => !disabled && inputRef.current?.click()}
         className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-colors duration-150 flex flex-col items-center justify-center gap-2 ${
           dragActive
-            ? 'border-accent-indigo-glow bg-accent-indigo-glow/5'
-            : 'border-border-prominent hover:border-accent-indigo-glow/50 bg-surface-canvas/50'
+            ? 'border-amber-action bg-amber-action/5'
+            : 'border-border-prominent hover:border-amber-action/50 bg-surface-canvas/50'
         } ${disabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
       >
         <input
@@ -115,12 +115,12 @@ export const CustomerFileDropzone: React.FC<CustomerFileDropzoneProps> = ({
           className="hidden"
           accept="image/*,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,.zip,.json"
         />
-        <div className="w-10 h-10 rounded-full bg-surface-subpanel flex items-center justify-center text-accent-indigo-glow">
+        <div className="w-10 h-10 rounded-full bg-surface-subpanel flex items-center justify-center text-amber-action">
           <UploadCloud className="w-5 h-5" />
         </div>
         <div>
           <p className="text-body-sm text-text-primary font-medium">
-            <span className="text-accent-indigo-glow underline underline-offset-2">Click to upload</span> or drag and drop
+            <span className="text-amber-action underline underline-offset-2">Click to upload</span> or drag and drop
           </p>
           <p className="text-xs text-text-muted mt-0.5">Images, PDF, documents, spreadsheets, or archives up to 10MB</p>
         </div>
@@ -142,7 +142,7 @@ export const CustomerFileDropzone: React.FC<CustomerFileDropzoneProps> = ({
               className="flex items-center justify-between p-2.5 bg-surface-subpanel border border-border-subtle rounded-lg text-body-sm"
             >
               <div className="flex items-center gap-2.5 truncate">
-                <FileText className="w-4 h-4 text-accent-indigo-glow flex-shrink-0" />
+                <FileText className="w-4 h-4 text-amber-action flex-shrink-0" />
                 <span className="text-text-primary truncate max-w-xs">{file.name}</span>
                 <span className="text-text-muted text-xs font-mono">({formatFileSize(file.size)})</span>
               </div>

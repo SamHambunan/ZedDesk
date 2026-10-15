@@ -461,4 +461,39 @@ describe('Customer Portal Conversation Thread, Composed Replies & Closed Lockout
     await user.click(screen.getByTestId('portal-closed-find-tickets-btn'))
     expect(onFindTickets).toHaveBeenCalledTimes(1)
   })
+
+  it('applies Warm Alabaster visual direction to conversation thread and composer without graphite leakage or staff presence', async () => {
+    sessionStorage.setItem('portal_token_ticket-uuid-1001', 'signed-hmac-token-123')
+
+    renderWithClient(
+      <CustomerPortalView
+        apiUrl="http://acme.localhost:8000"
+        subdomain="acme"
+        pathname="/portal/tickets/ticket-uuid-1001"
+      />
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('portal-ticket-subject')).toBeInTheDocument()
+    })
+
+    // Thread is scoped within data-theme="customer"
+    expect(screen.getByTestId('customer-portal-layout')).toHaveAttribute('data-theme', 'customer')
+
+    // Message card uses semantic border rather than dark-mode border-white/5
+    const messageCard = screen.getByTestId('portal-thread-message-msg-1')
+    expect(messageCard.className).toContain('border-border-subtle')
+    expect(messageCard.innerHTML).not.toContain('border-white/5')
+
+    // Composer header uses semantic amber and border-subtle instead of hardcoded graphite #0F1012 or #282A33
+    const composer = screen.getByTestId('customer-portal-reply-composer')
+    expect(composer.innerHTML).not.toContain('#0F1012')
+    expect(composer.innerHTML).not.toContain('#282A33')
+    expect(composer.innerHTML).toContain('text-amber-action')
+
+    // Staff presence indicators must NOT exist
+    expect(screen.queryByTestId('ticket-typing-indicator')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('ticket-viewers')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('online-members')).not.toBeInTheDocument()
+  })
 })
