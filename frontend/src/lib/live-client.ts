@@ -18,6 +18,7 @@ export interface PresenceMember {
 }
 
 export type LiveStatus = 'connecting' | 'connected' | 'disconnected'
+export type CustomerUnavailableReason = 'expired' | 'denied' | 'unavailable'
 
 export interface ILiveClient {
   readonly status: LiveStatus
@@ -27,6 +28,12 @@ export interface ILiveClient {
   readonly subscribeToTicket: (
     ticketId: string,
     onSignal: (signal: LiveSignalPayload) => void
+  ) => () => void
+  readonly subscribeToCustomerTicket?: (
+    ticketId: string,
+    token: string,
+    onSignal: (signal: LiveSignalPayload) => void,
+    onUnavailable?: (reason?: CustomerUnavailableReason) => void
   ) => () => void
   readonly subscribeToNotifications?: (
     onSignal: (signal: InboxSignalPayload) => void
@@ -88,9 +95,12 @@ export class LiveClient implements ILiveClient {
   private orgPresenceListeners = new Set<(members: readonly PresenceMember[]) => void>()
   private ticketViewersListeners = new Map<string, Set<(viewers: readonly PresenceMember[]) => void>>()
   private ticketTypingListeners = new Map<string, Set<(typingMembers: readonly PresenceMember[]) => void>>()
+  private customerTicketSignalListeners = new Map<string, Set<(signal: LiveSignalPayload) => void>>()
+  private customerTicketUnavailableListeners = new Map<string, Set<(reason?: CustomerUnavailableReason) => void>>()
 
   private currentOrgChannel: string | null = null
   private currentTicketChannels = new Map<string, string>() // ticketId -> channelName
+  private currentCustomerTicketChannels = new Map<string, { channelName: string; token: string }>()
   private currentNotificationChannel: string | null = null
   private currentOrgPresenceChannel: string | null = null
   private currentOrgPresenceMembers = new Map<number, PresenceMember>()
@@ -222,6 +232,8 @@ export class LiveClient implements ILiveClient {
       } else if (eventName === 'ticket.changed') {
         const payload: LiveSignalPayload = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data
         this.dispatchSignal(parsed.channel, payload)
+      } else if (eventName === 'ticket.unavailable') {
+        this.dispatchUnavailable(parsed.channel)
       } else if (eventName === 'inbox.changed' || eventName === '.inbox.changed') {
         const payload: InboxSignalPayload = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data
         this.dispatchNotificationSignal(parsed.channel, payload)
@@ -384,6 +396,25 @@ export class LiveClient implements ILiveClient {
         }
       }
     }
+
+    // Check if channel matches any customer ticket channel
+    for (const [ticketId, info] of this.currentCustomerTicketChannels.entries()) {
+      if (info.channelName === channel) {
+        const listeners = this.customerTicketSignalListeners.get(ticketId)
+        if (listeners) {
+          for (const listener of listeners) {
+            listener(payload)
+          }
+        }
+      }
+    }
+  }
+
+  private dispatchUnavailable(channel: string): void {
+    const ticketId = this.channelToTicketId.get(channel)
+    if (ticketId) {
+      this.notifyCustomerUnavailable(ticketId, 'unavailable')
+    }
   }
 
   private dispatchNotificationSignal(channel: string, payload: InboxSignalPayload): void {
@@ -480,6 +511,9 @@ export class LiveClient implements ILiveClient {
     }
     for (const ticketId of this.ticketViewersListeners.keys()) {
       promises.push(this.discoverTicketViewingChannel(ticketId))
+    }
+    for (const [ticketId, info] of this.currentCustomerTicketChannels.entries()) {
+      promises.push(this.discoverCustomerTicketChannel(ticketId, info.token))
     }
     await Promise.all(promises)
   }
@@ -607,6 +641,157 @@ export class LiveClient implements ILiveClient {
       }
     } catch {
       // Ticket channel discovery failure
+    }
+  }
+
+  public subscribeToCustomerTicket(
+    ticketId: string,
+    token: string,
+    onSignal: (signal: LiveSignalPayload) => void,
+    onUnavailable?: (reason?: CustomerUnavailableReason) => void
+  ): () => void {
+    let listeners = this.customerTicketSignalListeners.get(ticketId)
+    if (!listeners) {
+      listeners = new Set()
+      this.customerTicketSignalListeners.set(ticketId, listeners)
+    }
+    listeners.add(onSignal)
+
+    if (onUnavailable) {
+      let unavailListeners = this.customerTicketUnavailableListeners.get(ticketId)
+      if (!unavailListeners) {
+        unavailListeners = new Set()
+        this.customerTicketUnavailableListeners.set(ticketId, unavailListeners)
+      }
+      unavailListeners.add(onUnavailable)
+    }
+
+    this.discoverCustomerTicketChannel(ticketId, token)
+
+    return () => {
+      const currentListeners = this.customerTicketSignalListeners.get(ticketId)
+      if (currentListeners) {
+        currentListeners.delete(onSignal)
+        if (currentListeners.size === 0) {
+          this.customerTicketSignalListeners.delete(ticketId)
+        }
+      }
+      if (onUnavailable) {
+        const currentUnavail = this.customerTicketUnavailableListeners.get(ticketId)
+        if (currentUnavail) {
+          currentUnavail.delete(onUnavailable)
+          if (currentUnavail.size === 0) {
+            this.customerTicketUnavailableListeners.delete(ticketId)
+          }
+        }
+      }
+      if (
+        !this.customerTicketSignalListeners.has(ticketId) &&
+        !this.customerTicketUnavailableListeners.has(ticketId)
+      ) {
+        const info = this.currentCustomerTicketChannels.get(ticketId)
+        if (info) {
+          this.unsubscribeChannel(info.channelName)
+          this.channelToTicketId.delete(info.channelName)
+          this.currentCustomerTicketChannels.delete(ticketId)
+        }
+      }
+    }
+  }
+
+  private handleCustomerAuthError(status: number, ticketId: string): boolean {
+    if (status === 401) {
+      this.notifyCustomerUnavailable(ticketId, 'expired')
+      return true
+    }
+    if (status === 403 || status === 404) {
+      this.notifyCustomerUnavailable(ticketId, 'unavailable')
+      return true
+    }
+    return false
+  }
+
+  private async discoverCustomerTicketChannel(ticketId: string, token: string): Promise<void> {
+    try {
+      const res = await fetch(`${this.apiUrl}/api/portal/tickets/${ticketId}/live-channel`, {
+        headers: {
+          Accept: 'application/json',
+          'X-Customer-Token': token,
+        },
+      })
+      if (this.handleCustomerAuthError(res.status, ticketId)) {
+        return
+      }
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.channel) {
+        const oldInfo = this.currentCustomerTicketChannels.get(ticketId)
+        if (oldInfo && oldInfo.channelName !== data.channel) {
+          this.unsubscribeChannel(oldInfo.channelName)
+          this.channelToTicketId.delete(oldInfo.channelName)
+        }
+        this.currentCustomerTicketChannels.set(ticketId, { channelName: data.channel, token })
+        this.channelToTicketId.set(data.channel, ticketId)
+        await this.subscribeCustomerChannel(ticketId, data.channel, token)
+      }
+    } catch {
+      // Customer ticket channel discovery failure
+    }
+  }
+
+  private async subscribeCustomerChannel(
+    ticketId: string,
+    channelName: string,
+    token: string
+  ): Promise<void> {
+    if (!this.socketId || !this.socket || this.socket.readyState !== WebSocket.OPEN) return
+    const authData = await this.authorizeCustomerChannel(ticketId, channelName, token)
+    if (!authData) return
+    this.send({
+      event: 'pusher:subscribe',
+      data: {
+        channel: channelName,
+        auth: authData.auth,
+      },
+    })
+  }
+
+  private async authorizeCustomerChannel(
+    ticketId: string,
+    channelName: string,
+    token: string
+  ): Promise<{ auth: string } | null> {
+    if (!this.socketId) return null
+    try {
+      const res = await fetch(`${this.apiUrl}/api/portal/tickets/${ticketId}/broadcasting/auth`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-Customer-Token': token,
+        },
+        body: JSON.stringify({
+          socket_id: this.socketId,
+          channel_name: channelName,
+        }),
+      })
+      if (this.handleCustomerAuthError(res.status, ticketId)) {
+        return null
+      }
+      if (!res.ok) return null
+      const data = await res.json()
+      return data.auth ? { auth: data.auth } : null
+    } catch {
+      return null
+    }
+  }
+
+  private notifyCustomerUnavailable(ticketId: string, reason: CustomerUnavailableReason): void {
+    const listeners = this.customerTicketUnavailableListeners.get(ticketId)
+    if (listeners) {
+      for (const listener of listeners) {
+        listener(reason)
+      }
     }
   }
 
@@ -876,6 +1061,11 @@ export class LiveClient implements ILiveClient {
       promises.push(this.discoverTicketViewingChannel(ticketId))
     }
 
+    // Re-discover all active customer ticket channels in parallel
+    for (const [ticketId, info] of this.currentCustomerTicketChannels.entries()) {
+      promises.push(this.discoverCustomerTicketChannel(ticketId, info.token))
+    }
+
     await Promise.all(promises)
 
     // Notify reconnect listeners to refresh REST data
@@ -915,6 +1105,8 @@ export class MockLiveClient implements ILiveClient {
   private readonly orgPresenceListeners = new Set<(members: readonly PresenceMember[]) => void>()
   private readonly ticketViewersListeners = new Map<string, Set<(viewers: readonly PresenceMember[]) => void>>()
   private readonly ticketTypingListeners = new Map<string, Set<(typingMembers: readonly PresenceMember[]) => void>>()
+  private readonly customerTicketListeners = new Map<string, Set<(signal: LiveSignalPayload) => void>>()
+  private readonly customerTicketUnavailableListeners = new Map<string, Set<(reason?: CustomerUnavailableReason) => void>>()
   private currentOrgPresence: readonly PresenceMember[] = []
   private currentTicketViewers = new Map<string, readonly PresenceMember[]>()
   private currentTicketTyping = new Map<string, readonly PresenceMember[]>()
@@ -922,6 +1114,48 @@ export class MockLiveClient implements ILiveClient {
 
   constructor(initialStatus: LiveStatus = 'connected') {
     this.status = initialStatus
+  }
+
+  public subscribeToCustomerTicket(
+    ticketId: string,
+    _token: string,
+    onSignal: (signal: LiveSignalPayload) => void,
+    onUnavailable?: (reason?: CustomerUnavailableReason) => void
+  ): () => void {
+    let set = this.customerTicketListeners.get(ticketId)
+    if (!set) {
+      set = new Set()
+      this.customerTicketListeners.set(ticketId, set)
+    }
+    set.add(onSignal)
+
+    if (onUnavailable) {
+      let unavailSet = this.customerTicketUnavailableListeners.get(ticketId)
+      if (!unavailSet) {
+        unavailSet = new Set()
+        this.customerTicketUnavailableListeners.set(ticketId, unavailSet)
+      }
+      unavailSet.add(onUnavailable)
+    }
+
+    return () => {
+      const current = this.customerTicketListeners.get(ticketId)
+      if (current) {
+        current.delete(onSignal)
+        if (current.size === 0) {
+          this.customerTicketListeners.delete(ticketId)
+        }
+      }
+      if (onUnavailable) {
+        const currentUnavail = this.customerTicketUnavailableListeners.get(ticketId)
+        if (currentUnavail) {
+          currentUnavail.delete(onUnavailable)
+          if (currentUnavail.size === 0) {
+            this.customerTicketUnavailableListeners.delete(ticketId)
+          }
+        }
+      }
+    }
   }
 
   public onStatusChange(listener: (status: LiveStatus) => void): () => void {
@@ -1049,6 +1283,25 @@ export class MockLiveClient implements ILiveClient {
     if (ticketListeners) {
       for (const listener of ticketListeners) {
         listener(signal)
+      }
+    }
+    // Deliver to customer ticket listeners if subscribed
+    const customerListeners = this.customerTicketListeners.get(signal.ticket_id)
+    if (customerListeners) {
+      for (const listener of customerListeners) {
+        listener(signal)
+      }
+    }
+  }
+
+  public emitTicketUnavailable(
+    ticketId: string,
+    reason: CustomerUnavailableReason = 'unavailable'
+  ): void {
+    const listeners = this.customerTicketUnavailableListeners.get(ticketId)
+    if (listeners) {
+      for (const listener of listeners) {
+        listener(reason)
       }
     }
   }

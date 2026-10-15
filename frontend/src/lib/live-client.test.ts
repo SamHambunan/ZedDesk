@@ -832,6 +832,267 @@ describe('LiveClient and MockLiveClient', () => {
     client.disconnect()
     global.fetch = originalFetch
   })
+
+  it('LiveClient discovers, authorizes, and subscribes to customer ticket channel using X-Customer-Token (#156)', async () => {
+    const originalFetch = global.fetch
+    const fetchMock = vi.fn().mockImplementation((url: string, options?: any) => {
+      if (url.includes('/api/portal/tickets/ticket-99/live-channel')) {
+        expect(options?.headers?.['X-Customer-Token']).toBe('signed-customer-token')
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ channel: 'private-customer.ticket.ticket-99.gen1' }),
+        })
+      }
+      if (url.includes('/api/portal/tickets/ticket-99/broadcasting/auth')) {
+        expect(options?.headers?.['X-Customer-Token']).toBe('signed-customer-token')
+        const body = JSON.parse(options?.body || '{}')
+        expect(body.socket_id).toBe('123.456')
+        expect(body.channel_name).toBe('private-customer.ticket.ticket-99.gen1')
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ auth: 'customer-auth-sig' }),
+        })
+      }
+      return Promise.resolve({ ok: false, status: 404 })
+    })
+    global.fetch = fetchMock
+
+    const client = new LiveClient({
+      apiUrl: 'http://localhost:8000',
+      webSocketClass: MockWebSocket as any,
+    })
+
+    const signalSpy = vi.fn()
+    const unavailableSpy = vi.fn()
+
+    await vi.advanceTimersByTimeAsync(10)
+    const socket = MockWebSocket.instances[0]
+    expect(socket).toBeDefined()
+
+    socket.receive({
+      event: 'pusher:connection_established',
+      data: JSON.stringify({ socket_id: '123.456' }),
+    })
+
+    const unsubscribe = client.subscribeToCustomerTicket!(
+      'ticket-99',
+      'signed-customer-token',
+      signalSpy,
+      unavailableSpy
+    )
+
+    await vi.advanceTimersByTimeAsync(50)
+
+    expect(socket.sent).toContain(
+      JSON.stringify({
+        event: 'pusher:subscribe',
+        data: {
+          channel: 'private-customer.ticket.ticket-99.gen1',
+          auth: 'customer-auth-sig',
+        },
+      })
+    )
+
+    // Receive ticket.changed signal
+    socket.receive({
+      event: 'ticket.changed',
+      channel: 'private-customer.ticket.ticket-99.gen1',
+      data: JSON.stringify({
+        event_id: 'evt-1',
+        organization_id: 1,
+        ticket_id: 'ticket-99',
+        change_type: 'message_created',
+        revision: 2,
+      }),
+    })
+    expect(signalSpy).toHaveBeenCalledWith({
+      event_id: 'evt-1',
+      organization_id: 1,
+      ticket_id: 'ticket-99',
+      change_type: 'message_created',
+      revision: 2,
+    })
+
+    // Receive ticket.unavailable signal (soft delete / deletion)
+    socket.receive({
+      event: 'ticket.unavailable',
+      channel: 'private-customer.ticket.ticket-99.gen1',
+      data: '{}',
+    })
+    expect(unavailableSpy).toHaveBeenCalledWith('unavailable')
+
+    unsubscribe()
+    expect(socket.sent).toContain(
+      JSON.stringify({
+        event: 'pusher:unsubscribe',
+        data: {
+          channel: 'private-customer.ticket.ticket-99.gen1',
+        },
+      })
+    )
+
+    client.disconnect()
+    global.fetch = originalFetch
+  })
+
+  it('MockLiveClient supports subscribeToCustomerTicket, emitSignal, and emitTicketUnavailable (#156)', () => {
+    const mock = createMockLiveClient()
+    const signalSpy = vi.fn()
+    const unavailableSpy = vi.fn()
+
+    const unsubscribe = mock.subscribeToCustomerTicket!(
+      'ticket-55',
+      'cust-tok',
+      signalSpy,
+      unavailableSpy
+    )
+
+    mock.emitSignal({
+      event_id: 'e-1',
+      organization_id: 1,
+      ticket_id: 'ticket-55',
+      change_type: 'status_changed',
+      revision: 3,
+    })
+    expect(signalSpy).toHaveBeenCalledWith({
+      event_id: 'e-1',
+      organization_id: 1,
+      ticket_id: 'ticket-55',
+      change_type: 'status_changed',
+      revision: 3,
+    })
+
+    mock.emitTicketUnavailable!('ticket-55', 'unavailable')
+    expect(unavailableSpy).toHaveBeenCalledWith('unavailable')
+
+    unsubscribe()
+  })
+
+  it('LiveClient notifies unavailable listener with expired when token is rejected with 401 (#156)', async () => {
+    const originalFetch = global.fetch
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/portal/tickets/ticket-expired/live-channel')) {
+        return Promise.resolve({
+          ok: false,
+          status: 401,
+          json: async () => ({ message: 'Customer access token has expired.' }),
+        })
+      }
+      return Promise.resolve({ ok: false, status: 404 })
+    })
+
+    const client = new LiveClient({
+      apiUrl: 'http://localhost:8000',
+      webSocketClass: MockWebSocket as any,
+    })
+
+    const signalSpy = vi.fn()
+    const unavailableSpy = vi.fn()
+
+    await vi.advanceTimersByTimeAsync(10)
+    const socket = MockWebSocket.instances[0]
+    socket.receive({
+      event: 'pusher:connection_established',
+      data: JSON.stringify({ socket_id: '123.456' }),
+    })
+
+    client.subscribeToCustomerTicket!(
+      'ticket-expired',
+      'expired-token',
+      signalSpy,
+      unavailableSpy
+    )
+
+    await vi.advanceTimersByTimeAsync(50)
+
+    expect(unavailableSpy).toHaveBeenCalledWith('expired')
+
+    client.disconnect()
+    global.fetch = originalFetch
+  })
+
+  it('LiveClient rotates customer ticket channels and notifies reconnect listeners (#156)', async () => {
+    const originalFetch = global.fetch
+    let generation = 1
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/portal/tickets/ticket-rotate/live-channel')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ channel: `private-customer.ticket.ticket-rotate.gen${generation}` }),
+        })
+      }
+      if (url.includes('/api/portal/tickets/ticket-rotate/broadcasting/auth')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ auth: `auth-${generation}` }),
+        })
+      }
+      return Promise.resolve({ ok: false, status: 404 })
+    })
+
+    const client = new LiveClient({
+      apiUrl: 'http://localhost:8000',
+      webSocketClass: MockWebSocket as any,
+    })
+
+    const signalSpy = vi.fn()
+    const reconnectSpy = vi.fn()
+    client.onReconnect(reconnectSpy)
+
+    await vi.advanceTimersByTimeAsync(10)
+    const socket = MockWebSocket.instances[0]
+    socket.receive({
+      event: 'pusher:connection_established',
+      data: JSON.stringify({ socket_id: '123.456' }),
+    })
+
+    client.subscribeToCustomerTicket!(
+      'ticket-rotate',
+      'valid-token',
+      signalSpy
+    )
+
+    await vi.advanceTimersByTimeAsync(50)
+    expect(socket.sent).toContain(
+      JSON.stringify({
+        event: 'pusher:subscribe',
+        data: {
+          channel: 'private-customer.ticket.ticket-rotate.gen1',
+          auth: 'auth-1',
+        },
+      })
+    )
+
+    // Simulate generation rotation
+    generation = 2
+    await client.rotateChannels!()
+
+    expect(socket.sent).toContain(
+      JSON.stringify({
+        event: 'pusher:unsubscribe',
+        data: {
+          channel: 'private-customer.ticket.ticket-rotate.gen1',
+        },
+      })
+    )
+    expect(socket.sent).toContain(
+      JSON.stringify({
+        event: 'pusher:subscribe',
+        data: {
+          channel: 'private-customer.ticket.ticket-rotate.gen2',
+          auth: 'auth-2',
+        },
+      })
+    )
+    expect(reconnectSpy).toHaveBeenCalled()
+
+    client.disconnect()
+    global.fetch = originalFetch
+  })
 })
 
 
