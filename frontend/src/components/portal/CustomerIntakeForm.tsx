@@ -20,6 +20,11 @@ export interface FormErrors {
   message?: string
 }
 
+const getInputClassName = (hasError?: boolean, isTextarea = false) =>
+  `w-full ${isTextarea ? 'p-3.5' : 'h-10 px-3.5'} bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber transition-colors ${
+    hasError ? 'border-sentiment-negative' : 'border-border-subtle'
+  }`
+
 export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
   onSubmit,
   isSubmitting,
@@ -127,9 +132,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
                 if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: undefined }))
               }}
               placeholder="e.g. Alice Freeman"
-              className={`w-full h-10 px-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber transition-colors ${
-                fieldErrors.name ? 'border-sentiment-negative' : 'border-border-subtle'
-              }`}
+              className={getInputClassName(Boolean(fieldErrors.name))}
             />
             {fieldErrors.name && (
               <p data-testid="portal-error-name" className="text-[11px] text-sentiment-negative mt-1">
@@ -157,9 +160,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
                 if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }))
               }}
               placeholder="e.g. alice@example.com"
-              className={`w-full h-10 px-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber transition-colors ${
-                fieldErrors.email ? 'border-sentiment-negative' : 'border-border-subtle'
-              }`}
+              className={getInputClassName(Boolean(fieldErrors.email))}
             />
             {fieldErrors.email && (
               <p data-testid="portal-error-email" className="text-[11px] text-sentiment-negative mt-1">
@@ -190,9 +191,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
                 if (fieldErrors.subject) setFieldErrors((prev) => ({ ...prev, subject: undefined }))
               }}
               placeholder="Brief summary of your inquiry"
-              className={`w-full h-10 px-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber transition-colors ${
-                fieldErrors.subject ? 'border-sentiment-negative' : 'border-border-subtle'
-              }`}
+              className={getInputClassName(Boolean(fieldErrors.subject))}
             />
             {fieldErrors.subject && (
               <p data-testid="portal-error-subject" className="text-[11px] text-sentiment-negative mt-1">
@@ -244,9 +243,7 @@ export const CustomerIntakeForm: React.FC<CustomerIntakeFormProps> = ({
               if (fieldErrors.message) setFieldErrors((prev) => ({ ...prev, message: undefined }))
             }}
             placeholder="Describe your inquiry in detail..."
-            className={`w-full p-3.5 bg-surface-canvas border rounded-lg text-text-primary text-body-sm focus:outline-none focus:border-focus-amber focus:ring-1 focus:ring-focus-amber transition-colors ${
-              fieldErrors.message ? 'border-sentiment-negative' : 'border-border-subtle'
-            }`}
+            className={getInputClassName(Boolean(fieldErrors.message), true)}
           />
           {fieldErrors.message && (
             <p data-testid="portal-error-message-field" className="text-[11px] text-sentiment-negative mt-1">
