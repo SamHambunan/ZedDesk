@@ -6,7 +6,7 @@ import {
   FolderArchive,
   Filter,
 } from 'lucide-react'
-import type { PresetFilter, TicketMessage } from './types'
+import type { PresetFilter, TicketAssignmentAudit, TicketMessage } from './types'
 
 export const PRESET_DEFINITIONS: readonly {
   readonly id: PresetFilter
@@ -129,3 +129,36 @@ export function normalizeTicketMessage(m: any, defaultTicketId: string): TicketM
     created_at: m.created_at || new Date().toISOString(),
   }
 }
+
+export function normalizeTicketAssignments(rawList?: readonly any[] | null): TicketAssignmentAudit[] {
+  if (!rawList || !Array.isArray(rawList)) return []
+  return rawList.map((raw) => {
+    const memberName =
+      raw.member_name ||
+      raw.member?.user?.name ||
+      raw.member?.name ||
+      null
+    const teamName =
+      raw.team_name ||
+      raw.team?.name ||
+      null
+    const assignedByName =
+      raw.assigned_by_name ||
+      raw.assigned_by?.user?.name ||
+      raw.assigned_by?.name ||
+      'System'
+
+    return {
+      id: raw.id,
+      ticket_id: String(raw.ticket_id),
+      team_id: raw.team_id ?? raw.team?.id ?? null,
+      team_name: teamName,
+      member_id: raw.member_id ?? raw.member?.id ?? null,
+      member_name: memberName,
+      assigned_by_name: assignedByName,
+      created_at: raw.created_at || new Date().toISOString(),
+      note: raw.note ?? undefined,
+    }
+  })
+}
+
