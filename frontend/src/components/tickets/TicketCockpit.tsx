@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, use } from 'react'
+import React, { useState, useMemo, useRef, useEffect, useCallback, use } from 'react'
 import { useQuery, useQueryClient, QueryClientContext, QueryClientProvider } from '@tanstack/react-query'
 import { queryClient as defaultQueryClient } from '../../lib/query-client'
 import {
@@ -34,6 +34,8 @@ import {
   type TicketCockpitState,
   type TicketCockpitActions,
   type TicketCockpitMeta,
+  type ConflictedTicketField,
+  type TicketFieldConflict,
 } from './TicketCockpitContext'
 import {
   PRESET_DEFINITIONS,
@@ -70,6 +72,17 @@ export function resolveApiEndpoint(baseUrl: string, endpoint: string): string {
     return `${cleanBase}/${cleanEndpoint}`
   }
   return `${cleanBase}/api/${cleanEndpoint}`
+}
+
+class ApiMutationError extends Error {
+  readonly status: number
+  readonly current?: Record<string, unknown>
+
+  constructor(message: string, status: number, current?: Record<string, unknown>) {
+    super(message)
+    this.status = status
+    this.current = current
+  }
 }
 
 export function SafeQueryProvider({ children }: { readonly children: React.ReactNode }) {
@@ -167,6 +180,7 @@ function TicketCockpitInternalProvider({
   const seenEventIdsRef = useRef<Set<string>>(new Set())
   const knownRevisionsRef = useRef<Map<string, number>>(new Map())
   const [isUnavailable, setIsUnavailable] = useState(false)
+  const [fieldConflicts, setFieldConflicts] = useState<Record<string, Partial<Record<ConflictedTicketField, TicketFieldConflict>>>>({})
 
   // Queue holding state for in-place updates & deliberate reordering
   const [heldTickets, setHeldTickets] = useState<readonly TicketItem[] | null>(null)
@@ -275,6 +289,9 @@ function TicketCockpitInternalProvider({
         status: (rawTicket.status as TicketStatus) || 'new',
         priority: (rawTicket.priority as TicketPriority) || 'medium',
         revision: rawTicket.revision ?? 1,
+        status_revision: rawTicket.status_revision,
+        priority_revision: rawTicket.priority_revision,
+        assignment_revision: rawTicket.assignment_revision,
         customer: rawTicket.customer || {
           id: 'cust-unknown',
           name: 'External Requester',
@@ -549,6 +566,9 @@ function TicketCockpitInternalProvider({
         status: (raw.status as TicketStatus) || 'open',
         priority: (raw.priority as TicketPriority) || 'medium',
         revision: raw.revision ?? 1,
+        status_revision: raw.status_revision,
+        priority_revision: raw.priority_revision,
+        assignment_revision: raw.assignment_revision,
         customer: raw.customer || json.customer || null,
         assigned_team_id: raw.assigned_team_id ?? null,
         assigned_team_name: raw.assigned_team?.name ?? raw.assigned_team_name ?? null,
@@ -857,7 +877,7 @@ function TicketCockpitInternalProvider({
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      throw new Error(err.message || `Request to ${endpoint} failed (${res.status})`)
+      throw new ApiMutationError(err.message || `Request to ${endpoint} failed (${res.status})`, res.status, err.current)
     }
 
     cfgQueryClient.invalidateQueries({ queryKey: ['tickets'] })
@@ -865,6 +885,37 @@ function TicketCockpitInternalProvider({
       cfgQueryClient.invalidateQueries({ queryKey: ['ticket', ticketIdToInvalidate] })
     }
     return res.json().catch(() => null)
+  }
+
+  const currentTicketForMutation = useCallback((ticketId: string) => {
+    return queryClient.getQueryData<TicketItem>(['ticket', ticketId])
+      ?? effectiveTicketsRef.current.find((ticket) => ticket.id === ticketId)
+  }, [queryClient])
+
+  const recordFieldConflict = (
+    field: ConflictedTicketField,
+    ticketId: string,
+    intendedValue: TicketStatus | TicketPriority,
+    error: unknown
+  ): boolean => {
+    if (!(error instanceof ApiMutationError) || error.status !== 409) return false
+    const currentValue = error.current?.[field]
+    if (typeof currentValue !== 'string') return false
+    setFieldConflicts((previous) => ({
+      ...previous,
+      [ticketId]: {
+        ...previous[ticketId],
+        [field]: { ticketId, currentValue, intendedValue },
+      },
+    }))
+    return true
+  }
+
+  const clearFieldConflict = (ticketId: string, field: ConflictedTicketField) => {
+    setFieldConflicts((previous) => ({
+      ...previous,
+      [ticketId]: { ...previous[ticketId], [field]: undefined },
+    }))
   }
 
   // Stable Actions with functional state updates & ref lookups
@@ -915,7 +966,7 @@ function TicketCockpitInternalProvider({
         setMobilePane(pane)
       },
       claimTicket: async (ticketId: string) => {
-        const targetTicket = effectiveTicketsRef.current.find((t) => t.id === ticketId)
+        const targetTicket = currentTicketForMutation(ticketId)
         if (!targetTicket) return
         const previousTicket = targetTicket
 
@@ -950,7 +1001,9 @@ function TicketCockpitInternalProvider({
 
         try {
           if (onClaimTicket) await onClaimTicket(ticketId)
-          await executeApiMutation(`tickets/${ticketId}/claim`, 'POST', undefined, ticketId)
+          await executeApiMutation(`tickets/${ticketId}/claim`, 'POST',
+            targetTicket.assignment_revision !== undefined
+              ? { expected_assignment_revision: targetTicket.assignment_revision } : undefined, ticketId)
         } catch (err) {
           setInternalTickets((prev) =>
             prev.map((t) => (t.id === ticketId ? previousTicket : t))
@@ -959,7 +1012,7 @@ function TicketCockpitInternalProvider({
         }
       },
       updateStatus: async (ticketId: string, status: TicketStatus) => {
-        const targetTicket = effectiveTicketsRef.current.find((t) => t.id === ticketId)
+        const targetTicket = currentTicketForMutation(ticketId)
         if (!targetTicket || targetTicket.status === status) return
         const previousStatus = targetTicket.status
 
@@ -969,16 +1022,21 @@ function TicketCockpitInternalProvider({
 
         try {
           if (onUpdateStatus) await onUpdateStatus(ticketId, status)
-          await executeApiMutation(`tickets/${ticketId}/status`, 'PATCH', { status }, ticketId)
+          await executeApiMutation(`tickets/${ticketId}/status`, 'PATCH', {
+            status,
+            ...(targetTicket.status_revision !== undefined
+              ? { expected_status_revision: targetTicket.status_revision } : {}),
+          }, ticketId)
+          clearFieldConflict(ticketId, 'status')
         } catch (err) {
           setInternalTickets((prev) =>
             prev.map((t) => (t.id === ticketId ? { ...t, status: previousStatus } : t))
           )
-          throw err
+          if (!recordFieldConflict('status', ticketId, status, err)) throw err
         }
       },
       updatePriority: async (ticketId: string, priority: TicketPriority) => {
-        const targetTicket = effectiveTicketsRef.current.find((t) => t.id === ticketId)
+        const targetTicket = currentTicketForMutation(ticketId)
         if (!targetTicket || targetTicket.priority === priority) return
         const previousPriority = targetTicket.priority
 
@@ -988,16 +1046,63 @@ function TicketCockpitInternalProvider({
 
         try {
           if (onUpdatePriority) await onUpdatePriority(ticketId, priority)
-          await executeApiMutation(`tickets/${ticketId}/priority`, 'PATCH', { priority }, ticketId)
+          await executeApiMutation(`tickets/${ticketId}/priority`, 'PATCH', {
+            priority,
+            ...(targetTicket.priority_revision !== undefined
+              ? { expected_priority_revision: targetTicket.priority_revision } : {}),
+          }, ticketId)
+          clearFieldConflict(ticketId, 'priority')
         } catch (err) {
           setInternalTickets((prev) =>
             prev.map((t) => (t.id === ticketId ? { ...t, priority: previousPriority } : t))
           )
-          throw err
+          if (!recordFieldConflict('priority', ticketId, priority, err)) throw err
+        }
+      },
+      setConflictedFieldIntent: (ticketId: string, field: ConflictedTicketField, value: TicketStatus | TicketPriority) => {
+        setFieldConflicts((previous) => {
+          const conflict = previous[ticketId]?.[field]
+          if (!conflict) return previous
+          return {
+            ...previous,
+            [ticketId]: {
+              ...previous[ticketId],
+              [field]: { ...conflict, intendedValue: value },
+            },
+          }
+        })
+      },
+      useCurrentFieldValue: async (ticketId: string, field: ConflictedTicketField) => {
+        const conflict = fieldConflicts[ticketId]?.[field]
+        if (!conflict) return
+        await queryClient.refetchQueries(
+          { queryKey: ['ticket', conflict.ticketId], exact: true, type: 'active' },
+          { throwOnError: true }
+        )
+        clearFieldConflict(ticketId, field)
+      },
+      retryFieldChange: async (ticketId: string, field: ConflictedTicketField) => {
+        const conflict = fieldConflicts[ticketId]?.[field]
+        if (!conflict) return
+        await queryClient.refetchQueries(
+          { queryKey: ['ticket', conflict.ticketId], exact: true, type: 'active' },
+          { throwOnError: true }
+        )
+        const freshTicket = queryClient.getQueryData<TicketItem>(['ticket', conflict.ticketId])
+        const revision = freshTicket?.[`${field}_revision`]
+        if (revision === undefined) throw new Error('Could not refresh Ticket revision. Try again.')
+        try {
+          await executeApiMutation(`tickets/${conflict.ticketId}/${field}`, 'PATCH', {
+            [field]: conflict.intendedValue,
+            [`expected_${field}_revision`]: revision,
+          }, conflict.ticketId)
+          clearFieldConflict(ticketId, field)
+        } catch (error) {
+          if (!recordFieldConflict(field, conflict.ticketId, conflict.intendedValue, error)) throw error
         }
       },
       assign: async (ticketId: string, teamId: number | null, memberId: number | null) => {
-        const targetTicket = effectiveTicketsRef.current.find((t) => t.id === ticketId)
+        const targetTicket = currentTicketForMutation(ticketId)
         const previousTicket = targetTicket ? { ...targetTicket } : null
 
         const team = teams.find((tm) => tm.id === teamId)
@@ -1031,7 +1136,11 @@ function TicketCockpitInternalProvider({
 
         try {
           if (onAssign) await onAssign(ticketId, teamId, memberId)
-          await executeApiMutation(`tickets/${ticketId}/assign`, 'POST', { team_id: teamId, member_id: memberId }, ticketId)
+          await executeApiMutation(`tickets/${ticketId}/assign`, 'POST', {
+            team_id: teamId, member_id: memberId,
+            ...(previousTicket?.assignment_revision !== undefined
+              ? { expected_assignment_revision: previousTicket.assignment_revision } : {}),
+          }, ticketId)
         } catch (err) {
           if (previousTicket) {
             setInternalTickets((prev) =>
@@ -1218,7 +1327,9 @@ function TicketCockpitInternalProvider({
     }
   }, [
     controlledSelectedTicketId,
+    currentTicketForMutation,
     currentUserId,
+    fieldConflicts,
     internalSelectedTicketId,
     liveClientInstance,
     members,
@@ -1230,6 +1341,7 @@ function TicketCockpitInternalProvider({
     onSelectTicket,
     onUpdatePriority,
     onUpdateStatus,
+    queryClient,
     teams,
     userRole,
   ])
@@ -1258,6 +1370,7 @@ function TicketCockpitInternalProvider({
     isUnavailable,
     ticketViewers,
     ticketTypingMembers,
+    fieldConflicts,
   }), [
     effectiveTickets,
     filteredTickets,
@@ -1282,6 +1395,7 @@ function TicketCockpitInternalProvider({
     isUnavailable,
     ticketViewers,
     ticketTypingMembers,
+    fieldConflicts,
   ])
 
   const meta: TicketCockpitMeta = useMemo(() => ({

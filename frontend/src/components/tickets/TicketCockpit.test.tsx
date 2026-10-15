@@ -647,6 +647,219 @@ describe('TicketCockpit Compound Component Baseline', () => {
   })
 })
 
+describe('Ticket field conflict recovery', () => {
+  beforeEach(() => {
+    window.history.pushState({}, '', '/')
+    queryClient.clear()
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('keeps a stale Ticket Status choice, message draft, and attachment until an explicit retry', async () => {
+    const user = userEvent.setup()
+    const requests: Array<{ url: string; method: string; body?: Record<string, unknown> }> = []
+    let serverStatus = 'new'
+    let statusRevision = 3
+    const ticket = { ...INITIAL_MOCK_TICKETS[0], status: 'new' as const, priority: 'medium' as const,
+      revision: 8, status_revision: 3, priority_revision: 7, assignment_revision: 2 }
+
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      const body = init?.body ? JSON.parse(init.body as string) : undefined
+      requests.push({ url, method, body })
+      if (url.endsWith('/tickets/ticket-1/status') && method === 'PATCH') {
+        if (statusRevision === 3) {
+          serverStatus = 'open'
+          statusRevision = 4
+          return { ok: false, status: 409, json: async () => ({ message: 'Ticket status has changed since it was read.', current: { status: 'open', status_revision: 4, revision: 9 } }) }
+        }
+        serverStatus = body.status as string
+        statusRevision = 5
+        return { ok: true, json: async () => ({ data: { ...ticket, status: serverStatus, status_revision: 5 } }) }
+      }
+      if (url.endsWith('/tickets/ticket-1')) {
+        return { ok: true, json: async () => ({ data: { ...ticket, status: serverStatus, status_revision: statusRevision } }) }
+      }
+      if (url.includes('/tickets?')) {
+        return { ok: true, json: async () => ({ data: [{ ...ticket, status: serverStatus, status_revision: statusRevision }] }) }
+      }
+      return { ok: true, json: async () => ({ data: [] }) }
+    }))
+
+    render(
+      <TicketCockpit.Provider apiUrl="http://zeddesk.test/api" token="test-token" tickets={[ticket]}>
+        <TicketCockpit.Inspector />
+        <TicketCockpit.Detail />
+      </TicketCockpit.Provider>
+    )
+
+    await waitFor(() => expect(requests.some((request) => request.url.endsWith('/tickets/ticket-1'))).toBe(true))
+    await user.type(screen.getByTestId('composer-textarea'), 'Please check the attached logs.')
+    await user.upload(screen.getByTestId('composer-hidden-file-input'), new File(['log'], 'error.txt', { type: 'text/plain' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Ticket Status' }), 'pending')
+
+    await waitFor(() => expect(screen.getByText(/Current value: open/i)).toBeInTheDocument())
+    const statusSelect = screen.getByRole('combobox', { name: 'Ticket Status' }) as HTMLSelectElement
+    expect(statusSelect.value).toBe('pending')
+    expect(statusSelect).toHaveFocus()
+    await user.selectOptions(statusSelect, 'resolved')
+    expect(statusSelect.value).toBe('resolved')
+    await user.selectOptions(statusSelect, 'pending')
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'Use current value' })).toHaveFocus()
+    expect(screen.getByTestId('composer-textarea')).toHaveValue('Please check the attached logs.')
+    expect(screen.getByText('error.txt')).toBeInTheDocument()
+    expect(requests.filter((request) => request.url.endsWith('/status') && request.method === 'PATCH')).toHaveLength(1)
+    expect(requests.find((request) => request.url.endsWith('/status'))?.body).toMatchObject({ status: 'pending', expected_status_revision: 3 })
+
+    await user.click(screen.getByRole('button', { name: 'Retry my change' }))
+    await waitFor(() => expect(requests.filter((request) => request.url.endsWith('/status') && request.method === 'PATCH')).toHaveLength(2))
+    expect(requests.filter((request) => request.url.endsWith('/status'))[1].body).toMatchObject({ status: 'pending', expected_status_revision: 4 })
+    expect(screen.getByTestId('composer-textarea')).toHaveValue('Please check the attached logs.')
+    expect(screen.getByText('error.txt')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText(/Current value: open/i)).not.toBeInTheDocument())
+    expect(statusSelect).toHaveFocus()
+  })
+
+  it('uses the Priority revision despite an unrelated Ticket Status change and can accept a same-field conflict', async () => {
+    const user = userEvent.setup()
+    const requests: Array<{ url: string; method: string; body?: Record<string, unknown> }> = []
+    let priority = 'medium'
+    let priorityRevision = 7
+    const ticket = { ...INITIAL_MOCK_TICKETS[0], status: 'new' as const, priority: 'medium' as const,
+      revision: 8, status_revision: 3, priority_revision: 7, assignment_revision: 2 }
+
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      const body = init?.body ? JSON.parse(init.body as string) : undefined
+      requests.push({ url, method, body })
+      if (url.endsWith('/tickets/ticket-1/priority') && method === 'PATCH') {
+        if (body.priority === 'urgent') {
+          priority = 'high'
+          priorityRevision = 9
+          return { ok: false, status: 409, json: async () => ({ message: 'Ticket priority has changed since it was read.', current: { priority: 'high', priority_revision: 9, revision: 12 } }) }
+        }
+        priority = body.priority as string
+        priorityRevision += 1
+        return { ok: true, json: async () => ({ data: { ...ticket, status: 'open', priority, priority_revision: priorityRevision } }) }
+      }
+      if (url.endsWith('/tickets/ticket-1')) {
+        return { ok: true, json: async () => ({ data: { ...ticket, status: 'open', status_revision: 4, priority, priority_revision: priorityRevision } }) }
+      }
+      if (url.includes('/tickets?')) {
+        return { ok: true, json: async () => ({ data: [{ ...ticket, status: 'open', status_revision: 4, priority, priority_revision: priorityRevision }] }) }
+      }
+      return { ok: true, json: async () => ({ data: [] }) }
+    }))
+
+    render(<TicketCockpit.Provider apiUrl="http://zeddesk.test/api" token="test-token" tickets={[ticket]}><TicketCockpit.Inspector /></TicketCockpit.Provider>)
+    await waitFor(() => expect(requests.some((request) => request.url.endsWith('/tickets/ticket-1'))).toBe(true))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Priority' }), 'low')
+    await waitFor(() => expect(requests.some((request) => request.url.endsWith('/priority') && request.method === 'PATCH')).toBe(true))
+    expect(requests.find((request) => request.url.endsWith('/priority'))?.body).toMatchObject({ priority: 'low', expected_priority_revision: 7 })
+    expect(screen.queryByRole('button', { name: 'Retry my change' })).not.toBeInTheDocument()
+
+    await waitFor(() => expect((screen.getByRole('combobox', { name: 'Priority' }) as HTMLSelectElement).value).toBe('low'))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Priority' }), 'urgent')
+    await waitFor(() => expect(screen.getByText(/Current value: high/i)).toBeInTheDocument())
+    expect((screen.getByRole('combobox', { name: 'Priority' }) as HTMLSelectElement).value).toBe('urgent')
+    await user.click(screen.getByRole('button', { name: 'Use current value' }))
+    await waitFor(() => expect((screen.getByRole('combobox', { name: 'Priority' }) as HTMLSelectElement).value).toBe('high'))
+    expect(screen.queryByText(/Current value: high/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Priority' })).toHaveFocus()
+  })
+
+  it('keeps unresolved choices on their own Tickets while switching between them', async () => {
+    const user = userEvent.setup()
+    const first = { ...INITIAL_MOCK_TICKETS[0], status: 'new' as const, status_revision: 3 }
+    const second = { ...INITIAL_MOCK_TICKETS[1], status: 'new' as const, status_revision: 5 }
+    const tickets = [first, second]
+
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PATCH' && url.endsWith('/status')) {
+        const isFirst = url.includes('/ticket-1/')
+        return { ok: false, status: 409, json: async () => ({
+          message: 'Ticket status has changed since it was read.',
+          current: { status: isFirst ? 'open' : 'pending', status_revision: isFirst ? 4 : 6 },
+        }) }
+      }
+      if (url.endsWith('/tickets/ticket-1')) return { ok: true, json: async () => ({ data: first }) }
+      if (url.endsWith('/tickets/ticket-2')) return { ok: true, json: async () => ({ data: second }) }
+      if (url.includes('/tickets?')) return { ok: true, json: async () => ({ data: tickets }) }
+      return { ok: true, json: async () => ({ data: [] }) }
+    }))
+
+    render(
+      <TicketCockpit.Provider apiUrl="http://zeddesk.test/api" token="test-token" tickets={tickets}>
+        <TicketCockpit.Queue />
+        <TicketCockpit.Inspector />
+      </TicketCockpit.Provider>
+    )
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Ticket Status' }), 'resolved')
+    await waitFor(() => expect(screen.getByText('Current value: open')).toBeInTheDocument())
+    await user.click(screen.getByTestId('ticket-row-ticket-2'))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Ticket Status' }), 'open')
+    await waitFor(() => expect(screen.getByText('Current value: pending')).toBeInTheDocument())
+
+    await user.click(screen.getByTestId('ticket-row-ticket-1'))
+    expect((screen.getByRole('combobox', { name: 'Ticket Status' }) as HTMLSelectElement).value).toBe('resolved')
+    expect(screen.getByText('Current value: open')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Use current value' }))
+    await waitFor(() => expect(screen.queryByText('Current value: open')).not.toBeInTheDocument())
+
+    await user.click(screen.getByTestId('ticket-row-ticket-2'))
+    expect((screen.getByRole('combobox', { name: 'Ticket Status' }) as HTMLSelectElement).value).toBe('open')
+    expect(screen.getByText('Current value: pending')).toBeInTheDocument()
+  })
+
+  it('sends the Assignment revision for claim and Assignment without treating a lifecycle rejection as a conflict', async () => {
+    const user = userEvent.setup()
+    const requests: Array<{ url: string; method: string; body?: Record<string, unknown> }> = []
+    let assignmentRevision = 2
+    let assignedMemberId: number | null = null
+    const ticket = { ...INITIAL_MOCK_TICKETS[0], status: 'new' as const, priority: 'medium' as const,
+      revision: 8, status_revision: 3, priority_revision: 7, assignment_revision: 2 }
+
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      const body = init?.body ? JSON.parse(init.body as string) : undefined
+      requests.push({ url, method, body })
+      if (url.endsWith('/claim') && method === 'POST') {
+        assignedMemberId = 2
+        assignmentRevision = 3
+        return { ok: true, json: async () => ({ data: { ...ticket, assigned_member_id: 2, assignment_revision: 3 } }) }
+      }
+      if (url.endsWith('/assign') && method === 'POST') {
+        assignmentRevision = 4
+        return { ok: true, json: async () => ({ data: { ...ticket, assigned_team_id: 1, assigned_member_id: 2, assignment_revision: 4 } }) }
+      }
+      if (url.endsWith('/status') && method === 'PATCH') {
+        return { ok: false, status: 422, json: async () => ({ message: 'Ticket Status transition is not allowed.' }) }
+      }
+      const current = { ...ticket, assigned_member_id: assignedMemberId, assignment_revision: assignmentRevision }
+      if (url.endsWith('/tickets/ticket-1')) return { ok: true, json: async () => ({ data: current }) }
+      if (url.includes('/tickets?')) return { ok: true, json: async () => ({ data: [current] }) }
+      return { ok: true, json: async () => ({ data: [] }) }
+    }))
+
+    render(<TicketCockpit.Provider apiUrl="http://zeddesk.test/api" token="test-token" tickets={[ticket]} teams={MOCK_TEAMS} members={MOCK_MEMBERS}><TicketCockpit.Inspector /></TicketCockpit.Provider>)
+    await waitFor(() => expect(requests.some((request) => request.url.endsWith('/tickets/ticket-1'))).toBe(true))
+    await user.click(screen.getByRole('button', { name: 'Claim Ticket' }))
+    await waitFor(() => expect(requests.some((request) => request.url.endsWith('/claim') && request.method === 'POST')).toBe(true))
+    expect(requests.find((request) => request.url.endsWith('/claim'))?.body).toEqual({ expected_assignment_revision: 2 })
+
+    await waitFor(() => expect(requests.filter((request) => request.url.endsWith('/tickets/ticket-1')).length).toBeGreaterThan(1))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Assigned Team' }), '1')
+    await waitFor(() => expect(requests.some((request) => request.url.endsWith('/assign') && request.method === 'POST')).toBe(true))
+    expect(requests.find((request) => request.url.endsWith('/assign'))?.body).toMatchObject({ team_id: 1, expected_assignment_revision: 3 })
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Ticket Status' }), 'closed')
+    await waitFor(() => expect(screen.getByText('Ticket Status transition is not allowed.')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: 'Retry my change' })).not.toBeInTheDocument()
+  })
+})
+
 describe('Live Signals and Authorized REST Refresh (Issue #149)', () => {
   const originalFetch = global.fetch
 
