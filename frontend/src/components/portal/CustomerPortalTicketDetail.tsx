@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, History, ArrowLeft, ArrowDown } from 'lucide-react'
 import { Badge, type BadgeVariant } from '../ui/Badge'
@@ -115,30 +115,10 @@ export const CustomerPortalTicketDetail: React.FC<CustomerPortalTicketDetailProp
   const customer = accessState === 'normal' ? data?.customer : undefined
   const messages = accessState === 'normal' ? data?.messages || [] : []
 
-  useEffect(() => {
+  // Sync initial message count on first load without a redundant effect
+  if (messagesCountRef.current === 0 && messages.length > 0) {
     messagesCountRef.current = messages.length
-  }, [messages.length])
-
-  // Live client instantiation
-  const liveClientInstance = useMemo(() => {
-    if (propLiveClient) return propLiveClient
-    if (token && ticketUuid) {
-      return createLiveClient({
-        apiUrl,
-        customerToken: token,
-        customerTicketId: ticketUuid,
-      })
-    }
-    return undefined
-  }, [propLiveClient, apiUrl, token, ticketUuid])
-
-  useEffect(() => {
-    return () => {
-      if (!propLiveClient) {
-        liveClientInstance?.disconnect()
-      }
-    }
-  }, [liveClientInstance, propLiveClient])
+  }
 
   // Passive scroll listener for reading position tracking
   useEffect(() => {
@@ -158,39 +138,49 @@ export const CustomerPortalTicketDetail: React.FC<CustomerPortalTicketDetailProp
       }
     }
 
+    // Run once on mount to establish reading position accurately
+    handleScroll()
+
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => {
       window.removeEventListener('scroll', handleScroll)
     }
   }, [])
 
-  // Subscribe to authorized customer ticket channel
+  // Shared refetch processor for signals and reconnects
+  const handleRefetchResult = useCallback(
+    (res: any) => {
+      if (res.isError) {
+        const errMsg = res.error?.message || ''
+        if (isExpiredError(errMsg)) {
+          setAccessState('expired')
+          queryClient.removeQueries({ queryKey: ['portal-ticket', ticketUuid] })
+        } else if (isUnavailableError(errMsg)) {
+          setAccessState('unavailable')
+          queryClient.removeQueries({ queryKey: ['portal-ticket', ticketUuid] })
+        }
+      } else if (res.data) {
+        const newMessages = res.data.messages || []
+        if (newMessages.length > messagesCountRef.current) {
+          if (!isNearBottomRef.current) {
+            setHasNewReply(true)
+          }
+        }
+        messagesCountRef.current = newMessages.length
+      }
+    },
+    [queryClient, ticketUuid]
+  )
+
+  // Subscribe to authorized customer ticket channel (lifecycle managed in effect)
   useEffect(() => {
-    if (!liveClientInstance || !ticketUuid || !token) return
+    if (!ticketUuid || !token) return
+
+    const client = propLiveClient ?? createLiveClient({ apiUrl })
 
     const handleSignal = (signal: LiveSignalPayload) => {
       if (signal.ticket_id !== ticketUuid) return
-
-      refetch().then((res) => {
-        if (res.isError) {
-          const errMsg = res.error?.message || ''
-          if (isExpiredError(errMsg)) {
-            setAccessState('expired')
-            queryClient.removeQueries({ queryKey: ['portal-ticket', ticketUuid] })
-          } else if (isUnavailableError(errMsg)) {
-            setAccessState('unavailable')
-            queryClient.removeQueries({ queryKey: ['portal-ticket', ticketUuid] })
-          }
-        } else if (res.data) {
-          const newMessages = res.data.messages || []
-          if (newMessages.length > messagesCountRef.current) {
-            if (!isNearBottomRef.current) {
-              setHasNewReply(true)
-            }
-          }
-          messagesCountRef.current = newMessages.length
-        }
-      })
+      refetch().then(handleRefetchResult)
     }
 
     const handleUnavailable = (reason?: CustomerUnavailableReason) => {
@@ -202,35 +192,27 @@ export const CustomerPortalTicketDetail: React.FC<CustomerPortalTicketDetailProp
       }
     }
 
-    const unsubscribeTicket = liveClientInstance.subscribeToCustomerTicket
-      ? liveClientInstance.subscribeToCustomerTicket(
+    const unsubscribeTicket = client.subscribeToCustomerTicket
+      ? client.subscribeToCustomerTicket(
           ticketUuid,
           token,
           handleSignal,
           handleUnavailable
         )
-      : liveClientInstance.subscribeToTicket(ticketUuid, handleSignal)
+      : () => {}
 
-    const unsubscribeReconnect = liveClientInstance.onReconnect(() => {
-      refetch().then((res) => {
-        if (res.isError) {
-          const errMsg = res.error?.message || ''
-          if (isExpiredError(errMsg)) {
-            setAccessState('expired')
-            queryClient.removeQueries({ queryKey: ['portal-ticket', ticketUuid] })
-          } else if (isUnavailableError(errMsg)) {
-            setAccessState('unavailable')
-            queryClient.removeQueries({ queryKey: ['portal-ticket', ticketUuid] })
-          }
-        }
-      })
+    const unsubscribeReconnect = client.onReconnect(() => {
+      refetch().then(handleRefetchResult)
     })
 
     return () => {
       unsubscribeTicket()
       unsubscribeReconnect()
+      if (!propLiveClient) {
+        client.disconnect()
+      }
     }
-  }, [liveClientInstance, ticketUuid, token, refetch, queryClient])
+  }, [propLiveClient, apiUrl, ticketUuid, token, refetch, queryClient, handleRefetchResult])
 
   // 3. Reply mutation
   const replyMutation = useCustomerReplyMutation(apiUrl, ticketUuid, token)

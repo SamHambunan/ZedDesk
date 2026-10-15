@@ -59,8 +59,6 @@ export interface ILiveClient {
 export interface LiveClientOptions {
   readonly apiUrl: string
   readonly token?: string | null
-  readonly customerToken?: string | null
-  readonly customerTicketId?: string | null
   readonly appKey?: string
   readonly wsUrl?: string
   readonly webSocketClass?: typeof WebSocket
@@ -701,6 +699,18 @@ export class LiveClient implements ILiveClient {
     }
   }
 
+  private handleCustomerAuthError(status: number, ticketId: string): boolean {
+    if (status === 401) {
+      this.notifyCustomerUnavailable(ticketId, 'expired')
+      return true
+    }
+    if (status === 403 || status === 404) {
+      this.notifyCustomerUnavailable(ticketId, 'unavailable')
+      return true
+    }
+    return false
+  }
+
   private async discoverCustomerTicketChannel(ticketId: string, token: string): Promise<void> {
     try {
       const res = await fetch(`${this.apiUrl}/api/portal/tickets/${ticketId}/live-channel`, {
@@ -709,12 +719,7 @@ export class LiveClient implements ILiveClient {
           'X-Customer-Token': token,
         },
       })
-      if (res.status === 401) {
-        this.notifyCustomerUnavailable(ticketId, 'expired')
-        return
-      }
-      if (res.status === 403 || res.status === 404) {
-        this.notifyCustomerUnavailable(ticketId, 'unavailable')
+      if (this.handleCustomerAuthError(res.status, ticketId)) {
         return
       }
       if (!res.ok) return
@@ -770,12 +775,7 @@ export class LiveClient implements ILiveClient {
           channel_name: channelName,
         }),
       })
-      if (res.status === 401) {
-        this.notifyCustomerUnavailable(ticketId, 'expired')
-        return null
-      }
-      if (res.status === 403 || res.status === 404) {
-        this.notifyCustomerUnavailable(ticketId, 'unavailable')
+      if (this.handleCustomerAuthError(res.status, ticketId)) {
         return null
       }
       if (!res.ok) return null
