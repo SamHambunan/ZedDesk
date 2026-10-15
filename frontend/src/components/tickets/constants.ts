@@ -6,7 +6,14 @@ import {
   FolderArchive,
   Filter,
 } from 'lucide-react'
-import type { PresetFilter, TicketMessage } from './types'
+import type {
+  PresetFilter,
+  TicketAssignmentAudit,
+  TicketItem,
+  TicketMessage,
+  TicketPriority,
+  TicketStatus,
+} from './types'
 
 export const PRESET_DEFINITIONS: readonly {
   readonly id: PresetFilter
@@ -129,3 +136,88 @@ export function normalizeTicketMessage(m: any, defaultTicketId: string): TicketM
     created_at: m.created_at || new Date().toISOString(),
   }
 }
+
+export function normalizeTicketAssignments(rawList?: readonly any[] | null): TicketAssignmentAudit[] {
+  if (!rawList || !Array.isArray(rawList)) return []
+  return rawList.map((raw) => {
+    const memberName =
+      raw.member_name ||
+      raw.member?.user?.name ||
+      raw.member?.name ||
+      null
+    const teamName =
+      raw.team_name ||
+      raw.team?.name ||
+      null
+    const assignedByName =
+      raw.assigned_by_name ||
+      raw.assigned_by?.user?.name ||
+      raw.assigned_by?.name ||
+      'System'
+
+    return {
+      id: raw.id,
+      ticket_id: String(raw.ticket_id),
+      team_id: raw.team_id ?? raw.team?.id ?? null,
+      team_name: teamName,
+      member_id: raw.member_id ?? raw.member?.id ?? null,
+      member_name: memberName,
+      assigned_by_name: assignedByName,
+      created_at: raw.created_at || new Date().toISOString(),
+      note: raw.note ?? undefined,
+    }
+  })
+}
+
+export function formatAssignmentAuditTitle(asg: TicketAssignmentAudit): string {
+  if (asg.note) return asg.note
+  if (asg.member_name && asg.team_name) {
+    return `Assigned to ${asg.member_name} (${asg.team_name})`
+  }
+  if (asg.member_name) {
+    return `Assigned to ${asg.member_name}`
+  }
+  if (asg.team_name) {
+    return `Assigned to ${asg.team_name}`
+  }
+  return 'Unassigned'
+}
+
+export function formatAuditTime(dateStr?: string | null): string {
+  if (!dateStr) return ''
+  try {
+    return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return ''
+  }
+}
+
+export function normalizeTicketItem(rawTicket: any): TicketItem {
+  return {
+    id: String(rawTicket.id),
+    organization_id: rawTicket.organization_id ?? 1,
+    ticket_number: rawTicket.ticket_number ?? 1001,
+    subject: rawTicket.subject || 'Support Inquiry',
+    status: (rawTicket.status as TicketStatus) || 'new',
+    priority: (rawTicket.priority as TicketPriority) || 'medium',
+    revision: rawTicket.revision ?? 1,
+    status_revision: rawTicket.status_revision,
+    priority_revision: rawTicket.priority_revision,
+    assignment_revision: rawTicket.assignment_revision,
+    customer: rawTicket.customer || {
+      id: 'cust-unknown',
+      name: 'External Requester',
+      email: 'requester@example.com',
+    },
+    assigned_team_id: rawTicket.assigned_team_id ?? null,
+    assigned_team_name: rawTicket.assigned_team?.name ?? rawTicket.assigned_team_name ?? null,
+    assigned_member_id: rawTicket.assigned_member_id ?? null,
+    assigned_member_name: rawTicket.assigned_member?.user?.name ?? rawTicket.assigned_member_name ?? null,
+    tags: rawTicket.tags || [],
+    messages: rawTicket.messages || [],
+    assignments: normalizeTicketAssignments(rawTicket.assignments || rawTicket.ticket_assignments),
+    created_at: rawTicket.created_at,
+    updated_at: rawTicket.updated_at,
+  }
+}
+

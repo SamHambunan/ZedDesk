@@ -47,6 +47,8 @@ import {
   parseTicketNumberFromPath,
   matchesPreset,
   normalizeTicketMessage,
+  normalizeTicketAssignments,
+  normalizeTicketItem,
 } from './constants'
 import { INITIAL_MOCK_TICKETS } from './mockData'
 import { TicketTimeline } from './TicketTimeline'
@@ -205,8 +207,13 @@ function TicketCockpitInternalProvider({
     setPendingServerTickets(null)
   }
 
-  // Initial fallback data if no tickets are passed and no API URL is configured
-  const effectivePropTickets = propTickets ?? (apiUrl ? [] : INITIAL_MOCK_TICKETS)
+  // Initial fallback data if no tickets are passed and no API URL is configured (normalized at provider boundary)
+  const normalizedPropTickets = useMemo(() => {
+    if (!propTickets) return null
+    return propTickets.map(normalizeTicketItem)
+  }, [propTickets])
+
+  const effectivePropTickets = normalizedPropTickets ?? (apiUrl ? [] : INITIAL_MOCK_TICKETS)
 
   // Resolve initial ticket number from prop or window location (cheap primitive parsing, no useMemo)
   const initialTicketNum = typeof initialTicketNumber === 'number'
@@ -267,6 +274,32 @@ function TicketCockpitInternalProvider({
     return params.toString()
   }, [activePreset])
 
+  // TanStack Query: global organization tickets query to maintain global queue preset metrics
+  const { data: globalServerTickets } = useQuery<readonly TicketItem[]>({
+    queryKey: ['tickets-global', apiUrl],
+    queryFn: async () => {
+      const url = resolveApiEndpoint(apiUrl ?? '', 'tickets?all=true')
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+      }
+      if (token) {
+        headers.Authorization = `Bearer ${token}`
+      }
+      const res = await fetch(url, { headers })
+      if (!res.ok) throw new Error('Failed to fetch global tickets')
+      const data = await res.json()
+      const backendList: any[] = data.data || data.tickets || []
+      for (const raw of backendList) {
+        if (raw.id && raw.revision !== undefined) {
+          knownRevisionsRef.current.set(String(raw.id), raw.revision)
+        }
+      }
+      return backendList.map(normalizeTicketItem)
+    },
+    enabled: Boolean(apiUrl),
+    staleTime: 30_000,
+  })
+
   // TanStack Query: live query to GET /api/tickets with scoped preset parameters
   const {
     data: serverTickets,
@@ -292,32 +325,7 @@ function TicketCockpitInternalProvider({
           knownRevisionsRef.current.set(String(raw.id), raw.revision)
         }
       }
-      return backendList.map((rawTicket) => ({
-        id: String(rawTicket.id),
-        organization_id: rawTicket.organization_id ?? 1,
-        ticket_number: rawTicket.ticket_number ?? 1001,
-        subject: rawTicket.subject || 'Support Inquiry',
-        status: (rawTicket.status as TicketStatus) || 'new',
-        priority: (rawTicket.priority as TicketPriority) || 'medium',
-        revision: rawTicket.revision ?? 1,
-        status_revision: rawTicket.status_revision,
-        priority_revision: rawTicket.priority_revision,
-        assignment_revision: rawTicket.assignment_revision,
-        customer: rawTicket.customer || {
-          id: 'cust-unknown',
-          name: 'External Requester',
-          email: 'requester@example.com',
-        },
-        assigned_team_id: rawTicket.assigned_team_id ?? null,
-        assigned_team_name: rawTicket.assigned_team?.name ?? null,
-        assigned_member_id: rawTicket.assigned_member_id ?? null,
-        assigned_member_name: rawTicket.assigned_member?.user?.name ?? null,
-        tags: rawTicket.tags || [],
-        messages: rawTicket.messages || [],
-        assignments: rawTicket.assignments || [],
-        created_at: rawTicket.created_at,
-        updated_at: rawTicket.updated_at,
-      }))
+      return backendList.map(normalizeTicketItem)
     },
     enabled: Boolean(apiUrl),
     staleTime: 30_000,
@@ -361,11 +369,11 @@ function TicketCockpitInternalProvider({
   }
 
   // Adjust internal state during render when external data props change
-  const [prevPropTickets, setPrevPropTickets] = useState(propTickets)
-  if (propTickets !== prevPropTickets) {
-    setPrevPropTickets(propTickets)
-    if (propTickets) {
-      setInternalTickets(propTickets)
+  const [prevPropTickets, setPrevPropTickets] = useState(normalizedPropTickets)
+  if (normalizedPropTickets !== prevPropTickets) {
+    setPrevPropTickets(normalizedPropTickets)
+    if (normalizedPropTickets) {
+      setInternalTickets(normalizedPropTickets)
     }
   }
 
@@ -433,10 +441,33 @@ function TicketCockpitInternalProvider({
     ? controlledSelectedTicketId
     : internalSelectedTicketId
 
+  // Unified pool of all organization tickets to preserve global preset metrics across scoped queries
+  const allKnownTickets = useMemo(() => {
+    if (normalizedPropTickets && normalizedPropTickets.length > 0) {
+      return effectiveTickets
+    }
+    const ticketMap = new Map<string, TicketItem>()
+    if (globalServerTickets) {
+      for (const t of globalServerTickets) {
+        ticketMap.set(String(t.id), t)
+      }
+    }
+    if (serverTickets) {
+      for (const t of serverTickets) {
+        ticketMap.set(String(t.id), t)
+      }
+    }
+    for (const t of effectiveTickets) {
+      ticketMap.set(String(t.id), t)
+    }
+    const result = Array.from(ticketMap.values())
+    return result.length > 0 ? result : effectiveTickets
+  }, [normalizedPropTickets, effectiveTickets, globalServerTickets, serverTickets])
+
   // Target ticket synchronization: When initialTicketNum updates or tickets hydrate, select targeted ticket
   const [syncedTicketNum, setSyncedTicketNum] = useState<number | null>(null)
-  if (initialTicketNum !== null && syncedTicketNum !== initialTicketNum && effectiveTickets.length > 0) {
-    const match = effectiveTickets.find((t) => t.ticket_number === initialTicketNum)
+  if (initialTicketNum !== null && syncedTicketNum !== initialTicketNum && allKnownTickets.length > 0) {
+    const match = allKnownTickets.find((t) => t.ticket_number === initialTicketNum)
     if (match) {
       setSyncedTicketNum(initialTicketNum)
       if (internalSelectedTicketId !== match.id) {
@@ -460,7 +491,7 @@ function TicketCockpitInternalProvider({
     const handlePopState = () => {
       const num = parseTicketNumberFromPath(window.location.pathname)
       if (num !== null) {
-        const target = effectiveTickets.find((t) => t.ticket_number === num)
+        const target = allKnownTickets.find((t) => t.ticket_number === num)
         if (target) {
           setInternalSelectedTicketId(target.id)
           setMobilePane('detail')
@@ -475,18 +506,26 @@ function TicketCockpitInternalProvider({
 
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
-  }, [effectiveTickets])
+  }, [allKnownTickets])
 
-  // Calculate counts for each preset using shared matchesPreset predicate
+  // Calculate counts for each preset using shared matchesPreset predicate against all known tickets (single-pass reduction)
   const presetCounts = useMemo(() => {
-    return {
-      all_open: effectiveTickets.filter((t) => matchesPreset(t, 'all_open', currentUserId)).length,
-      my_tickets: effectiveTickets.filter((t) => matchesPreset(t, 'my_tickets', currentUserId)).length,
-      unassigned: effectiveTickets.filter((t) => matchesPreset(t, 'unassigned', currentUserId)).length,
-      team_queue: effectiveTickets.filter((t) => matchesPreset(t, 'team_queue', currentUserId)).length,
-      resolved_closed: effectiveTickets.filter((t) => matchesPreset(t, 'resolved_closed', currentUserId)).length,
+    const counts = {
+      all_open: 0,
+      my_tickets: 0,
+      unassigned: 0,
+      team_queue: 0,
+      resolved_closed: 0,
     }
-  }, [effectiveTickets, currentUserId])
+    for (const ticket of allKnownTickets) {
+      if (matchesPreset(ticket, 'all_open', currentUserId)) counts.all_open++
+      if (matchesPreset(ticket, 'my_tickets', currentUserId)) counts.my_tickets++
+      if (matchesPreset(ticket, 'unassigned', currentUserId)) counts.unassigned++
+      if (matchesPreset(ticket, 'team_queue', currentUserId)) counts.team_queue++
+      if (matchesPreset(ticket, 'resolved_closed', currentUserId)) counts.resolved_closed++
+    }
+    return counts
+  }, [allKnownTickets, currentUserId])
 
   // Filter tickets by preset, compound filter dropdowns, and search query (derived in render)
   const filteredTickets = useMemo(() => {
@@ -587,8 +626,7 @@ function TicketCockpitInternalProvider({
         assigned_member_name: raw.assigned_member?.user?.name ?? raw.assigned_member_name ?? null,
         tags: raw.tags || json.tags || [],
         messages: normalizedMessages,
-        assignments: raw.assignments || json.assignments || json.ticket_assignments || [],
-        attachments: raw.attachments || json.attachments || [],
+        assignments: normalizeTicketAssignments(raw.assignments || json.assignments || json.ticket_assignments),
         created_at: raw.created_at,
         updated_at: raw.updated_at,
       } as TicketItem
@@ -837,7 +875,7 @@ function TicketCockpitInternalProvider({
     if (isUnavailable) return null
     let baseTicket: TicketItem | null = null
     if (selectedTicketId) {
-      baseTicket = effectiveTickets.find((t) => t.id === selectedTicketId) ?? null
+      baseTicket = allKnownTickets.find((t) => t.id === selectedTicketId) ?? null
     }
     if (!baseTicket) {
       baseTicket = filteredTickets[0] ?? effectiveTickets[0] ?? null
@@ -854,7 +892,7 @@ function TicketCockpitInternalProvider({
     }
 
     return baseTicket
-  }, [effectiveTickets, selectedTicketId, filteredTickets, serverTicketDetail, targetTicketId, isUnavailable])
+  }, [allKnownTickets, effectiveTickets, selectedTicketId, filteredTickets, serverTicketDetail, targetTicketId, isUnavailable])
 
   // Derive whether activeTicket is outside the currently active preset
   const isOutsidePreset = Boolean(
@@ -1451,7 +1489,7 @@ function TicketCockpitInternalProvider({
   ])
 
   const state: TicketCockpitState = useMemo(() => ({
-    tickets: effectiveTickets,
+    tickets: allKnownTickets,
     filteredTickets,
     selectedTicketId,
     activeTicket,
@@ -1477,7 +1515,7 @@ function TicketCockpitInternalProvider({
     fieldConflicts,
     assignmentConflicts,
   }), [
-    effectiveTickets,
+    allKnownTickets,
     filteredTickets,
     selectedTicketId,
     activeTicket,

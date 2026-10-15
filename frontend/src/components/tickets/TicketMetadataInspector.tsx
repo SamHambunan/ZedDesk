@@ -29,6 +29,7 @@ import { Toast } from '../ui/Toast'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
+import { formatAssignmentAuditTitle, formatAuditTime } from './constants'
 
 // --- Compound Subcomponent 1: CustomerCard ---
 export interface InspectorCustomerCardProps {
@@ -771,12 +772,12 @@ export const InspectorAuditLog: React.FC<InspectorAuditLogProps> = ({
                 className="text-[11px] text-text-secondary font-mono border-l border-white/10 pl-2 space-y-0.5"
               >
                 <div className="text-text-primary font-medium">
-                  {asg.note || (asg.member_name ? `Assigned to ${asg.member_name}` : 'Unassigned')}
+                  {formatAssignmentAuditTitle(asg)}
                 </div>
                 <div className="text-text-muted text-[10px] flex items-center justify-between">
-                  <span>By {asg.assigned_by_name}</span>
+                  <span>By {asg.assigned_by_name || 'System'}</span>
                   <span className="tabular-nums">
-                    {new Date(asg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {formatAuditTime(asg.created_at)}
                   </span>
                 </div>
               </div>

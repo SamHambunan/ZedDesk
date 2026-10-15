@@ -402,6 +402,48 @@ describe('TicketCockpit.Inspector & TicketMetadataInspector (Issue #105)', () =>
     expect(screen.getByTestId('assignment-history-body')).toBeInTheDocument()
   })
 
+  it('correctly maps nested Eloquent assignment relations to member, team, and assigner names', () => {
+    const ticketWithNestedAssignments = {
+      ...INITIAL_MOCK_TICKETS[0],
+      assignments: [
+        {
+          id: 'asg-nested-1',
+          ticket_id: 't-1001',
+          team_id: 1,
+          member_id: 2,
+          created_at: '2026-10-12T08:00:00.000Z',
+          member: { user: { name: 'Acme Agent' } },
+          team: { name: 'Support Tier 1' },
+          assigned_by: { user: { name: 'Acme Admin' } },
+        },
+        {
+          id: 'asg-nested-2',
+          ticket_id: 't-1001',
+          team_id: 2,
+          member_id: null,
+          created_at: '2026-10-12T09:00:00.000Z',
+          team: { name: 'Billing Support' },
+          assigned_by: { user: { name: 'Acme Admin' } },
+        },
+      ],
+    }
+
+    render(
+      <TicketCockpit.Provider
+        tickets={[ticketWithNestedAssignments]}
+        teams={MOCK_TEAMS}
+        members={MOCK_MEMBERS}
+        allTags={MOCK_TAGS_POOL}
+      >
+        <TicketCockpit.Inspector />
+      </TicketCockpit.Provider>
+    )
+
+    expect(screen.getByText('Assigned to Acme Agent (Support Tier 1)')).toBeInTheDocument()
+    expect(screen.getByText('Assigned to Billing Support')).toBeInTheDocument()
+    expect(screen.getAllByText(/By Acme Admin/i)).toHaveLength(2)
+  })
+
   it('strictly omits destructive controls (delete button) from DOM for agent role', () => {
     render(
       <TicketCockpit.Provider

@@ -391,6 +391,115 @@ describe('TicketCockpit Compound Component Baseline', () => {
     }
   })
 
+  it('preserves global sub-rail preset counts when switching between scoped preset queries', async () => {
+    const user = userEvent.setup()
+
+    const allTicketsList = [
+      {
+        id: 't-1',
+        ticket_number: 1,
+        subject: 'First Open Ticket',
+        status: 'open',
+        priority: 'high',
+        assigned_team_id: 1,
+        assigned_member_id: 2,
+        customer: { id: 'c1', name: 'Alice', email: 'alice@test.com' },
+        tags: [],
+        messages: [],
+        assignments: [],
+      },
+      {
+        id: 't-2',
+        ticket_number: 2,
+        subject: 'Second Pending Ticket',
+        status: 'pending',
+        priority: 'medium',
+        assigned_team_id: 1,
+        assigned_member_id: null,
+        customer: { id: 'c2', name: 'Bob', email: 'bob@test.com' },
+        tags: [],
+        messages: [],
+        assignments: [],
+      },
+      {
+        id: 't-3',
+        ticket_number: 3,
+        subject: 'Resolved Ticket',
+        status: 'resolved',
+        priority: 'low',
+        assigned_team_id: null,
+        assigned_member_id: null,
+        customer: { id: 'c3', name: 'Charlie', email: 'charlie@test.com' },
+        tags: [],
+        messages: [],
+        assignments: [],
+      },
+    ]
+
+    const mockFetch = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('all=true')) {
+        return {
+          ok: true,
+          json: async () => ({ data: allTicketsList }),
+        }
+      }
+      if (url.includes('unassigned=true')) {
+        // Scoped response returns only unassigned tickets (t-2, t-3)
+        return {
+          ok: true,
+          json: async () => ({ data: [allTicketsList[1], allTicketsList[2]] }),
+        }
+      }
+      return {
+        ok: true,
+        json: async () => ({ data: allTicketsList }),
+      }
+    })
+
+    vi.stubGlobal('fetch', mockFetch)
+
+    try {
+      render(
+        <TicketCockpit.Provider
+          apiUrl="http://acme.localhost"
+          token="secret-token"
+          teams={MOCK_TEAMS}
+          members={MOCK_MEMBERS}
+          allTags={MOCK_TAGS_POOL}
+          currentUserId={2}
+        >
+          <TicketCockpit.Frame>
+            <TicketCockpit.SubRail />
+            <TicketCockpit.Queue />
+          </TicketCockpit.Frame>
+        </TicketCockpit.Provider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByTestId('preset-count-all_open')).toHaveTextContent('2')
+        expect(screen.getByTestId('preset-count-my_tickets')).toHaveTextContent('1')
+        expect(screen.getByTestId('preset-count-unassigned')).toHaveTextContent('2')
+      })
+
+      // Click Unassigned preset
+      await user.click(screen.getByTestId('preset-btn-unassigned'))
+
+      // Queue displays unassigned tickets
+      await waitFor(() => {
+        expect(screen.getByTestId('ticket-row-t-2')).toBeInTheDocument()
+      })
+
+      // Crucial assertion: Subrail preset counts MUST NOT drop to 0 or re-scope to unassigned only!
+      expect(screen.getByTestId('preset-count-all_open')).toHaveTextContent('2')
+      expect(screen.getByTestId('preset-count-my_tickets')).toHaveTextContent('1')
+      expect(screen.getByTestId('preset-count-unassigned')).toHaveTextContent('2')
+      expect(screen.getByTestId('preset-count-team_queue')).toHaveTextContent('2')
+      expect(screen.getByTestId('preset-count-resolved_closed')).toHaveTextContent('1')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('displays accurate preset count badges formatted with font-mono and tabular-nums', () => {
     render(
       <TicketCockpit.Provider
