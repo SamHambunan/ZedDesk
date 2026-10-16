@@ -100,7 +100,7 @@ class Ticket extends Model
 
         static::created(function (Ticket $ticket) {
             app(TicketNotificationService::class)->ticketCreated($ticket);
-            TicketCreated::dispatch($ticket);
+            app(DurableDelivery::class)->signal(new TicketCreated($ticket));
         });
 
         static::updating(function (Ticket $ticket) {
@@ -117,11 +117,11 @@ class Ticket extends Model
 
         static::deleted(function (Ticket $ticket) {
             if (! $ticket->isForceDeleting()) {
-                TicketChanged::dispatch($ticket, TicketChanged::DELETED);
-                CustomerTicketChanged::dispatch($ticket, CustomerTicketChanged::DELETED);
+                app(DurableDelivery::class)->signal(new TicketChanged($ticket, TicketChanged::DELETED));
+                app(DurableDelivery::class)->signal(new CustomerTicketChanged($ticket, CustomerTicketChanged::DELETED));
             }
         });
-        static::restored(fn (Ticket $ticket) => TicketChanged::dispatch($ticket, TicketChanged::RESTORED));
+        static::restored(fn (Ticket $ticket) => app(DurableDelivery::class)->signal(new TicketChanged($ticket, TicketChanged::RESTORED)));
     }
 
     /**
@@ -296,7 +296,7 @@ class Ticket extends Model
 
         $this->update(['priority' => $resolved]);
         $this->refresh();
-        TicketChanged::dispatch($this, TicketChanged::PRIORITY_CHANGED);
+        app(DurableDelivery::class)->signal(new TicketChanged($this, TicketChanged::PRIORITY_CHANGED));
 
         return $this;
     }
@@ -326,12 +326,12 @@ class Ticket extends Model
             throw new DomainException('Cross-organization tag assignment is rejected.');
         }
 
-        DB::transaction(function () use ($tagModel) {
+        DB::transaction(fn () => app(DurableDelivery::class)->capture(function () use ($tagModel) {
             $changes = $this->tags()->syncWithoutDetaching([$tagModel->id]);
             if ($changes['attached'] !== []) {
                 $this->recordTagChange();
             }
-        });
+        }));
 
         return $this;
     }
@@ -352,11 +352,11 @@ class Ticket extends Model
             throw new DomainException('Cross-organization tag detachment is rejected.');
         }
 
-        DB::transaction(function () use ($tagModel) {
+        DB::transaction(fn () => app(DurableDelivery::class)->capture(function () use ($tagModel) {
             if ($this->tags()->detach($tagModel->id) > 0) {
                 $this->recordTagChange();
             }
-        });
+        }));
 
         return $this;
     }
@@ -384,12 +384,12 @@ class Ticket extends Model
             $tagIds[] = $tagModel->id;
         }
 
-        DB::transaction(function () use ($tagIds) {
+        DB::transaction(fn () => app(DurableDelivery::class)->capture(function () use ($tagIds) {
             $changes = $this->tags()->sync($tagIds);
             if ($changes['attached'] !== [] || $changes['detached'] !== [] || $changes['updated'] !== []) {
                 $this->recordTagChange();
             }
-        });
+        }));
 
         return $this;
     }
@@ -398,6 +398,6 @@ class Ticket extends Model
     {
         DB::table('tickets')->where('id', $this->id)->update(['updated_at' => now()]);
         $this->refresh();
-        TicketChanged::dispatch($this, TicketChanged::TAGS_CHANGED);
+        app(DurableDelivery::class)->signal(new TicketChanged($this, TicketChanged::TAGS_CHANGED));
     }
 }

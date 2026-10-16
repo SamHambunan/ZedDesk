@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Tag;
 use App\Models\Ticket;
 use App\Services\AuditLogWriter;
+use App\Services\TagCatalogCache;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,14 +19,17 @@ use Illuminate\Validation\Rule;
 
 class TagController extends Controller
 {
+    public function __construct(
+        private readonly TagCatalogCache $catalogCache,
+    ) {}
+
     /**
      * List all tags for the current organization.
      */
     public function index(): JsonResponse
     {
-        $tags = Tag::query()
-            ->orderBy('name')
-            ->get();
+        $orgId = OrganizationContext::getCurrentId();
+        $tags = $orgId ? $this->catalogCache->get($orgId) : [];
 
         return response()->json([
             'data' => $tags,

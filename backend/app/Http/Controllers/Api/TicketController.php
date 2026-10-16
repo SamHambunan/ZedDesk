@@ -17,6 +17,7 @@ use App\Models\Ticket;
 use App\Models\TicketMessage;
 use App\Services\AttachmentService;
 use App\Services\AuditLogWriter;
+use App\Services\DurableDelivery;
 use App\Services\TicketAssignmentService;
 use App\Services\TicketFieldEditor;
 use DomainException;
@@ -357,7 +358,7 @@ class TicketController extends Controller
         $statusOverride = ($messageType === TicketMessageType::INTERNAL_NOTE->value) ? null : $rawStatusOverride;
 
         try {
-            return $attachmentService->transaction(function () use ($ticket, $currentMember, $messageType, $body, $statusOverride, $files, $attachmentService) {
+            return $attachmentService->transaction(fn () => app(DurableDelivery::class)->capture(function () use ($ticket, $currentMember, $messageType, $body, $statusOverride, $files, $attachmentService) {
                 $ticket = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
 
                 if ($ticket->isClosed()) {
@@ -414,7 +415,7 @@ class TicketController extends Controller
                         'status' => $freshTicket->status instanceof TicketStatus ? $freshTicket->status->value : $freshTicket->status,
                     ],
                 ], 201);
-            });
+            }));
         } catch (InvalidTicketTransitionException $e) {
             return response()->json([
                 'message' => $e->getMessage(),
@@ -582,10 +583,10 @@ class TicketController extends Controller
 
         Gate::authorize('delete', $ticket);
 
-        DB::transaction(function () use ($ticket, $request) {
+        DB::transaction(fn () => app(DurableDelivery::class)->capture(function () use ($ticket, $request) {
             $ticket->delete();
             app(AuditLogWriter::class)->recordSoftDelete($ticket, $request->user());
-        });
+        }));
 
         return response()->json([
             'message' => 'Ticket deleted successfully.',
@@ -605,10 +606,10 @@ class TicketController extends Controller
             return response()->json(['message' => 'Ticket is not deleted.'], 422);
         }
 
-        DB::transaction(function () use ($ticket, $request) {
+        DB::transaction(fn () => app(DurableDelivery::class)->capture(function () use ($ticket, $request) {
             $ticket->restore();
             app(AuditLogWriter::class)->recordRestore($ticket, $request->user());
-        });
+        }));
 
         return response()->json([
             'message' => 'Ticket restored successfully.',

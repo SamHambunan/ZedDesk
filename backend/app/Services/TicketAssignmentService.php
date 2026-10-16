@@ -71,7 +71,7 @@ class TicketAssignmentService
             throw new DomainException('Cross-organization assignment author is rejected.');
         }
 
-        return DB::transaction(function () use ($ticket, $team, $member, $teamModel, $memberModel, $assignedByModel, $expectedRevision) {
+        return DB::transaction(fn () => app(DurableDelivery::class)->capture(function () use ($ticket, $team, $member, $teamModel, $memberModel, $assignedByModel, $expectedRevision) {
             $current = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
             $this->assertCurrentRevision($current, $expectedRevision);
             $this->assertOpen($current, 'Assignment updates are rejected.');
@@ -111,10 +111,10 @@ class TicketAssignmentService
             }
 
             TicketAssigned::dispatch($current, $assignment);
-            TicketChanged::dispatch($current, TicketChanged::ASSIGNMENT_CHANGED);
+            app(DurableDelivery::class)->signal(new TicketChanged($current, TicketChanged::ASSIGNMENT_CHANGED));
 
             return $assignment;
-        });
+        }));
     }
 
     /**
@@ -148,7 +148,7 @@ class TicketAssignmentService
             throw new DomainException('Cross-organization ticket claiming is rejected.');
         }
 
-        return DB::transaction(function () use ($ticket, $memberModel, $expectedRevision) {
+        return DB::transaction(fn () => app(DurableDelivery::class)->capture(function () use ($ticket, $memberModel, $expectedRevision) {
             $current = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
             $this->assertCurrentRevision($current, $expectedRevision);
             $this->assertOpen($current, 'Ticket claiming is rejected.');
@@ -193,10 +193,10 @@ class TicketAssignmentService
             );
 
             TicketAssigned::dispatch($current, $assignment);
-            TicketChanged::dispatch($current, TicketChanged::ASSIGNMENT_CHANGED);
+            app(DurableDelivery::class)->signal(new TicketChanged($current, TicketChanged::ASSIGNMENT_CHANGED));
 
             return $assignment;
-        });
+        }));
     }
 
     private function assertCurrentRevision(Ticket $ticket, ?int $expectedRevision): void

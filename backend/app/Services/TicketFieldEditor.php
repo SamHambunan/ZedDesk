@@ -44,7 +44,7 @@ class TicketFieldEditor
      */
     private function apply(Ticket $ticket, string $field, ?int $expectedRevision, Closure $change): ?array
     {
-        return DB::transaction(function () use ($ticket, $field, $expectedRevision, $change) {
+        return DB::transaction(fn () => app(DurableDelivery::class)->capture(function () use ($ticket, $field, $expectedRevision, $change) {
             $current = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
             $revisionField = "{$field}_revision";
 
@@ -62,6 +62,6 @@ class TicketFieldEditor
             $change($current);
 
             return null;
-        });
+        }));
     }
 }
