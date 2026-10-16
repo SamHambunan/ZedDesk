@@ -19,7 +19,7 @@ class TicketFieldEditor
             function (Ticket $current) use ($status, $actor) {
                 $old = $current->status;
                 $this->stateMachine->transitionTo($current, $status);
-                if ($actor && $current->status !== $old) {
+                if ($current->status !== $old) {
                     $this->auditLogWriter->recordStatusChange($current, $actor, $old, $current->status);
                 }
             });

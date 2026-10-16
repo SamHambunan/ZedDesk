@@ -20,25 +20,13 @@ class AuditLogWriter
 {
     public function recordPriorityChange(Ticket $ticket, User $actor, TicketPriority $old, TicketPriority $new): void
     {
-        $organizationId = OrganizationContext::getCurrentId();
-        if ($organizationId === null || (int) $ticket->organization_id !== $organizationId) {
-            throw new LogicException('Audit Organization must match the verified Ticket Organization.');
-        }
-
-        DB::table('audit_logs')->insert([
-            'id' => (string) Str::uuid(),
-            'occurred_at' => now(),
-            'classification' => 'business',
-            'action' => 'ticket.priority_changed',
-            'outcome' => 'success',
-            'organization_id' => $organizationId,
-            'actor_type' => 'user',
-            'actor_id' => (string) $actor->id,
-            'target_type' => 'ticket',
-            'target_id' => $ticket->id,
-            'changes' => json_encode(['priority' => ['old' => $old->value, 'new' => $new->value]], JSON_THROW_ON_ERROR),
-            'request_location' => '/api/tickets/{ticket}/priority',
-        ]);
+        $this->record(
+            ticket: $ticket,
+            actor: $actor,
+            action: 'ticket.priority_changed',
+            changes: ['priority' => ['old' => $old->value, 'new' => $new->value]],
+            requestLocation: '/api/tickets/{ticket}/priority',
+        );
     }
 
     public function recordStatusChange(Ticket $ticket, User|OrganizationMember|null $actor, TicketStatus|string $old, TicketStatus|string $new): void
@@ -186,26 +174,22 @@ class AuditLogWriter
 
     public function recordSoftDelete(Ticket $ticket, User|OrganizationMember|null $actor): void
     {
-        $statusValue = $ticket->status instanceof TicketStatus ? $ticket->status->value : (string) $ticket->status;
-
         $this->record(
             ticket: $ticket,
             actor: $actor,
             action: 'ticket.deleted',
-            changes: ['status' => $statusValue],
+            changes: ['deleted' => true],
             requestLocation: '/api/tickets/{ticket}',
         );
     }
 
     public function recordRestore(Ticket $ticket, User|OrganizationMember|null $actor): void
     {
-        $statusValue = $ticket->status instanceof TicketStatus ? $ticket->status->value : (string) $ticket->status;
-
         $this->record(
             ticket: $ticket,
             actor: $actor,
             action: 'ticket.restored',
-            changes: ['status' => $statusValue],
+            changes: ['restored' => true],
             requestLocation: '/api/tickets/{ticket}/restore',
         );
     }
@@ -224,10 +208,12 @@ class AuditLogWriter
         string $classification = 'business',
         string $outcome = 'success',
     ): void {
-        $organizationId = OrganizationContext::getCurrentId() ?? (int) $ticket->organization_id;
-        if ($organizationId === null || (int) $ticket->organization_id !== $organizationId) {
+        $contextOrgId = OrganizationContext::getCurrentId();
+        if ($contextOrgId !== null && (int) $ticket->organization_id !== $contextOrgId) {
             throw new LogicException('Audit Organization must match the verified Ticket Organization.');
         }
+
+        $organizationId = $contextOrgId ?? (int) $ticket->organization_id;
 
         [$actorType, $actorId] = $this->resolveActor($actor);
 

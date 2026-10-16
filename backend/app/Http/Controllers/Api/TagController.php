@@ -98,8 +98,11 @@ class TagController extends Controller
 
         try {
             DB::transaction(function () use ($ticket, $validated, $request) {
+                $alreadyAttached = $ticket->tags()->where('tags.id', $validated['tag_id'])->exists();
                 $ticket->attachTag($validated['tag_id']);
-                app(AuditLogWriter::class)->recordTagAttached($ticket, $request->user(), $validated['tag_id']);
+                if (! $alreadyAttached) {
+                    app(AuditLogWriter::class)->recordTagAttached($ticket, $request->user(), $validated['tag_id']);
+                }
             });
         } catch (DomainException|InvalidTicketTransitionException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
@@ -121,8 +124,11 @@ class TagController extends Controller
 
         try {
             DB::transaction(function () use ($ticket, $tagId, $request) {
+                $wasAttached = $ticket->tags()->where('tags.id', $tagId)->exists();
                 $ticket->detachTag($tagId);
-                app(AuditLogWriter::class)->recordTagDetached($ticket, $request->user(), $tagId);
+                if ($wasAttached) {
+                    app(AuditLogWriter::class)->recordTagDetached($ticket, $request->user(), $tagId);
+                }
             });
         } catch (DomainException|InvalidTicketTransitionException $e) {
             return response()->json(['message' => $e->getMessage()], 422);

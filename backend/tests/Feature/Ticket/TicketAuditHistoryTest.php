@@ -431,6 +431,17 @@ test('tag attach and detach record audit logs and roll back on failure', functio
         ->and($detachLog->target_id)->toBe($this->ticket->id)
         ->and($detachLog->changes['tag_id'])->toBe($tag->id);
 
+    // Idempotent re-detach of already detached tag does not create duplicate audit log
+    $this->deleteJson("http://acme.localhost/api/tickets/{$this->ticket->id}/tags/{$tag->id}")->assertStatus(200);
+    expect(AuditLog::where('action', 'ticket.tag_detached')->count())->toBe(1);
+
+    // Re-attach tag then idempotent re-attach does not create duplicate audit log
+    $this->postJson("http://acme.localhost/api/tickets/{$this->ticket->id}/tags", ['tag_id' => $tag->id])->assertStatus(200);
+    expect(AuditLog::where('action', 'ticket.tag_attached')->count())->toBe(2);
+    $this->postJson("http://acme.localhost/api/tickets/{$this->ticket->id}/tags", ['tag_id' => $tag->id])->assertStatus(200);
+    expect(AuditLog::where('action', 'ticket.tag_attached')->count())->toBe(2);
+    $this->deleteJson("http://acme.localhost/api/tickets/{$this->ticket->id}/tags/{$tag->id}")->assertStatus(200);
+
     // Rollback test
     enableAuditInsertFailure();
     $failAttach = $this->postJson("http://acme.localhost/api/tickets/{$this->ticket->id}/tags", [
@@ -457,7 +468,8 @@ test('soft delete and restore record audit logs, retain target id after deletion
         ->and($delLog->actor_type)->toBe('user')
         ->and($delLog->actor_id)->toBe((string) $this->adminUser->id)
         ->and($delLog->target_type)->toBe('ticket')
-        ->and($delLog->target_id)->toBe($ticketId);
+        ->and($delLog->target_id)->toBe($ticketId)
+        ->and($delLog->changes['deleted'])->toBeTrue();
 
     // Even if force deleted, the historical identifier is retained
     expect($this->ticket->fresh()->trashed())->toBeTrue();
@@ -468,7 +480,8 @@ test('soft delete and restore record audit logs, retain target id after deletion
 
     $restoreLog = AuditLog::where('action', 'ticket.restored')->sole();
     expect($restoreLog->organization_id)->toBe($this->organization->id)
-        ->and($restoreLog->target_id)->toBe($ticketId);
+        ->and($restoreLog->target_id)->toBe($ticketId)
+        ->and($restoreLog->changes['restored'])->toBeTrue();
 
     // Rollback test
     enableAuditInsertFailure();
@@ -499,4 +512,24 @@ test('ordinary reads, notification read markers, presence, and live channels do 
     $this->postJson('http://acme.localhost/api/notifications/mark-all-read')->assertStatus(200);
 
     expect(AuditLog::count())->toBe($initialCount);
+});
+
+test('only an Organization Admin can read the audit log feed for remaining ticket actions', function () {
+    Sanctum::actingAs($this->agentUser);
+    $this->patchJson("http://acme.localhost/api/tickets/{$this->ticket->id}/status", [
+        'status' => 'pending',
+    ])->assertStatus(200);
+
+    // Non-admin agent is forbidden from reading the audit log feed
+    $this->getJson($this->auditUrl)->assertForbidden();
+
+    // Organization Admin can read and filter the audit log feed over HTTP
+    Sanctum::actingAs($this->adminUser);
+    $adminRes = $this->getJson($this->auditUrl.'?action=ticket.status_changed&target_id='.$this->ticket->id);
+    $adminRes->assertOk();
+    $adminRes->assertJsonFragment(['action' => 'ticket.status_changed', 'target_id' => $this->ticket->id]);
+
+    // Cross-tenant access is rejected
+    $otherOrg = Organization::create(['name' => 'Other Org', 'slug' => 'other-org']);
+    $this->getJson('http://other-org.localhost/api/audit-logs')->assertForbidden();
 });
