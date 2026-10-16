@@ -45,6 +45,10 @@ LUA;
      */
     public function get(string $organizationId): array
     {
+        if ($organizationId === '') {
+            return [];
+        }
+
         $cacheKey = $this->cacheKey($organizationId);
         $versionKey = $this->versionKey($organizationId);
 
@@ -68,9 +72,9 @@ LUA;
         $startTime = now()->timestamp;
         $version = '0';
         try {
-            $v = $this->redis()->get($versionKey);
-            if ($v !== null && $v !== false) {
-                $version = (string) $v;
+            $storedVersion = $this->redis()->get($versionKey);
+            if ($storedVersion !== null && $storedVersion !== false) {
+                $version = (string) $storedVersion;
             }
         } catch (Throwable $e) {
             Log::warning("Tag catalog cache version read failed: {$e->getMessage()}");
@@ -92,6 +96,10 @@ LUA;
      */
     public function storeCache(string $organizationId, array $tags, string $expectedVersion, int $startTime): bool
     {
+        if ($organizationId === '') {
+            return false;
+        }
+
         $cacheKey = $this->cacheKey($organizationId);
         $versionKey = $this->versionKey($organizationId);
 
@@ -126,6 +134,10 @@ LUA;
      */
     public function invalidate(string $organizationId): void
     {
+        if ($organizationId === '') {
+            return;
+        }
+
         $cacheKey = $this->cacheKey($organizationId);
         $versionKey = $this->versionKey($organizationId);
 
@@ -148,6 +160,10 @@ LUA;
      */
     public function fetchFromDatabase(string $organizationId): array
     {
+        if ($organizationId === '') {
+            return [];
+        }
+
         return Tag::withoutGlobalScopes()
             ->where('organization_id', $organizationId)
             ->orderBy('name')

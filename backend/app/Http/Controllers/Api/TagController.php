@@ -26,8 +26,8 @@ class TagController extends Controller
      */
     public function index(): JsonResponse
     {
-        $orgId = OrganizationContext::getCurrentId() ?? '';
-        $tags = $this->catalogCache->get($orgId);
+        $orgId = OrganizationContext::getCurrentId();
+        $tags = $orgId ? $this->catalogCache->get($orgId) : [];
 
         return response()->json([
             'data' => $tags,
@@ -61,14 +61,6 @@ class TagController extends Controller
             'name' => $validated['name'],
             'slug' => $validated['slug'],
         ]);
-
-        if ($orgId) {
-            try {
-                $this->catalogCache->invalidate($orgId);
-            } catch (\Throwable $e) {
-                // Committed Tag creation must not fail merely because cache invalidation failed
-            }
-        }
 
         return response()->json([
             'data' => $tag,

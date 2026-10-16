@@ -404,3 +404,36 @@ test('unauthenticated and unauthorized requests are not served by cache', functi
     Sanctum::actingAs($this->betaUser);
     $this->getJson('http://acme.localhost/api/tags')->assertStatus(403);
 });
+
+test('updating an existing tag invalidates the organization tag catalog cache', function () {
+    Sanctum::actingAs($this->acmeUser);
+
+    // Warm cache
+    $this->getJson('http://acme.localhost/api/tags')->assertStatus(200);
+
+    // Update tag
+    $this->acmeTag->update(['name' => 'Renamed Bug']);
+
+    // Next getJson must fetch from DB and include the updated tag name
+    $response = $this->getJson('http://acme.localhost/api/tags');
+    $response->assertStatus(200);
+
+    $names = collect($response->json('data'))->pluck('name')->all();
+    expect($names)->toContain('Renamed Bug')
+        ->and($names)->not->toContain('Bug');
+});
+
+test('deleting a tag invalidates the organization tag catalog cache', function () {
+    Sanctum::actingAs($this->acmeUser);
+
+    // Warm cache
+    $this->getJson('http://acme.localhost/api/tags')->assertStatus(200);
+
+    // Delete tag
+    $this->acmeTag->delete();
+
+    // Next getJson must fetch from DB and be empty
+    $response = $this->getJson('http://acme.localhost/api/tags');
+    $response->assertStatus(200)
+        ->assertJsonCount(0, 'data');
+});
