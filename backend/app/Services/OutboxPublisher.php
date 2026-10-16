@@ -33,9 +33,19 @@ class OutboxPublisher
                 $envelope = json_decode($signal->envelope, true, 512, JSON_THROW_ON_ERROR);
                 $channels = $this->channels($signal, $envelope);
                 if ($channels !== []) {
-                    $eventName = $signal->kind === 'member_inbox' ? 'inbox.changed' : 'ticket.changed';
+                    $eventName = match ($signal->kind) {
+                        'member_inbox' => 'inbox.changed',
+                        'customer_ticket' => ($envelope['change_type'] ?? null) === 'deleted'
+                            ? 'ticket.unavailable'
+                            : 'ticket.changed',
+                        default => 'ticket.changed',
+                    };
+                    $payload = ($signal->kind === 'customer_ticket' && ($envelope['change_type'] ?? null) === 'deleted')
+                        ? []
+                        : $envelope;
+
                     try {
-                        Broadcast::connection('reverb')->broadcast($channels, $eventName, $envelope);
+                        Broadcast::connection('reverb')->broadcast($channels, $eventName, $payload);
                     } catch (Throwable $error) {
                         app(OutboxFailure::class)->record($signal, $error, true);
 
@@ -91,11 +101,8 @@ class OutboxPublisher
         }
         $ticket = Ticket::withoutGlobalScopes()->withTrashed()->whereKey($signal->ticket_id)
             ->where('organization_id', $signal->organization_id)->first();
-        if (! $ticket || $ticket->trashed() || $ticket->revision > (int) $envelope['revision']) {
+        if (! $ticket) {
             return [];
-        }
-        if ($ticket->revision < (int) $envelope['revision']) {
-            throw new InvalidArgumentException('Delivery revision exceeds the Ticket revision.');
         }
 
         if ($signal->kind === 'customer_ticket') {
@@ -108,11 +115,52 @@ class OutboxPublisher
                 return [];
             }
 
+            if ($envelope['change_type'] === 'deleted') {
+                if (! $ticket->trashed()) {
+                    return [];
+                }
+
+                $channelName = $envelope['deletion_channel'] ?? app(CustomerTicketLiveChannel::class)->name($signal->ticket_id);
+
+                return [new PrivateChannel($channelName)];
+            }
+
+            if ($ticket->trashed() || $ticket->revision > (int) $envelope['revision']) {
+                return [];
+            }
+            if ($ticket->revision < (int) $envelope['revision']) {
+                throw new InvalidArgumentException('Delivery revision exceeds the Ticket revision.');
+            }
+
             return [new PrivateChannel(app(CustomerTicketLiveChannel::class)->name($signal->ticket_id))];
         }
+
         if ($signal->kind !== 'staff_ticket') {
             throw new InvalidArgumentException('Unknown delivery kind.');
         }
+
+        if ($envelope['change_type'] === 'deleted') {
+            if (! $ticket->trashed()) {
+                return [];
+            }
+
+            return [
+                new PrivateChannel(app(TicketLiveChannel::class)->name($signal->ticket_id)),
+                new PrivateChannel(app(OrganizationLiveChannel::class)->name((int) $signal->organization_id)),
+            ];
+        }
+
+        if ($ticket->trashed() || $ticket->revision > (int) $envelope['revision']) {
+            return [];
+        }
+        if ($ticket->revision < (int) $envelope['revision']) {
+            throw new InvalidArgumentException('Delivery revision exceeds the Ticket revision.');
+        }
+
+        if ($envelope['change_type'] === 'created') {
+            return [new PrivateChannel(app(OrganizationLiveChannel::class)->name((int) $signal->organization_id))];
+        }
+
         $channels = [new PrivateChannel(app(TicketLiveChannel::class)->name($signal->ticket_id))];
         if ($envelope['change_type'] !== 'message_created') {
             $channels[] = new PrivateChannel(app(OrganizationLiveChannel::class)->name((int) $signal->organization_id));

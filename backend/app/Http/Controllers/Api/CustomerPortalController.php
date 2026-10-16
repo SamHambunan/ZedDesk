@@ -61,7 +61,7 @@ class CustomerPortalController extends Controller
             ], 422);
         }
 
-        return $this->attachmentService->transaction(function () use ($organization, $validated, $files, $request) {
+        return $this->attachmentService->transaction(fn () => app(DurableDelivery::class)->capture(function () use ($organization, $validated, $files, $request) {
             // Find or create customer
             $customer = $this->findOrCreateCustomer->execute([
                 'name' => $validated['name'],
@@ -124,7 +124,7 @@ class CustomerPortalController extends Controller
                 ],
                 'attachments' => $storedAttachments,
             ], 201);
-        });
+        }));
     }
 
     /**
