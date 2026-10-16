@@ -49,13 +49,15 @@ Artisan::command('delivery:failures {id? : Specific delivery signal ID to inspec
 
     $rows = $query->orderByDesc('quarantined_at')
         ->limit(max(1, min(100, (int) $this->option('limit'))))
-        ->get(['id', 'organization_id', 'kind', 'ticket_id', 'failures', 'last_error', 'quarantined_at']);
+        ->get(['id', 'organization_id', 'kind', 'ticket_id', 'failures', 'infrastructure_failures', 'last_error', 'quarantined_at']);
 
     $failureService = app(\App\Services\OutboxFailure::class);
     $this->table(['ID', 'Organization', 'Kind', 'Ticket', 'Attempts', 'Error', 'Quarantined'],
         $rows->map(fn ($row) => [
             $row->id, $row->organization_id, $row->kind, $row->ticket_id ?? '-',
-            $row->failures, $row->last_error ? $failureService->sanitizeError($row->last_error) : '-', $row->quarantined_at,
+            $row->failures + $row->infrastructure_failures,
+            $row->last_error ? $failureService->sanitizeError($row->last_error) : '-',
+            $row->quarantined_at,
         ])->all());
 
     return 0;
@@ -70,11 +72,21 @@ Artisan::command('delivery:inspect {id}', function (string $id) {
     }
 
     $envelope = json_decode($row->envelope, true) ?: [];
-    foreach (array_keys($envelope) as $key) {
-        if (preg_match('/(token|secret|password|bearer|auth|key)/i', $key)) {
-            unset($envelope[$key]);
+    $sanitizeEnvelope = function (&$data) use (&$sanitizeEnvelope) {
+        if (! is_array($data)) {
+            return;
         }
-    }
+        foreach ($data as $key => &$value) {
+            if (is_string($key) && preg_match('/(token|secret|password|bearer|auth|key)/i', $key)) {
+                unset($data[$key]);
+                continue;
+            }
+            if (is_array($value)) {
+                $sanitizeEnvelope($value);
+            }
+        }
+    };
+    $sanitizeEnvelope($envelope);
 
     $status = $row->delivered_at ? 'delivered' : ($row->quarantined_at ? 'quarantined' : 'pending');
     $failureService = app(\App\Services\OutboxFailure::class);
@@ -102,39 +114,7 @@ Artisan::command('delivery:inspect {id}', function (string $id) {
     return 0;
 })->purpose('Inspect a specific durable delivery signal with sanitized diagnostics');
 
-Artisan::command('delivery:retry {id? : The delivery signal ID to retry} {--all : Retry all quarantined delivery signals} {--organization= : Filter by Organization ID when retrying all} {--dispatch : Immediately dispatch after resetting}', function (OutboxDispatcher $dispatcher) {
-    if ($this->option('all')) {
-        $query = DB::table('delivery_outbox')->whereNotNull('quarantined_at');
-        if ($org = $this->option('organization')) {
-            $query->where('organization_id', (int) $org);
-        }
-        $count = $query->update([
-            'failures' => 0,
-            'infrastructure_failures' => 0,
-            'quarantined_at' => null,
-            'available_at' => now(),
-            'reservation_token' => null,
-            'reserved_until' => null,
-            'last_error' => null,
-            'updated_at' => now(),
-        ]);
-        $this->info("Scheduled {$count} quarantined delivery signals for retry.");
-
-        if ($this->option('dispatch')) {
-            $dispatched = $dispatcher->dispatch();
-            $this->info("Dispatched {$dispatched} delivery signals.");
-        }
-
-        return 0;
-    }
-
-    $id = $this->argument('id');
-    if (! $id) {
-        $this->error('Please provide a delivery signal ID or use --all.');
-
-        return 1;
-    }
-
+Artisan::command('delivery:retry {id : The delivery signal ID to retry}', function (string $id) {
     $signal = DB::table('delivery_outbox')->where('id', $id)->first();
     if (! $signal) {
         $this->error('Delivery signal not found.');
@@ -161,13 +141,8 @@ Artisan::command('delivery:retry {id? : The delivery signal ID to retry} {--all 
 
     $this->info('Delivery signal scheduled for retry.');
 
-    if ($this->option('dispatch')) {
-        $dispatched = $dispatcher->dispatch();
-        $this->info("Dispatched {$dispatched} delivery signals.");
-    }
-
     return 0;
-})->purpose('Retry one or all quarantined delivery signals');
+})->purpose('Retry one quarantined or failed delivery signal');
 
 Artisan::command('delivery:clean {--days=7 : Retention threshold in days}', function () {
     $days = max(1, (int) $this->option('days'));
@@ -179,10 +154,6 @@ Artisan::command('delivery:clean {--days=7 : Retention threshold in days}', func
 
     return 0;
 })->purpose('Clean up completed delivery records older than retention threshold');
-
-Artisan::command('delivery:prune {--days=7 : Retention threshold in days}', function () {
-    return $this->call('delivery:clean', ['--days' => $this->option('days')]);
-})->purpose('Alias for delivery:clean');
 
 Schedule::command('delivery:dispatch')->everyTenSeconds();
 Schedule::command('delivery:clean')->daily();

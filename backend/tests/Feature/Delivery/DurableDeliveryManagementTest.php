@@ -134,6 +134,11 @@ test('delivery failures CLI lists quarantined signals and inspects selected fail
             'token' => 'should-be-sanitized',
             'password' => 'secret123',
             'safe_field' => 'visible',
+            'nested' => [
+                'secret_key' => 'nested-secret-value',
+                'inner_token' => 'nested-token-value',
+                'normal_data' => 'keep-me',
+            ],
         ],
     ]);
 
@@ -154,7 +159,10 @@ test('delivery failures CLI lists quarantined signals and inspects selected fail
         ->and($inspectOutput)->toContain('quarantined')
         ->and($inspectOutput)->toContain('safe_field')
         ->and($inspectOutput)->not->toContain('should-be-sanitized')
-        ->and($inspectOutput)->not->toContain('secret123');
+        ->and($inspectOutput)->not->toContain('secret123')
+        ->and($inspectOutput)->not->toContain('nested-secret-value')
+        ->and($inspectOutput)->not->toContain('nested-token-value')
+        ->and($inspectOutput)->toContain('keep-me');
 
     // Inspecting via delivery:failures {id} also works
     $exitCodeFailures = Artisan::call('delivery:failures', ['id' => $signalId]);
@@ -328,24 +336,19 @@ test('explicit retry respects current-access checks suppressing delivery if tick
     expect(DB::table('delivery_outbox')->where('id', $signalId)->value('delivered_at'))->not->toBeNull();
 });
 
-test('bulk retry --all retries all quarantined signals with optional organization filter', function () {
-    [$org1, , $ticket1] = deliveryTestFixture('acme');
-    [$org2, , $ticket2] = deliveryTestFixture('globex');
+test('delivery failures CLI accurately calculates total attempts across non-transient and infrastructure failures', function () {
+    [$org, , $ticket] = deliveryTestFixture('acme');
+    $signalId = insertOutboxRecord($org->id, $ticket->id, [
+        'quarantined_at' => now(),
+        'failures' => 5,
+        'infrastructure_failures' => 3,
+        'last_error' => 'InvalidArgumentException: test',
+    ]);
 
-    $s1 = insertOutboxRecord($org1->id, $ticket1->id, ['quarantined_at' => now(), 'failures' => 5]);
-    $s2 = insertOutboxRecord($org1->id, $ticket1->id, ['quarantined_at' => now(), 'failures' => 5]);
-    $s3 = insertOutboxRecord($org2->id, $ticket2->id, ['quarantined_at' => now(), 'failures' => 5]);
-
-    // Retry only Org 1 quarantined
-    $this->artisan('delivery:retry', ['--all' => true, '--organization' => (string) $org1->id])->assertSuccessful();
-
-    expect(DB::table('delivery_outbox')->where('id', $s1)->value('quarantined_at'))->toBeNull()
-        ->and(DB::table('delivery_outbox')->where('id', $s2)->value('quarantined_at'))->toBeNull()
-        ->and(DB::table('delivery_outbox')->where('id', $s3)->value('quarantined_at'))->not->toBeNull();
-
-    // Retry all remaining
-    $this->artisan('delivery:retry', ['--all' => true])->assertSuccessful();
-    expect(DB::table('delivery_outbox')->where('id', $s3)->value('quarantined_at'))->toBeNull();
+    Artisan::call('delivery:failures');
+    $output = Artisan::output();
+    expect($output)->toContain($signalId)
+        ->and($output)->toContain('8'); // 5 non-transient + 3 infrastructure = 8 attempts
 });
 
 test('explicit retry on already delivered signal is rejected safely', function () {

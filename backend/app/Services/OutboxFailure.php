@@ -55,11 +55,7 @@ class OutboxFailure
     public function sanitizeError(Throwable|string $error): string
     {
         if (is_string($error)) {
-            $sanitized = preg_replace('/(password|secret|token|bearer|key)[=:\s]+[^\s,;&]+/i', '$1=[REDACTED]', $error);
-            $sanitized = preg_replace('/[a-f0-9]{32,}/i', '[REDACTED]', $sanitized);
-            $sanitized = preg_replace('/\s+/', ' ', $sanitized);
-
-            return Str::limit($sanitized, 255);
+            return Str::limit($this->sanitizeMessage($error), 255);
         }
 
         $class = class_basename($error);
@@ -68,11 +64,14 @@ class OutboxFailure
             return $class;
         }
 
+        return Str::limit($class.': '.$this->sanitizeMessage($message), 255);
+    }
+
+    public function sanitizeMessage(string $message): string
+    {
         $sanitized = preg_replace('/(password|secret|token|bearer|key)[=:\s]+[^\s,;&]+/i', '$1=[REDACTED]', $message);
         $sanitized = preg_replace('/[a-f0-9]{32,}/i', '[REDACTED]', $sanitized);
-        $sanitized = preg_replace('/\s+/', ' ', $sanitized);
-        $full = $class.': '.$sanitized;
 
-        return Str::limit($full, 255);
+        return preg_replace('/\s+/', ' ', $sanitized);
     }
 }
