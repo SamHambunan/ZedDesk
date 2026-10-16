@@ -76,12 +76,21 @@ class AttachmentService
             return DB::transaction($callback);
         } catch (Throwable $e) {
             foreach ($this->writtenPaths as $path) {
-                Storage::disk($this->disk)->delete($path);
+                try {
+                    // A committed callback can throw after metadata is durable.
+                    if (! TicketAttachment::withoutGlobalScopes()->where('file_path', $path)->exists()) {
+                        Storage::disk($this->disk)->delete($path);
+                    }
+                } catch (Throwable $cleanupError) {
+                    report($cleanupError);
+                }
             }
 
             throw $e;
         } finally {
-            $this->writtenPaths = $previousPaths;
+            $this->writtenPaths = $previousPaths === null
+                ? null
+                : array_merge($previousPaths, $this->writtenPaths);
         }
     }
 
@@ -126,7 +135,7 @@ class AttachmentService
         $filePath = "tenants/{$message->organization_id}/tickets/{$ticket->id}/attachments/{$attachmentId}.{$extension}";
 
         // Cleanup takes this same lock before checking for a metadata reference.
-        DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', [$filePath]);
+        AttachmentPathLock::hold($filePath);
         $this->writtenPaths[] = $filePath;
 
         if (! Storage::disk($this->disk)->put($filePath, $file->getContent())) {

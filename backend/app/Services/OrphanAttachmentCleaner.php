@@ -30,8 +30,7 @@ class OrphanAttachmentCleaner
             }
 
             $deleted += DB::transaction(function () use ($disk, $path) {
-                $lock = DB::selectOne('SELECT CASE WHEN pg_try_advisory_xact_lock(hashtextextended(?, 0)) THEN 1 ELSE 0 END AS locked', [$path]);
-                if ((int) $lock->locked !== 1) {
+                if (! AttachmentPathLock::tryHold($path)) {
                     return 0;
                 }
 

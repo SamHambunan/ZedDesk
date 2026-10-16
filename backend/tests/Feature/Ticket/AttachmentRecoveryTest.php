@@ -11,9 +11,11 @@ use App\Models\TicketMessage;
 use App\Models\User;
 use App\Services\AttachmentService;
 use App\Services\CustomerTokenService;
+use Illuminate\Database\Events\TransactionCommitted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
@@ -49,7 +51,7 @@ test('message transaction failure after attachment write removes bytes and messa
     {
         public function store(UploadedFile $file, TicketMessage $message): TicketAttachment
         {
-            parent::store($file, $message);
+            $this->transaction(fn () => parent::store($file, $message));
             throw new RuntimeException('later write failed');
         }
     });
@@ -63,6 +65,37 @@ test('message transaction failure after attachment write removes bytes and messa
     expect(Storage::disk('private')->allFiles('tenants'))->toBe([]);
     $this->assertDatabaseCount('ticket_attachments', 0);
     $this->assertDatabaseMissing('ticket_messages', ['body' => 'Reply with a file']);
+});
+
+test('separate upload removes partial bytes when storage reports a failed write', function () {
+    $disk = Storage::disk('private');
+    $failingDisk = Mockery::mock($disk)->makePartial();
+    $failingDisk->shouldReceive('put')->once()->andReturnUsing(function ($path, $contents) use ($disk) {
+        $disk->put($path, $contents);
+
+        return false;
+    });
+    Storage::set('private', $failingDisk);
+
+    $this->post("http://acme.localhost/api/tickets/{$this->ticket->id}/messages/{$this->message->id}/attachments", [
+        'file' => UploadedFile::fake()->create('partial.pdf', 10, 'application/pdf'),
+    ])->assertStatus(500);
+
+    expect($disk->allFiles('tenants'))->toBe([]);
+    $this->assertDatabaseCount('ticket_attachments', 0);
+});
+
+test('a commit listener failure preserves a referenced attachment', function () {
+    TicketAttachment::created(function () {
+        Event::listen(TransactionCommitted::class, fn () => throw new RuntimeException('post-commit callback failed'));
+    });
+
+    $this->post("http://acme.localhost/api/tickets/{$this->ticket->id}/messages/{$this->message->id}/attachments", [
+        'file' => UploadedFile::fake()->create('saved.pdf', 10, 'application/pdf'),
+    ])->assertStatus(500);
+
+    $attachment = TicketAttachment::firstOrFail();
+    Storage::disk('private')->assertExists($attachment->file_path);
 });
 
 test('customer ticket creation failure after attachment write removes bytes and business records', function () {
