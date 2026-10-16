@@ -16,6 +16,7 @@ use App\Models\TicketAttachment;
 use App\Models\TicketMessage;
 use App\Repositories\CustomerRepository;
 use App\Services\AttachmentService;
+use App\Services\AuditLogWriter;
 use App\Services\CustomerTokenService;
 use App\Services\DurableDelivery;
 use Illuminate\Http\JsonResponse;
@@ -98,6 +99,8 @@ class CustomerPortalController extends Controller
             // Generate cryptographically signed HMAC token for customer access
             $token = $this->tokenService->generateToken($customer, $ticket);
             $accessUrl = $this->tokenService->generateTicketUrl($ticket, $token, $request);
+
+            app(AuditLogWriter::class)->recordTicketCreated($ticket, $customer);
 
             return response()->json([
                 'message' => 'Ticket created successfully.',
@@ -259,6 +262,7 @@ class CustomerPortalController extends Controller
                 }
 
                 $ticketModel->recordConversationChange($message);
+                app(AuditLogWriter::class)->recordPublicReply($ticketModel, $customer, $message);
 
                 return response()->json([
                     'message' => 'Reply submitted successfully.',
