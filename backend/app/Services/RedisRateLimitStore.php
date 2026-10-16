@@ -21,15 +21,15 @@ redis.call('EXPIRE', KEYS[1], 120)
 return 1
 LUA;
 
-    public function allow(string $key, int $window, bool $write, int $allLimit, int $writeLimit): bool
+    public function allow(RateLimitAttempt $attempt): bool
     {
         return (int) Redis::connection()->eval(
             self::SCRIPT,
             1,
-            config('rate_limits.key_prefix').':'.$key.':'.$window,
-            $allLimit,
-            $writeLimit,
-            $write ? 1 : 0,
+            config('rate_limits.key_prefix').':'.$attempt->key.':'.$attempt->window,
+            $attempt->allLimit,
+            $attempt->writeLimit,
+            $attempt->write ? 1 : 0,
         ) === 1;
     }
 }

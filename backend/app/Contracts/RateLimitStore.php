@@ -2,7 +2,9 @@
 
 namespace App\Contracts;
 
+use App\Services\RateLimitAttempt;
+
 interface RateLimitStore
 {
-    public function allow(string $key, int $window, bool $write, int $allLimit, int $writeLimit): bool;
+    public function allow(RateLimitAttempt $attempt): bool;
 }

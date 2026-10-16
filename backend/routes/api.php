@@ -64,7 +64,8 @@ Route::middleware(['auth:sanctum', 'limit.authenticated:global'])->group(functio
 });
 
 Route::get('/invitations/{token}', [InvitationController::class, 'show']);
-Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept']);
+Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept'])
+    ->middleware('limit.authenticated:optional');
 
 Route::middleware(['auth:sanctum', 'ensure.organization_member', 'limit.authenticated:member'])->group(function () {
     Route::get('/audit-logs', [AuditLogController::class, 'index']);
