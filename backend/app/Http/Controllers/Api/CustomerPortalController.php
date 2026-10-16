@@ -21,7 +21,6 @@ use App\Services\DurableDelivery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerPortalController extends Controller
@@ -242,7 +241,7 @@ class CustomerPortalController extends Controller
         }
 
         try {
-            return DB::transaction(fn () => app(DurableDelivery::class)->capture(function () use ($organization, $ticketModel, $customer, $body, $files) {
+            return $this->attachmentService->transaction(fn () => app(DurableDelivery::class)->capture(function () use ($organization, $ticketModel, $customer, $body, $files) {
                 $message = TicketMessage::create([
                     'organization_id' => $organization->id,
                     'ticket_id' => $ticketModel->id,
