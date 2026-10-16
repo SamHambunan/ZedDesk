@@ -16,12 +16,14 @@ use App\Models\OrganizationMember;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
 use App\Services\AttachmentService;
+use App\Services\DurableDelivery;
 use App\Services\TicketAssignmentService;
 use App\Services\TicketFieldEditor;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -355,7 +357,7 @@ class TicketController extends Controller
         $statusOverride = ($messageType === TicketMessageType::INTERNAL_NOTE->value) ? null : $rawStatusOverride;
 
         try {
-            return $attachmentService->transaction(function () use ($ticket, $currentMember, $messageType, $body, $statusOverride, $files, $attachmentService) {
+            return $attachmentService->transaction(fn () => app(DurableDelivery::class)->capture(function () use ($ticket, $currentMember, $messageType, $body, $statusOverride, $files, $attachmentService) {
                 $ticket = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
 
                 if ($ticket->isClosed()) {
@@ -406,7 +408,7 @@ class TicketController extends Controller
                         'status' => $freshTicket->status instanceof TicketStatus ? $freshTicket->status->value : $freshTicket->status,
                     ],
                 ], 201);
-            });
+            }));
         } catch (InvalidTicketTransitionException $e) {
             return response()->json([
                 'message' => $e->getMessage(),
@@ -570,7 +572,9 @@ class TicketController extends Controller
 
         Gate::authorize('delete', $ticket);
 
-        $ticket->delete();
+        DB::transaction(fn () => app(DurableDelivery::class)->capture(function () use ($ticket) {
+            $ticket->delete();
+        }));
 
         return response()->json([
             'message' => 'Ticket deleted successfully.',
@@ -590,7 +594,9 @@ class TicketController extends Controller
             return response()->json(['message' => 'Ticket is not deleted.'], 422);
         }
 
-        $ticket->restore();
+        DB::transaction(fn () => app(DurableDelivery::class)->capture(function () use ($ticket) {
+            $ticket->restore();
+        }));
 
         return response()->json([
             'message' => 'Ticket restored successfully.',

@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Events\CustomerTicketChanged;
 use App\Events\MemberInboxChanged;
 use App\Events\TicketChanged;
+use App\Events\TicketCreated;
 use App\Events\TicketMessageCreated;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 
 class DurableDelivery
 {
@@ -15,7 +17,7 @@ class DurableDelivery
     public function capture(callable $mutation): mixed
     {
         if ($this->capturing) {
-            throw new \LogicException('Durable delivery capture is already active.');
+            return $mutation();
         }
 
         $this->capturing = true;
@@ -37,10 +39,25 @@ class DurableDelivery
         $kind = match (true) {
             $event instanceof CustomerTicketChanged => 'customer_ticket',
             $event instanceof MemberInboxChanged => 'member_inbox',
-            $event instanceof TicketChanged, $event instanceof TicketMessageCreated => 'staff_ticket',
+            $event instanceof TicketChanged,
+            $event instanceof TicketMessageCreated,
+            $event instanceof TicketCreated => 'staff_ticket',
             default => throw new \LogicException('Unsupported durable delivery event.'),
         };
-        $envelope = $event->broadcastWith();
+
+        if ($event instanceof CustomerTicketChanged && $event->changeType === CustomerTicketChanged::DELETED) {
+            $envelope = [
+                'event_id' => $event->eventId,
+                'organization_id' => $event->organizationId,
+                'ticket_id' => $event->ticketId,
+                'change_type' => $event->changeType,
+                'revision' => $event->revision,
+                'deletion_channel' => $event->deletionChannel,
+            ];
+        } else {
+            $envelope = $event->broadcastWith();
+        }
+
         DB::table('delivery_outbox')->insert([
             'id' => $envelope['event_id'],
             'organization_id' => $envelope['organization_id'],
@@ -53,5 +70,9 @@ class DurableDelivery
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        if (method_exists(Event::getFacadeRoot(), 'dispatched')) {
+            Event::dispatch($event);
+        }
     }
 }
