@@ -20,7 +20,6 @@ use App\Services\CustomerTokenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerPortalController extends Controller
@@ -61,7 +60,7 @@ class CustomerPortalController extends Controller
             ], 422);
         }
 
-        return DB::transaction(function () use ($organization, $validated, $files, $request) {
+        return $this->attachmentService->transaction(function () use ($organization, $validated, $files, $request) {
             // Find or create customer
             $customer = $this->findOrCreateCustomer->execute([
                 'name' => $validated['name'],
@@ -241,7 +240,7 @@ class CustomerPortalController extends Controller
         }
 
         try {
-            return DB::transaction(function () use ($organization, $ticketModel, $customer, $body, $files) {
+            return $this->attachmentService->transaction(function () use ($organization, $ticketModel, $customer, $body, $files) {
                 $message = TicketMessage::create([
                     'organization_id' => $organization->id,
                     'ticket_id' => $ticketModel->id,
