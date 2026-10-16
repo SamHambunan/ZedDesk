@@ -7,6 +7,7 @@ use App\Models\OrganizationMember;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Services\OutboxDispatcher;
+use App\Services\OutboxFailure;
 use App\Services\OutboxPublisher;
 use Illuminate\Contracts\Broadcasting\Broadcaster;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -182,7 +183,7 @@ test('infrastructure outages retry indefinitely with maximum 60-second backoff a
         $signalId = insertOutboxRecord($org->id, $ticket->id);
         $signal = DB::table('delivery_outbox')->where('id', $signalId)->first();
 
-        $failure = app(\App\Services\OutboxFailure::class);
+        $failure = app(OutboxFailure::class);
 
         // Simulate 8 consecutive infrastructure failures (e.g. Redis/Reverb/DB outages)
         for ($attempt = 1; $attempt <= 8; $attempt++) {
@@ -215,7 +216,7 @@ test('non-transient failures back off and quarantine strictly on the fifth attem
     $signalId = insertOutboxRecord($org->id, $ticket->id);
     $signal = DB::table('delivery_outbox')->where('id', $signalId)->first();
 
-    $failure = app(\App\Services\OutboxFailure::class);
+    $failure = app(OutboxFailure::class);
 
     for ($attempt = 1; $attempt <= 4; $attempt++) {
         $error = new InvalidArgumentException("Schema mismatch attempt {$attempt}");
@@ -498,7 +499,7 @@ test('pending work resumes publication within recovery target of sixty seconds a
         $signal = DB::table('delivery_outbox')->where('id', $signalId)->first();
 
         // Record an infrastructure failure with max backoff
-        $failure = app(\App\Services\OutboxFailure::class);
+        $failure = app(OutboxFailure::class);
         $failure->record($signal, new RuntimeException('Connection dropped'), true);
 
         $failingSignal = DB::table('delivery_outbox')->where('id', $signalId)->first();
@@ -519,7 +520,3 @@ test('pending work resumes publication within recovery target of sixty seconds a
         Carbon::setTestNow();
     }
 });
-
-
-
-

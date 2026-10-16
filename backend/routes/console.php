@@ -2,6 +2,7 @@
 
 use App\Services\OrphanAttachmentCleaner;
 use App\Services\OutboxDispatcher;
+use App\Services\OutboxFailure;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -51,7 +52,7 @@ Artisan::command('delivery:failures {id? : Specific delivery signal ID to inspec
         ->limit(max(1, min(100, (int) $this->option('limit'))))
         ->get(['id', 'organization_id', 'kind', 'ticket_id', 'failures', 'infrastructure_failures', 'last_error', 'quarantined_at']);
 
-    $failureService = app(\App\Services\OutboxFailure::class);
+    $failureService = app(OutboxFailure::class);
     $this->table(['ID', 'Organization', 'Kind', 'Ticket', 'Attempts', 'Error', 'Quarantined'],
         $rows->map(fn ($row) => [
             $row->id, $row->organization_id, $row->kind, $row->ticket_id ?? '-',
@@ -79,6 +80,7 @@ Artisan::command('delivery:inspect {id}', function (string $id) {
         foreach ($data as $key => &$value) {
             if (is_string($key) && preg_match('/(token|secret|password|bearer|auth|key)/i', $key)) {
                 unset($data[$key]);
+
                 continue;
             }
             if (is_array($value)) {
@@ -89,7 +91,7 @@ Artisan::command('delivery:inspect {id}', function (string $id) {
     $sanitizeEnvelope($envelope);
 
     $status = $row->delivered_at ? 'delivered' : ($row->quarantined_at ? 'quarantined' : 'pending');
-    $failureService = app(\App\Services\OutboxFailure::class);
+    $failureService = app(OutboxFailure::class);
 
     $this->info("Delivery Signal Inspection: {$row->id}");
     $this->table(['Field', 'Value'], [
