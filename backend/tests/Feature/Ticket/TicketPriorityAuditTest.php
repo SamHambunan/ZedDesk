@@ -7,7 +7,6 @@ use App\Models\Organization;
 use App\Models\OrganizationMember;
 use App\Models\Ticket;
 use App\Models\User;
-use App\Services\AuditLogWriter;
 use App\Services\CustomerTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -53,9 +52,14 @@ test('a successful Priority change has one attributable metadata-only audit reco
 });
 
 test('a required audit failure rolls back the Priority and its revision', function () {
-    $writer = Mockery::mock(AuditLogWriter::class);
-    $writer->shouldReceive('recordPriorityChange')->once()->andThrow(new RuntimeException('audit unavailable'));
-    $this->app->instance(AuditLogWriter::class, $writer);
+    DB::unprepared(<<<'SQL'
+CREATE FUNCTION reject_audit_insert() RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION 'audit storage unavailable';
+END;
+$$ LANGUAGE plpgsql
+SQL);
+    DB::unprepared('CREATE TRIGGER reject_audit_insert BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION reject_audit_insert()');
 
     $this->patchJson($this->priorityUrl, ['priority' => 'high'])->assertStatus(500);
 
@@ -96,6 +100,7 @@ test('history is isolated by Organization and preserves deleted identifiers', fu
     $this->getJson($this->auditUrl)->assertOk()->assertJsonPath('data.0.target_id', $id);
 
     $other = Organization::create(['name' => 'Other', 'slug' => 'other']);
+    $this->getJson('http://other.localhost/api/audit-logs')->assertForbidden();
     OrganizationMember::create(['organization_id' => $other->id, 'user_id' => $this->user->id, 'role' => 'admin']);
     $this->getJson('http://other.localhost/api/audit-logs')->assertOk()->assertJsonCount(0, 'data');
     $this->postJson($this->auditUrl, ['action' => 'forged'])->assertStatus(405);
