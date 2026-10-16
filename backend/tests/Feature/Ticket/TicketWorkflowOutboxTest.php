@@ -304,3 +304,97 @@ test('failed outbox write rolls back the entire ticket mutation', function () {
     expect($ticket->fresh()->priority->value)->toBe('medium')
         ->and(DB::table('delivery_outbox')->where('ticket_id', $ticket->id)->count())->toBe(0);
 });
+
+test('delayed publication broadcasts creation to organization, message to ticket and organization, and inbox to member', function () {
+    [$organization, $customer, $user, $member] = ticketWorkflowFixture();
+
+    $this->postJson('http://acme.localhost/api/portal/tickets', [
+        'name' => 'Customer',
+        'email' => 'customer@acme.test',
+        'subject' => 'Delayed live recovery test',
+        'message' => 'First message',
+    ])->assertCreated();
+
+    $ticket = Ticket::where('organization_id', $organization->id)->first();
+    $creationSignal = DB::table('delivery_outbox')->where('ticket_id', $ticket->id)->where('kind', 'staff_ticket')->first();
+    $inboxSignal = DB::table('delivery_outbox')->where('ticket_id', $ticket->id)->where('kind', 'member_inbox')->first();
+
+    // 1. Publish creation signal -> broadcasts 'ticket.changed' to OrganizationLiveChannel only
+    $broadcaster = Mockery::mock(Broadcaster::class);
+    $broadcaster->shouldReceive('broadcast')->once()->withArgs(function ($channels, $event, $payload) use ($organization) {
+        return $event === 'ticket.changed'
+            && count($channels) === 1
+            && str_contains((string) $channels[0], 'organization.'.$organization->id)
+            && ($payload['change_type'] ?? null) === 'created';
+    });
+    Broadcast::shouldReceive('connection')->once()->with('reverb')->andReturn($broadcaster);
+
+    $token1 = (string) Str::uuid();
+    DB::table('delivery_outbox')->where('id', $creationSignal->id)->update([
+        'reservation_token' => $token1,
+        'reserved_until' => now()->addMinutes(1),
+    ]);
+    app(OutboxPublisher::class)->publish($creationSignal->id, $token1);
+    expect(DB::table('delivery_outbox')->where('id', $creationSignal->id)->value('delivered_at'))->not->toBeNull();
+
+    // 2. Publish inbox signal -> broadcasts 'inbox.changed' to MemberNotificationChannel
+    $broadcaster2 = Mockery::mock(Broadcaster::class);
+    $broadcaster2->shouldReceive('broadcast')->once()->withArgs(function ($channels, $event, $payload) use ($organization, $member) {
+        return $event === 'inbox.changed'
+            && count($channels) === 1
+            && str_contains((string) $channels[0], 'private-organization.'.$organization->id.'.member.'.$member->id);
+    });
+    Broadcast::shouldReceive('connection')->once()->with('reverb')->andReturn($broadcaster2);
+
+    $token2 = (string) Str::uuid();
+    DB::table('delivery_outbox')->where('id', $inboxSignal->id)->update([
+        'reservation_token' => $token2,
+        'reserved_until' => now()->addMinutes(1),
+    ]);
+    app(OutboxPublisher::class)->publish($inboxSignal->id, $token2);
+    expect(DB::table('delivery_outbox')->where('id', $inboxSignal->id)->value('delivered_at'))->not->toBeNull();
+});
+
+test('failed background publication never changes a committed mutation into an error', function () {
+    [$organization, $customer, $user, $member] = ticketWorkflowFixture();
+    $ticket = Ticket::create(['organization_id' => $organization->id, 'customer_id' => $customer->id, 'subject' => 'Committed mutation']);
+
+    Sanctum::actingAs($user);
+
+    // HTTP mutation succeeds even if publication later fails
+    $this->postJson("http://acme.localhost/api/tickets/{$ticket->id}/messages", [
+        'message_type' => 'public_reply',
+        'body' => 'Public response',
+    ])->assertCreated();
+
+    expect(DB::table('ticket_messages')->where('ticket_id', $ticket->id)->count())->toBe(1);
+
+    // Now simulate background publication failure
+    $currentRevision = $ticket->fresh()->revision;
+    $signal = DB::table('delivery_outbox')
+        ->where('ticket_id', $ticket->id)
+        ->where('kind', 'staff_ticket')
+        ->get()
+        ->first(fn ($s) => json_decode($s->envelope, true)['revision'] === $currentRevision);
+    expect($signal)->not->toBeNull();
+
+    $token = (string) Str::uuid();
+    DB::table('delivery_outbox')->where('id', $signal->id)->update([
+        'reservation_token' => $token,
+        'reserved_until' => now()->addMinutes(1),
+    ]);
+
+    $broadcaster = Mockery::mock(Broadcaster::class);
+    $broadcaster->shouldReceive('broadcast')->andThrow(new RuntimeException('Reverb connection timeout'));
+    Broadcast::shouldReceive('connection')->with('reverb')->andReturn($broadcaster);
+
+    // Background publisher records failure without throwing or affecting committed message
+    app(OutboxPublisher::class)->publish($signal->id, $token);
+
+    $freshSignal = DB::table('delivery_outbox')->where('id', $signal->id)->first();
+    expect($freshSignal->delivered_at)->toBeNull()
+        ->and($freshSignal->last_error)->toContain('RuntimeException');
+
+    // The message is still committed in the database and HTTP 201 response was unaffected
+    expect(DB::table('ticket_messages')->where('ticket_id', $ticket->id)->count())->toBe(1);
+});

@@ -33,16 +33,13 @@ class OutboxPublisher
                 $envelope = json_decode($signal->envelope, true, 512, JSON_THROW_ON_ERROR);
                 $channels = $this->channels($signal, $envelope);
                 if ($channels !== []) {
-                    $eventName = match ($signal->kind) {
-                        'member_inbox' => 'inbox.changed',
-                        'customer_ticket' => ($envelope['change_type'] ?? null) === 'deleted'
-                            ? 'ticket.unavailable'
-                            : 'ticket.changed',
+                    $isCustomerDeletion = $signal->kind === 'customer_ticket' && ($envelope['change_type'] ?? null) === 'deleted';
+                    $eventName = match (true) {
+                        $signal->kind === 'member_inbox' => 'inbox.changed',
+                        $isCustomerDeletion => 'ticket.unavailable',
                         default => 'ticket.changed',
                     };
-                    $payload = ($signal->kind === 'customer_ticket' && ($envelope['change_type'] ?? null) === 'deleted')
-                        ? []
-                        : $envelope;
+                    $payload = $isCustomerDeletion ? [] : $envelope;
 
                     try {
                         Broadcast::connection('reverb')->broadcast($channels, $eventName, $payload);
@@ -116,7 +113,7 @@ class OutboxPublisher
             }
 
             if ($envelope['change_type'] === 'deleted') {
-                if (! $ticket->trashed()) {
+                if (! $ticket->trashed() || $this->isObsoleteOrInvalid($ticket, (int) $envelope['revision'])) {
                     return [];
                 }
 
@@ -125,11 +122,8 @@ class OutboxPublisher
                 return [new PrivateChannel($channelName)];
             }
 
-            if ($ticket->trashed() || $ticket->revision > (int) $envelope['revision']) {
+            if ($ticket->trashed() || $this->isObsoleteOrInvalid($ticket, (int) $envelope['revision'])) {
                 return [];
-            }
-            if ($ticket->revision < (int) $envelope['revision']) {
-                throw new InvalidArgumentException('Delivery revision exceeds the Ticket revision.');
             }
 
             return [new PrivateChannel(app(CustomerTicketLiveChannel::class)->name($signal->ticket_id))];
@@ -140,7 +134,7 @@ class OutboxPublisher
         }
 
         if ($envelope['change_type'] === 'deleted') {
-            if (! $ticket->trashed()) {
+            if (! $ticket->trashed() || $this->isObsoleteOrInvalid($ticket, (int) $envelope['revision'])) {
                 return [];
             }
 
@@ -150,11 +144,8 @@ class OutboxPublisher
             ];
         }
 
-        if ($ticket->trashed() || $ticket->revision > (int) $envelope['revision']) {
+        if ($ticket->trashed() || $this->isObsoleteOrInvalid($ticket, (int) $envelope['revision'])) {
             return [];
-        }
-        if ($ticket->revision < (int) $envelope['revision']) {
-            throw new InvalidArgumentException('Delivery revision exceeds the Ticket revision.');
         }
 
         if ($envelope['change_type'] === 'created') {
@@ -167,5 +158,18 @@ class OutboxPublisher
         }
 
         return $channels;
+    }
+
+    private function isObsoleteOrInvalid(Ticket $ticket, int $envelopeRevision): bool
+    {
+        if ($ticket->revision > $envelopeRevision) {
+            return true;
+        }
+
+        if ($ticket->revision < $envelopeRevision) {
+            throw new InvalidArgumentException('Delivery revision exceeds the Ticket revision.');
+        }
+
+        return false;
     }
 }

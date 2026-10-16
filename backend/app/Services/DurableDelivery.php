@@ -9,8 +9,6 @@ use App\Events\TicketCreated;
 use App\Events\TicketMessageCreated;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Testing\Fakes\EventFake;
-use ReflectionMethod;
 
 class DurableDelivery
 {
@@ -73,16 +71,8 @@ class DurableDelivery
             'updated_at' => now(),
         ]);
 
-        $root = Event::getFacadeRoot();
-        if ($root instanceof EventFake) {
-            $name = get_class($event);
-            $shouldFake = new ReflectionMethod($root, 'shouldFakeEvent');
-            $shouldFake->setAccessible(true);
-            if ($shouldFake->invoke($root, $name, [$event])) {
-                $fakeEvent = new ReflectionMethod($root, 'fakeEvent');
-                $fakeEvent->setAccessible(true);
-                $fakeEvent->invoke($root, $event, $name, [$event, []]);
-            }
+        if (method_exists(Event::getFacadeRoot(), 'dispatched')) {
+            Event::dispatch($event);
         }
     }
 }
