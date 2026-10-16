@@ -16,39 +16,176 @@ Artisan::command('delivery:dispatch {--limit=100}', function (OutboxDispatcher $
     $this->info("Dispatched {$count} delivery signals.");
 })->purpose('Enqueue pending durable delivery signals');
 
-Artisan::command('delivery:status', function () {
-    $pending = DB::table('delivery_outbox')->whereNull('delivered_at')->whereNull('quarantined_at');
+Artisan::command('delivery:status {--organization=}', function () {
+    $organizationId = $this->option('organization');
+    $query = DB::table('delivery_outbox');
+    if ($organizationId !== null) {
+        $query->where('organization_id', (int) $organizationId);
+    }
+    $pending = (clone $query)->whereNull('delivered_at')->whereNull('quarantined_at');
     $oldest = (clone $pending)->min('created_at');
     $this->table(['Pending', 'Oldest pending age (seconds)', 'Quarantined'], [[
         $pending->count(),
         $oldest ? now()->diffInSeconds($oldest) : 0,
-        DB::table('delivery_outbox')->whereNotNull('quarantined_at')->count(),
+        (clone $query)->whereNotNull('quarantined_at')->count(),
     ]]);
 })->purpose('Inspect durable delivery backlog');
 
-Artisan::command('delivery:failures {--limit=20}', function () {
-    $rows = DB::table('delivery_outbox')->whereNotNull('quarantined_at')
-        ->orderByDesc('quarantined_at')->limit(max(1, min(100, (int) $this->option('limit'))))
+Artisan::command('delivery:failures {id? : Specific delivery signal ID to inspect} {--organization= : Filter by Organization ID} {--all : Include active non-quarantined failures} {--limit=20 : Maximum records to display}', function () {
+    if ($id = $this->argument('id')) {
+        return $this->call('delivery:inspect', ['id' => $id]);
+    }
+
+    $query = DB::table('delivery_outbox');
+    if ($this->option('all')) {
+        $query->where(fn ($q) => $q->whereNotNull('quarantined_at')->orWhere('failures', '>', 0)->orWhere('infrastructure_failures', '>', 0));
+    } else {
+        $query->whereNotNull('quarantined_at');
+    }
+
+    if ($organization = $this->option('organization')) {
+        $query->where('organization_id', (int) $organization);
+    }
+
+    $rows = $query->orderByDesc('quarantined_at')
+        ->limit(max(1, min(100, (int) $this->option('limit'))))
         ->get(['id', 'organization_id', 'kind', 'ticket_id', 'failures', 'last_error', 'quarantined_at']);
+
+    $failureService = app(\App\Services\OutboxFailure::class);
     $this->table(['ID', 'Organization', 'Kind', 'Ticket', 'Attempts', 'Error', 'Quarantined'],
         $rows->map(fn ($row) => [
             $row->id, $row->organization_id, $row->kind, $row->ticket_id ?? '-',
-            $row->failures, $row->last_error ?? '-', $row->quarantined_at,
+            $row->failures, $row->last_error ? $failureService->sanitizeError($row->last_error) : '-', $row->quarantined_at,
         ])->all());
+
+    return 0;
 })->purpose('List quarantined delivery signals for inspection and retry');
 
-Artisan::command('delivery:retry {id}', function (string $id) {
-    $count = DB::table('delivery_outbox')->where('id', $id)->whereNotNull('quarantined_at')->update([
-        'failures' => 0, 'quarantined_at' => null, 'available_at' => now(),
-        'reservation_token' => null, 'reserved_until' => null, 'updated_at' => now(),
-    ]);
-    $count ? $this->info('Delivery signal scheduled for retry.') : $this->error('Quarantined delivery signal not found.');
+Artisan::command('delivery:inspect {id}', function (string $id) {
+    $row = DB::table('delivery_outbox')->where('id', $id)->first();
+    if (! $row) {
+        $this->error("Delivery signal {$id} not found.");
 
-    return $count ? 0 : 1;
-})->purpose('Retry one quarantined delivery signal');
+        return 1;
+    }
+
+    $envelope = json_decode($row->envelope, true) ?: [];
+    foreach (array_keys($envelope) as $key) {
+        if (preg_match('/(token|secret|password|bearer|auth|key)/i', $key)) {
+            unset($envelope[$key]);
+        }
+    }
+
+    $status = $row->delivered_at ? 'delivered' : ($row->quarantined_at ? 'quarantined' : 'pending');
+    $failureService = app(\App\Services\OutboxFailure::class);
+
+    $this->info("Delivery Signal Inspection: {$row->id}");
+    $this->table(['Field', 'Value'], [
+        ['ID', $row->id],
+        ['Organization ID', $row->organization_id],
+        ['Kind', $row->kind],
+        ['Status', $status],
+        ['Ticket ID', $row->ticket_id ?? '-'],
+        ['Customer ID', $row->customer_id ?? '-'],
+        ['Recipient Member ID', $row->recipient_member_id ?? '-'],
+        ['Non-transient Failures', $row->failures],
+        ['Infrastructure Failures', $row->infrastructure_failures],
+        ['Last Error', $row->last_error ? $failureService->sanitizeError($row->last_error) : '-'],
+        ['Available At', $row->available_at],
+        ['Quarantined At', $row->quarantined_at ?? '-'],
+        ['Delivered At', $row->delivered_at ?? '-'],
+        ['Created At', $row->created_at],
+        ['Updated At', $row->updated_at],
+        ['Envelope (Diagnostics)', json_encode($envelope, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)],
+    ]);
+
+    return 0;
+})->purpose('Inspect a specific durable delivery signal with sanitized diagnostics');
+
+Artisan::command('delivery:retry {id? : The delivery signal ID to retry} {--all : Retry all quarantined delivery signals} {--organization= : Filter by Organization ID when retrying all} {--dispatch : Immediately dispatch after resetting}', function (OutboxDispatcher $dispatcher) {
+    if ($this->option('all')) {
+        $query = DB::table('delivery_outbox')->whereNotNull('quarantined_at');
+        if ($org = $this->option('organization')) {
+            $query->where('organization_id', (int) $org);
+        }
+        $count = $query->update([
+            'failures' => 0,
+            'infrastructure_failures' => 0,
+            'quarantined_at' => null,
+            'available_at' => now(),
+            'reservation_token' => null,
+            'reserved_until' => null,
+            'last_error' => null,
+            'updated_at' => now(),
+        ]);
+        $this->info("Scheduled {$count} quarantined delivery signals for retry.");
+
+        if ($this->option('dispatch')) {
+            $dispatched = $dispatcher->dispatch();
+            $this->info("Dispatched {$dispatched} delivery signals.");
+        }
+
+        return 0;
+    }
+
+    $id = $this->argument('id');
+    if (! $id) {
+        $this->error('Please provide a delivery signal ID or use --all.');
+
+        return 1;
+    }
+
+    $signal = DB::table('delivery_outbox')->where('id', $id)->first();
+    if (! $signal) {
+        $this->error('Delivery signal not found.');
+
+        return 1;
+    }
+
+    if ($signal->delivered_at !== null) {
+        $this->error('Delivery signal is already delivered.');
+
+        return 1;
+    }
+
+    DB::table('delivery_outbox')->where('id', $id)->update([
+        'failures' => 0,
+        'infrastructure_failures' => 0,
+        'quarantined_at' => null,
+        'available_at' => now(),
+        'reservation_token' => null,
+        'reserved_until' => null,
+        'last_error' => null,
+        'updated_at' => now(),
+    ]);
+
+    $this->info('Delivery signal scheduled for retry.');
+
+    if ($this->option('dispatch')) {
+        $dispatched = $dispatcher->dispatch();
+        $this->info("Dispatched {$dispatched} delivery signals.");
+    }
+
+    return 0;
+})->purpose('Retry one or all quarantined delivery signals');
+
+Artisan::command('delivery:clean {--days=7 : Retention threshold in days}', function () {
+    $days = max(1, (int) $this->option('days'));
+    $count = DB::table('delivery_outbox')
+        ->whereNotNull('delivered_at')
+        ->where('delivered_at', '<', now()->subDays($days))
+        ->delete();
+    $this->info("Cleaned {$count} completed delivery records older than {$days} days.");
+
+    return 0;
+})->purpose('Clean up completed delivery records older than retention threshold');
+
+Artisan::command('delivery:prune {--days=7 : Retention threshold in days}', function () {
+    return $this->call('delivery:clean', ['--days' => $this->option('days')]);
+})->purpose('Alias for delivery:clean');
 
 Schedule::command('delivery:dispatch')->everyTenSeconds();
-Schedule::call(fn () => DB::table('delivery_outbox')->where('delivered_at', '<', now()->subDays(7))->delete())->daily();
+Schedule::command('delivery:clean')->daily();
 Artisan::command('attachments:clean-orphans {--organization=}', function (OrphanAttachmentCleaner $cleaner) {
     $organization = $this->option('organization');
     $deleted = $cleaner->clean($organization === null ? null : (int) $organization);
