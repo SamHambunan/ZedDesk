@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\TagCatalogCache;
 use App\Traits\BelongsToOrganization;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -31,6 +32,19 @@ class Tag extends Model
                 $tag->slug = Str::slug($tag->name);
             }
         });
+
+        $invalidateCache = function (Tag $tag): void {
+            if (! empty($tag->organization_id)) {
+                try {
+                    app(TagCatalogCache::class)->invalidate($tag->organization_id);
+                } catch (\Throwable) {
+                    // Safe fallback: committed Tag mutation must not fail if cache invalidation fails
+                }
+            }
+        };
+
+        static::saved($invalidateCache);
+        static::deleted($invalidateCache);
     }
 
     /**
