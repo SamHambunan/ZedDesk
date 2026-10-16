@@ -9,6 +9,7 @@ use App\Models\Ticket;
 use App\Models\User;
 use App\Services\CustomerTokenService;
 use App\Services\OutboxPublisher;
+use Illuminate\Contracts\Broadcasting\Broadcaster;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Broadcast;
@@ -80,7 +81,7 @@ test('publication acknowledges only after broadcast and duplicate execution is h
     $reservation = $signal->reservation_token;
     expect($signal->delivered_at)->toBeNull();
 
-    $broadcaster = Mockery::mock(\Illuminate\Contracts\Broadcasting\Broadcaster::class);
+    $broadcaster = Mockery::mock(Broadcaster::class);
     $broadcaster->shouldReceive('broadcast')->once()->withArgs(function ($channels, $event, $payload) use ($signal) {
         return $event === 'ticket.changed' && $payload['event_id'] === $signal->id
             && count($channels) === 1 && str_contains((string) $channels[0], 'customer.ticket.');
@@ -103,7 +104,7 @@ test('broadcast outage stays pending without exhausting the five permanent failu
     $this->artisan('delivery:dispatch')->assertSuccessful();
     $signal = DB::table('delivery_outbox')->where('kind', 'customer_ticket')->first();
 
-    $broadcaster = Mockery::mock(\Illuminate\Contracts\Broadcasting\Broadcaster::class);
+    $broadcaster = Mockery::mock(Broadcaster::class);
     $broadcaster->shouldReceive('broadcast')->once()->andThrow(new RuntimeException('Reverb unavailable'));
     Broadcast::shouldReceive('connection')->once()->with('reverb')->andReturn($broadcaster);
     app(OutboxPublisher::class)->publish($signal->id, $signal->reservation_token);

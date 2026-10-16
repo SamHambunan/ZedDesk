@@ -9,7 +9,6 @@ use App\Events\TicketStatusChanged;
 use App\Exceptions\InvalidTicketTransitionException;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
-use App\Services\DurableDelivery;
 
 class TicketStateMachine
 {

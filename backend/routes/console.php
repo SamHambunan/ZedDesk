@@ -1,10 +1,10 @@
 <?php
 
+use App\Services\OutboxDispatcher;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
-use App\Services\OutboxDispatcher;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -42,6 +42,7 @@ Artisan::command('delivery:retry {id}', function (string $id) {
         'reservation_token' => null, 'reserved_until' => null, 'updated_at' => now(),
     ]);
     $count ? $this->info('Delivery signal scheduled for retry.') : $this->error('Quarantined delivery signal not found.');
+
     return $count ? 0 : 1;
 })->purpose('Retry one quarantined delivery signal');
 
