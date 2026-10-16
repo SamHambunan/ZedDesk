@@ -150,6 +150,8 @@ return [
         'default' => [
             'url' => env('REDIS_URL'),
             'host' => env('REDIS_HOST', '127.0.0.1'),
+            'timeout' => (float) env('REDIS_CONNECT_TIMEOUT', 1.0),
+            'read_timeout' => (float) env('REDIS_READ_TIMEOUT', 1.0),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),

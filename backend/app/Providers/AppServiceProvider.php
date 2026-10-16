@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Broadcasting\PresenceChannelManager;
+use App\Contracts\RateLimitStore;
 use App\Models\Customer;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
@@ -13,6 +14,7 @@ use App\Services\DurableDelivery;
 use App\Services\MemberNotificationChannel;
 use App\Services\OrganizationLiveChannel;
 use App\Services\OrganizationPresenceChannel;
+use App\Services\PostgresRateLimitStore;
 use App\Services\TicketLiveChannel;
 use App\Services\TicketViewingPresenceChannel;
 use Illuminate\Support\Facades\Broadcast;
@@ -29,6 +31,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(ChannelManager::class, PresenceChannelManager::class);
         $this->app->singleton(DurableDelivery::class);
+        $this->app->bind(RateLimitStore::class, PostgresRateLimitStore::class);
     }
 
     /**
