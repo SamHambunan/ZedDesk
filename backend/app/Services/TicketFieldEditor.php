@@ -5,12 +5,13 @@ namespace App\Services;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Models\Ticket;
+use App\Models\User;
 use Closure;
 use Illuminate\Support\Facades\DB;
 
 class TicketFieldEditor
 {
-    public function __construct(private TicketStateMachine $stateMachine) {}
+    public function __construct(private TicketStateMachine $stateMachine, private AuditLogWriter $auditLogWriter) {}
 
     public function updateStatus(Ticket $ticket, string $status, ?int $expectedRevision): ?array
     {
@@ -18,10 +19,16 @@ class TicketFieldEditor
             fn (Ticket $current) => $this->stateMachine->transitionTo($current, $status));
     }
 
-    public function updatePriority(Ticket $ticket, string $priority, ?int $expectedRevision): ?array
+    public function updatePriority(Ticket $ticket, string $priority, ?int $expectedRevision, User $actor): ?array
     {
         return $this->apply($ticket, 'priority', $expectedRevision,
-            fn (Ticket $current) => $current->updatePriority($priority));
+            function (Ticket $current) use ($priority, $actor) {
+                $old = $current->priority;
+                $current->updatePriority($priority);
+                if ($current->priority !== $old) {
+                    $this->auditLogWriter->recordPriorityChange($current, $actor, $old, $current->priority);
+                }
+            });
     }
 
     /**
