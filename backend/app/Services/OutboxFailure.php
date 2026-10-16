@@ -55,16 +55,16 @@ class OutboxFailure
     public function sanitizeError(Throwable|string $error): string
     {
         if (is_string($error)) {
-            return Str::limit($this->sanitizeMessage($error), 255);
+            return mb_substr(Str::limit($this->sanitizeMessage($error), 252, '...'), 0, 255);
         }
 
         $class = class_basename($error);
         $message = trim($error->getMessage());
         if ($message === '' || $message === $class) {
-            return $class;
+            return mb_substr($class, 0, 255);
         }
 
-        return Str::limit($class.': '.$this->sanitizeMessage($message), 255);
+        return mb_substr(Str::limit($class.': '.$this->sanitizeMessage($message), 252, '...'), 0, 255);
     }
 
     public function sanitizeMessage(string $message): string

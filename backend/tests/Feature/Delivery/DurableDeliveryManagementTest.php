@@ -1,6 +1,7 @@
 <?php
 
 use App\Context\OrganizationContext;
+use App\Jobs\PublishOutboxSignal;
 use App\Models\Customer;
 use App\Models\Organization;
 use App\Models\OrganizationMember;
@@ -15,6 +16,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
@@ -417,6 +419,8 @@ test('cleanup prunes completed delivery records older than seven days and never 
 });
 
 test('abandoned reservation recovers with a new token after process crash and invalidates previous token', function () {
+    Queue::fake([PublishOutboxSignal::class]);
+
     [$org, , $ticket] = deliveryTestFixture('acme');
     $signalId = insertOutboxRecord($org->id, $ticket->id);
 
@@ -492,6 +496,7 @@ test('process restart after partial publication safely resumes and completes wit
 });
 
 test('pending work resumes publication within recovery target of sixty seconds after infrastructure heals', function () {
+    Queue::fake([PublishOutboxSignal::class]);
     Carbon::setTestNow(now());
     try {
         [$org, , $ticket] = deliveryTestFixture('acme');
@@ -519,4 +524,19 @@ test('pending work resumes publication within recovery target of sixty seconds a
     } finally {
         Carbon::setTestNow();
     }
+});
+
+test('outbox failure sanitization truncates long errors to fit within database schema limits', function () {
+    [$org, , $ticket] = deliveryTestFixture('acme');
+    $signalId = insertOutboxRecord($org->id, $ticket->id);
+    $signal = DB::table('delivery_outbox')->where('id', $signalId)->first();
+
+    $failure = app(OutboxFailure::class);
+    $longError = new RuntimeException(str_repeat('Very long network connection timeout message with token=super_secret_token ', 10));
+    $failure->record($signal, $longError, true);
+
+    $updated = DB::table('delivery_outbox')->where('id', $signalId)->first();
+    expect(strlen($updated->last_error))->toBeLessThanOrEqual(255)
+        ->and($updated->last_error)->not->toContain('super_secret_token')
+        ->and($updated->last_error)->toContain('RuntimeException');
 });
