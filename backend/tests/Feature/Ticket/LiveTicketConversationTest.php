@@ -13,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 
@@ -148,15 +149,17 @@ test('Customer Public Reply with an attachment signals staff and REST recovers t
         'attachments' => [UploadedFile::fake()->create('screenshot.png', 10, 'image/png')],
     ], ['X-Customer-Token' => $token, 'Accept' => 'application/json'])->assertCreated();
 
-    Event::assertDispatchedTimes(TicketMessageCreated::class, 1);
-    $event = Event::dispatched(TicketMessageCreated::class)[0][0];
-    expect($event->broadcastWith()['revision'])->toBeGreaterThan($before)
-        ->and($event->broadcastWith()['ticket_id'])->toBe($this->ticket->id);
+    $signal = DB::table('delivery_outbox')->where('ticket_id', $this->ticket->id)
+        ->where('kind', 'staff_ticket')->where('envelope->change_type', 'message_created')->first();
+    expect($signal)->not->toBeNull();
+    $envelope = json_decode($signal->envelope, true);
+    expect($envelope['revision'])->toBeGreaterThan($before)
+        ->and($envelope['ticket_id'])->toBe($this->ticket->id);
 
     Sanctum::actingAs($this->user);
     $this->getJson("http://acme.localhost/api/tickets/{$this->ticket->id}")
         ->assertOk()
-        ->assertJsonPath('ticket.revision', $event->broadcastWith()['revision'])
+        ->assertJsonPath('ticket.revision', $envelope['revision'])
         ->assertJsonFragment(['body' => 'Customer update']);
 });
 

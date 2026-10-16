@@ -9,6 +9,7 @@ use App\Events\TicketStatusChanged;
 use App\Exceptions\InvalidTicketTransitionException;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
+use App\Services\DurableDelivery;
 
 class TicketStateMachine
 {
@@ -97,8 +98,8 @@ class TicketStateMachine
             TicketStatus::from($currentValue),
             TicketStatus::from($targetValue)
         );
-        TicketChanged::dispatch($ticket, TicketChanged::STATUS_CHANGED);
-        CustomerTicketChanged::dispatch($ticket, CustomerTicketChanged::STATUS_CHANGED);
+        app(DurableDelivery::class)->signal(new TicketChanged($ticket, TicketChanged::STATUS_CHANGED));
+        app(DurableDelivery::class)->signal(new CustomerTicketChanged($ticket, CustomerTicketChanged::STATUS_CHANGED));
 
         return $ticket;
     }

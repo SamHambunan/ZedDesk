@@ -103,7 +103,7 @@ class TicketNotificationService
                     json_encode((object) $metadata, JSON_THROW_ON_ERROR), $now, $now, $now]
             );
 
-            MemberInboxChanged::dispatch((int) $ticket->organization_id, (int) $memberId);
+            app(DurableDelivery::class)->signal(new MemberInboxChanged((int) $ticket->organization_id, (int) $memberId), $ticket->id);
         }
     }
 }

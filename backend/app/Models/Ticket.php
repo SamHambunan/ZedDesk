@@ -12,6 +12,7 @@ use App\Events\TicketCreated;
 use App\Events\TicketMessageCreated;
 use App\Exceptions\InvalidTicketTransitionException;
 use App\Services\TicketNotificationService;
+use App\Services\DurableDelivery;
 use App\Services\TicketNumberGenerator;
 use App\Traits\BelongsToOrganization;
 use DomainException;
@@ -171,9 +172,9 @@ class Ticket extends Model
         DB::table('tickets')->where('id', $this->id)->update(['updated_at' => now()]);
         $this->refresh();
         app(TicketNotificationService::class)->conversationChanged($this, $message);
-        TicketMessageCreated::dispatch($message, $this);
+        app(DurableDelivery::class)->signal(new TicketMessageCreated($message, $this));
         if ($message->isPublicReply()) {
-            CustomerTicketChanged::dispatch($this, CustomerTicketChanged::MESSAGE_CREATED);
+            app(DurableDelivery::class)->signal(new CustomerTicketChanged($this, CustomerTicketChanged::MESSAGE_CREATED));
         }
 
         return $this;
