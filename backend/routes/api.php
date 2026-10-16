@@ -2,6 +2,7 @@
 
 use App\Context\OrganizationContext;
 use App\Http\Controllers\Api\AttachmentController;
+use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerPortalController;
 use App\Http\Controllers\Api\InvitationController;
@@ -66,6 +67,7 @@ Route::get('/invitations/{token}', [InvitationController::class, 'show']);
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept']);
 
 Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(function () {
+    Route::get('/audit-logs', [AuditLogController::class, 'index']);
     Route::get('/live/presence-channel', function (OrganizationPresenceChannel $channels) {
         return response()->json([
             'channel' => 'presence-'.$channels->name(OrganizationContext::getCurrentId()),

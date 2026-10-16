@@ -30,7 +30,8 @@ class TicketPriorityController extends Controller
 
         try {
             $conflict = $fieldEditor->updatePriority($ticket, $validated['priority'],
-                isset($validated['expected_priority_revision']) ? (int) $validated['expected_priority_revision'] : null);
+                isset($validated['expected_priority_revision']) ? (int) $validated['expected_priority_revision'] : null,
+                $request->user());
         } catch (InvalidTicketTransitionException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
