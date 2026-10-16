@@ -8,6 +8,7 @@ use App\Models\Ticket;
 use App\Models\TicketAttachment;
 use App\Models\TicketMessage;
 use App\Services\AttachmentService;
+use App\Services\AuditLogWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -37,7 +38,12 @@ class AttachmentController extends Controller
         ]);
 
         try {
-            $attachment = $service->store($request->file('file'), $message);
+            $attachment = $service->transaction(function () use ($service, $request, $ticket, $message) {
+                $attachment = $service->store($request->file('file'), $message);
+                app(AuditLogWriter::class)->recordAttachmentCreated($ticket, $request->user(), $attachment, $message);
+
+                return $attachment;
+            });
         } catch (InvalidAttachmentException $e) {
             return response()->json([
                 'message' => $e->getMessage(),

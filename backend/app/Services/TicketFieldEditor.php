@@ -13,10 +13,16 @@ class TicketFieldEditor
 {
     public function __construct(private TicketStateMachine $stateMachine, private AuditLogWriter $auditLogWriter) {}
 
-    public function updateStatus(Ticket $ticket, string $status, ?int $expectedRevision): ?array
+    public function updateStatus(Ticket $ticket, string $status, ?int $expectedRevision, ?User $actor = null): ?array
     {
         return $this->apply($ticket, 'status', $expectedRevision,
-            fn (Ticket $current) => $this->stateMachine->transitionTo($current, $status));
+            function (Ticket $current) use ($status, $actor) {
+                $old = $current->status;
+                $this->stateMachine->transitionTo($current, $status);
+                if ($actor && $current->status !== $old) {
+                    $this->auditLogWriter->recordStatusChange($current, $actor, $old, $current->status);
+                }
+            });
     }
 
     public function updatePriority(Ticket $ticket, string $priority, ?int $expectedRevision, User $actor): ?array

@@ -20,8 +20,11 @@ class TicketAssignmentService
 {
     public function __construct(
         protected TicketStateMachine $stateMachine,
-        protected TicketNotificationService $notifications
-    ) {}
+        protected TicketNotificationService $notifications,
+        protected ?AuditLogWriter $auditLogWriter = null
+    ) {
+        $this->auditLogWriter = $auditLogWriter ?? app(AuditLogWriter::class);
+    }
 
     /**
      * Assign a ticket to a team, an organization member, or both.
@@ -97,6 +100,14 @@ class TicketAssignmentService
 
             if ($previousTeamId !== $current->assigned_team_id || $previousMemberId !== $current->assigned_member_id) {
                 $this->notifications->assignmentChanged($current, $previousTeamId, $previousMemberId, $assignedByModel?->id);
+                $this->auditLogWriter->recordAssignment(
+                    $current,
+                    $assignedByModel ?? auth()->user(),
+                    $previousTeamId,
+                    $current->assigned_team_id,
+                    $previousMemberId,
+                    $current->assigned_member_id
+                );
             }
 
             TicketAssigned::dispatch($current, $assignment);
@@ -173,6 +184,13 @@ class TicketAssignmentService
             ]);
 
             $this->notifications->assignmentChanged($current, $previousTeamId, null, $memberModel->id);
+            $this->auditLogWriter->recordClaim(
+                $current,
+                $memberModel,
+                $previousTeamId,
+                $current->assigned_team_id,
+                $memberModel->id
+            );
 
             TicketAssigned::dispatch($current, $assignment);
             TicketChanged::dispatch($current, TicketChanged::ASSIGNMENT_CHANGED);

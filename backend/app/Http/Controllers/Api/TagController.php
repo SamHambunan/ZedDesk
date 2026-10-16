@@ -7,9 +7,11 @@ use App\Exceptions\InvalidTicketTransitionException;
 use App\Http\Controllers\Controller;
 use App\Models\Tag;
 use App\Models\Ticket;
+use App\Services\AuditLogWriter;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -95,7 +97,10 @@ class TagController extends Controller
         ]);
 
         try {
-            $ticket->attachTag($validated['tag_id']);
+            DB::transaction(function () use ($ticket, $validated, $request) {
+                $ticket->attachTag($validated['tag_id']);
+                app(AuditLogWriter::class)->recordTagAttached($ticket, $request->user(), $validated['tag_id']);
+            });
         } catch (DomainException|InvalidTicketTransitionException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -108,14 +113,17 @@ class TagController extends Controller
     /**
      * Detach a tag from a ticket.
      */
-    public function detachFromTicket(string $ticketId, string $tagId): JsonResponse
+    public function detachFromTicket(Request $request, string $ticketId, string $tagId): JsonResponse
     {
         $ticket = Ticket::findOrFail($ticketId);
 
         Gate::authorize('update', $ticket);
 
         try {
-            $ticket->detachTag($tagId);
+            DB::transaction(function () use ($ticket, $tagId, $request) {
+                $ticket->detachTag($tagId);
+                app(AuditLogWriter::class)->recordTagDetached($ticket, $request->user(), $tagId);
+            });
         } catch (DomainException|InvalidTicketTransitionException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

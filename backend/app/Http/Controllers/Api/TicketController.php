@@ -16,12 +16,14 @@ use App\Models\OrganizationMember;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
 use App\Services\AttachmentService;
+use App\Services\AuditLogWriter;
 use App\Services\TicketAssignmentService;
 use App\Services\TicketFieldEditor;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -388,6 +390,12 @@ class TicketController extends Controller
 
                 $freshTicket = $ticket->recordConversationChange($message);
 
+                if ($messageType === TicketMessageType::INTERNAL_NOTE->value) {
+                    app(AuditLogWriter::class)->recordInternalNote($ticket, $currentMember, $message);
+                } else {
+                    app(AuditLogWriter::class)->recordPublicReply($ticket, $currentMember, $message);
+                }
+
                 return response()->json([
                     'message' => 'Ticket message created successfully.',
                     'data' => [
@@ -542,8 +550,12 @@ class TicketController extends Controller
         ]);
 
         try {
-            $conflict = $fieldEditor->updateStatus($ticket, $validated['status'],
-                isset($validated['expected_status_revision']) ? (int) $validated['expected_status_revision'] : null);
+            $conflict = $fieldEditor->updateStatus(
+                $ticket,
+                $validated['status'],
+                isset($validated['expected_status_revision']) ? (int) $validated['expected_status_revision'] : null,
+                $request->user()
+            );
         } catch (InvalidTicketTransitionException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -564,13 +576,16 @@ class TicketController extends Controller
     /**
      * Soft-delete a ticket (restricted to Admins).
      */
-    public function destroy(string $ticketId): JsonResponse
+    public function destroy(Request $request, string $ticketId): JsonResponse
     {
         $ticket = Ticket::findOrFail($ticketId);
 
         Gate::authorize('delete', $ticket);
 
-        $ticket->delete();
+        DB::transaction(function () use ($ticket, $request) {
+            $ticket->delete();
+            app(AuditLogWriter::class)->recordSoftDelete($ticket, $request->user());
+        });
 
         return response()->json([
             'message' => 'Ticket deleted successfully.',
@@ -580,7 +595,7 @@ class TicketController extends Controller
     /**
      * Restore a soft-deleted ticket (restricted to Admins).
      */
-    public function restore(string $ticketId): JsonResponse
+    public function restore(Request $request, string $ticketId): JsonResponse
     {
         $ticket = Ticket::withTrashed()->findOrFail($ticketId);
 
@@ -590,7 +605,10 @@ class TicketController extends Controller
             return response()->json(['message' => 'Ticket is not deleted.'], 422);
         }
 
-        $ticket->restore();
+        DB::transaction(function () use ($ticket, $request) {
+            $ticket->restore();
+            app(AuditLogWriter::class)->recordRestore($ticket, $request->user());
+        });
 
         return response()->json([
             'message' => 'Ticket restored successfully.',
