@@ -56,3 +56,4 @@ Artisan::command('attachments:clean-orphans {--organization=}', function (Orphan
 })->purpose('Remove abandoned private attachment files after a one-hour grace period');
 
 Schedule::command('attachments:clean-orphans')->hourly()->withoutOverlapping();
+Schedule::call(fn () => DB::table('rate_limit_windows')->where('window_start', '<', now()->subHours(2)->timestamp)->delete())->daily();

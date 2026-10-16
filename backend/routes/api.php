@@ -55,7 +55,7 @@ Route::get('/health', function () {
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'limit.authenticated:global'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/organizations', [OrganizationController::class, 'index']);
     Route::post('/organizations', [OrganizationController::class, 'store']);
@@ -66,7 +66,7 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::get('/invitations/{token}', [InvitationController::class, 'show']);
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept']);
 
-Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(function () {
+Route::middleware(['auth:sanctum', 'ensure.organization_member', 'limit.authenticated:member'])->group(function () {
     Route::get('/audit-logs', [AuditLogController::class, 'index']);
     Route::get('/live/presence-channel', function (OrganizationPresenceChannel $channels) {
         return response()->json([
@@ -138,7 +138,7 @@ Route::middleware(['auth:sanctum', 'ensure.organization_member'])->group(functio
 
 Route::post('/broadcasting/auth', function (Request $request) {
     return Broadcast::auth($request);
-})->middleware('auth:sanctum');
+})->middleware(['auth:sanctum', 'limit.authenticated:global']);
 
 Route::prefix('portal')->group(function () {
     Route::post('/tickets', [CustomerPortalController::class, 'store']);
