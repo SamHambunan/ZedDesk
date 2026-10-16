@@ -25,6 +25,17 @@ Artisan::command('delivery:status', function () {
     ]]);
 })->purpose('Inspect durable delivery backlog');
 
+Artisan::command('delivery:failures {--limit=20}', function () {
+    $rows = DB::table('delivery_outbox')->whereNotNull('quarantined_at')
+        ->orderByDesc('quarantined_at')->limit(max(1, min(100, (int) $this->option('limit'))))
+        ->get(['id', 'organization_id', 'kind', 'ticket_id', 'failures', 'last_error', 'quarantined_at']);
+    $this->table(['ID', 'Organization', 'Kind', 'Ticket', 'Attempts', 'Error', 'Quarantined'],
+        $rows->map(fn ($row) => [
+            $row->id, $row->organization_id, $row->kind, $row->ticket_id ?? '-',
+            $row->failures, $row->last_error ?? '-', $row->quarantined_at,
+        ])->all());
+})->purpose('List quarantined delivery signals for inspection and retry');
+
 Artisan::command('delivery:retry {id}', function (string $id) {
     $count = DB::table('delivery_outbox')->where('id', $id)->whereNotNull('quarantined_at')->update([
         'failures' => 0, 'quarantined_at' => null, 'available_at' => now(),
@@ -34,5 +45,5 @@ Artisan::command('delivery:retry {id}', function (string $id) {
     return $count ? 0 : 1;
 })->purpose('Retry one quarantined delivery signal');
 
-Schedule::command('delivery:dispatch')->everyTenSeconds()->withoutOverlapping();
+Schedule::command('delivery:dispatch')->everyTenSeconds();
 Schedule::call(fn () => DB::table('delivery_outbox')->where('delivered_at', '<', now()->subDays(7))->delete())->daily();

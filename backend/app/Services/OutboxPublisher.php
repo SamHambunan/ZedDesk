@@ -37,7 +37,7 @@ class OutboxPublisher
                     try {
                         Broadcast::connection('reverb')->broadcast($channels, $eventName, $envelope);
                     } catch (Throwable $error) {
-                        $this->failed($signal, $error, true);
+                        app(OutboxFailure::class)->record($signal, $error, true);
 
                         return;
                     }
@@ -52,7 +52,8 @@ class OutboxPublisher
                         'updated_at' => now(),
                     ]);
             } catch (Throwable $error) {
-                $this->failed($signal, $error, false);
+                $failure = app(OutboxFailure::class);
+                $failure->record($signal, $error, $failure->isInfrastructure($error));
             }
         } finally {
             OrganizationContext::clear();
@@ -101,6 +102,11 @@ class OutboxPublisher
             if (! $signal->customer_id || (string) $ticket->customer_id !== (string) $signal->customer_id) {
                 return [];
             }
+            $customerExists = DB::table('customers')->where('id', $signal->customer_id)
+                ->where('organization_id', $signal->organization_id)->exists();
+            if (! $customerExists) {
+                return [];
+            }
 
             return [new PrivateChannel(app(CustomerTicketLiveChannel::class)->name($signal->ticket_id))];
         }
@@ -113,20 +119,5 @@ class OutboxPublisher
         }
 
         return $channels;
-    }
-
-    private function failed(object $signal, Throwable $error, bool $infrastructure): void
-    {
-        $count = ($infrastructure ? $signal->infrastructure_failures : $signal->failures) + 1;
-        DB::table('delivery_outbox')->where('id', $signal->id)
-            ->where('reservation_token', $signal->reservation_token)->update([
-                'reservation_token' => null,
-                'reserved_until' => null,
-                $infrastructure ? 'infrastructure_failures' : 'failures' => $count,
-                'available_at' => now()->addSeconds(min(2 ** min($count, 5), 30)),
-                'quarantined_at' => ! $infrastructure && $count >= 5 ? now() : null,
-                'last_error' => class_basename($error),
-                'updated_at' => now(),
-            ]);
     }
 }

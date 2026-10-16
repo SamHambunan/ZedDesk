@@ -19,8 +19,8 @@ return new class extends Migration
             $table->timestamp('available_at')->index();
             $table->uuid('reservation_token')->nullable();
             $table->timestamp('reserved_until')->nullable();
-            $table->unsignedSmallInteger('failures')->default(0);
-            $table->unsignedSmallInteger('infrastructure_failures')->default(0);
+            $table->unsignedInteger('failures')->default(0);
+            $table->unsignedInteger('infrastructure_failures')->default(0);
             $table->string('last_error')->nullable();
             $table->timestamp('delivered_at')->nullable();
             $table->timestamp('quarantined_at')->nullable();

@@ -41,16 +41,7 @@ class OutboxDispatcher
                 PublishOutboxSignal::dispatch($signal->id, $signal->reservation_token);
                 $dispatched++;
             } catch (Throwable $error) {
-                $failures = $signal->infrastructure_failures + 1;
-                DB::table('delivery_outbox')->where('id', $signal->id)
-                    ->where('reservation_token', $signal->reservation_token)->update([
-                        'reservation_token' => null,
-                        'reserved_until' => null,
-                        'infrastructure_failures' => $failures,
-                        'available_at' => now()->addSeconds(min(2 ** min($failures, 5), 30)),
-                        'last_error' => class_basename($error),
-                        'updated_at' => now(),
-                    ]);
+                app(OutboxFailure::class)->record($signal, $error, true);
                 break;
             }
         }

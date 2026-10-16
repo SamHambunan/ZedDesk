@@ -1,31 +1,42 @@
 <?php
 
 use App\Context\OrganizationContext;
+use App\Jobs\PublishOutboxSignal;
 use App\Models\Customer;
 use App\Models\Organization;
 use App\Models\OrganizationMember;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Services\CustomerTokenService;
+use App\Services\OutboxPublisher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
-use App\Jobs\PublishOutboxSignal;
-use App\Services\OutboxPublisher;
-use Illuminate\Support\Facades\Broadcast;
 
 uses(RefreshDatabase::class);
 
 afterEach(fn () => OrganizationContext::clear());
 
-test('customer reply commits its message, grouped notification, and minimal delivery intent together', function () {
+function customerReplyFixture(bool $withMember = false): array
+{
     $organization = Organization::create(['name' => 'Acme', 'slug' => 'acme']);
     $customer = Customer::create(['organization_id' => $organization->id, 'name' => 'Customer', 'email' => 'customer@acme.test']);
-    $user = User::create(['name' => 'Agent', 'email' => 'agent@acme.test', 'password' => bcrypt('password')]);
-    $member = OrganizationMember::create(['organization_id' => $organization->id, 'user_id' => $user->id, 'role' => 'agent']);
     $ticket = Ticket::create(['organization_id' => $organization->id, 'customer_id' => $customer->id, 'subject' => 'Help']);
-    $ticket->update(['assigned_member_id' => $member->id, 'status' => 'pending']);
-    $token = app(CustomerTokenService::class)->generateToken($customer, $ticket);
+    $member = null;
+    if ($withMember) {
+        $user = User::create(['name' => 'Agent', 'email' => 'agent@acme.test', 'password' => bcrypt('password')]);
+        $member = OrganizationMember::create(['organization_id' => $organization->id, 'user_id' => $user->id, 'role' => 'agent']);
+        $ticket->update(['assigned_member_id' => $member->id]);
+    }
+
+    return [$organization, $ticket, app(CustomerTokenService::class)->generateToken($customer, $ticket), $member];
+}
+
+test('customer reply commits its message, grouped notification, and minimal delivery intent together', function () {
+    [$organization, $ticket, $token, $member] = customerReplyFixture(true);
+    $ticket->update(['status' => 'pending']);
 
     $this->withHeader('X-Customer-Token', $token)
         ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", ['message' => 'Private reply body'])
@@ -42,10 +53,7 @@ test('customer reply commits its message, grouped notification, and minimal deli
 
 test('dispatcher reserves committed signals and retries an abandoned accepted job', function () {
     Queue::fake();
-    $organization = Organization::create(['name' => 'Acme', 'slug' => 'acme']);
-    $customer = Customer::create(['organization_id' => $organization->id, 'name' => 'Customer', 'email' => 'customer@acme.test']);
-    $ticket = Ticket::create(['organization_id' => $organization->id, 'customer_id' => $customer->id, 'subject' => 'Help']);
-    $token = app(CustomerTokenService::class)->generateToken($customer, $ticket);
+    [, $ticket, $token] = customerReplyFixture();
     $this->withHeader('X-Customer-Token', $token)
         ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", ['message' => 'Recover me'])
         ->assertCreated();
@@ -63,10 +71,7 @@ test('dispatcher reserves committed signals and retries an abandoned accepted jo
 
 test('publication acknowledges only after broadcast and duplicate execution is harmless', function () {
     Queue::fake();
-    $organization = Organization::create(['name' => 'Acme', 'slug' => 'acme']);
-    $customer = Customer::create(['organization_id' => $organization->id, 'name' => 'Customer', 'email' => 'customer@acme.test']);
-    $ticket = Ticket::create(['organization_id' => $organization->id, 'customer_id' => $customer->id, 'subject' => 'Help']);
-    $token = app(CustomerTokenService::class)->generateToken($customer, $ticket);
+    [, $ticket, $token] = customerReplyFixture();
     $this->withHeader('X-Customer-Token', $token)
         ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", ['message' => 'One reply'])
         ->assertCreated();
@@ -91,10 +96,7 @@ test('publication acknowledges only after broadcast and duplicate execution is h
 
 test('broadcast outage stays pending without exhausting the five permanent failure attempts', function () {
     Queue::fake();
-    $organization = Organization::create(['name' => 'Acme', 'slug' => 'acme']);
-    $customer = Customer::create(['organization_id' => $organization->id, 'name' => 'Customer', 'email' => 'customer@acme.test']);
-    $ticket = Ticket::create(['organization_id' => $organization->id, 'customer_id' => $customer->id, 'subject' => 'Help']);
-    $token = app(CustomerTokenService::class)->generateToken($customer, $ticket);
+    [, $ticket, $token] = customerReplyFixture();
     $this->withHeader('X-Customer-Token', $token)
         ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", ['message' => 'During outage'])
         ->assertCreated();
@@ -117,10 +119,7 @@ test('broadcast outage stays pending without exhausting the five permanent failu
 
 test('delayed customer signal is suppressed after Ticket ownership changes', function () {
     Queue::fake();
-    $organization = Organization::create(['name' => 'Acme', 'slug' => 'acme']);
-    $customer = Customer::create(['organization_id' => $organization->id, 'name' => 'Customer', 'email' => 'customer@acme.test']);
-    $ticket = Ticket::create(['organization_id' => $organization->id, 'customer_id' => $customer->id, 'subject' => 'Help']);
-    $token = app(CustomerTokenService::class)->generateToken($customer, $ticket);
+    [$organization, $ticket, $token] = customerReplyFixture();
     $this->withHeader('X-Customer-Token', $token)
         ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", ['message' => 'Before transfer'])
         ->assertCreated();
@@ -136,13 +135,7 @@ test('delayed customer signal is suppressed after Ticket ownership changes', fun
 
 test('delayed inbox signal is suppressed when the Ticket is unavailable', function () {
     Queue::fake();
-    $organization = Organization::create(['name' => 'Acme', 'slug' => 'acme']);
-    $customer = Customer::create(['organization_id' => $organization->id, 'name' => 'Customer', 'email' => 'customer@acme.test']);
-    $user = User::create(['name' => 'Agent', 'email' => 'agent@acme.test', 'password' => bcrypt('password')]);
-    $member = OrganizationMember::create(['organization_id' => $organization->id, 'user_id' => $user->id, 'role' => 'agent']);
-    $ticket = Ticket::create(['organization_id' => $organization->id, 'customer_id' => $customer->id, 'subject' => 'Help']);
-    $ticket->update(['assigned_member_id' => $member->id]);
-    $token = app(CustomerTokenService::class)->generateToken($customer, $ticket);
+    [, $ticket, $token] = customerReplyFixture(true);
     $this->withHeader('X-Customer-Token', $token)
         ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", ['message' => 'Before deletion'])
         ->assertCreated();
@@ -156,13 +149,7 @@ test('delayed inbox signal is suppressed when the Ticket is unavailable', functi
 });
 
 test('required outbox write failure rolls back the reply and Notification', function () {
-    $organization = Organization::create(['name' => 'Acme', 'slug' => 'acme']);
-    $customer = Customer::create(['organization_id' => $organization->id, 'name' => 'Customer', 'email' => 'customer@acme.test']);
-    $user = User::create(['name' => 'Agent', 'email' => 'agent@acme.test', 'password' => bcrypt('password')]);
-    $member = OrganizationMember::create(['organization_id' => $organization->id, 'user_id' => $user->id, 'role' => 'agent']);
-    $ticket = Ticket::create(['organization_id' => $organization->id, 'customer_id' => $customer->id, 'subject' => 'Help']);
-    $ticket->update(['assigned_member_id' => $member->id]);
-    $token = app(CustomerTokenService::class)->generateToken($customer, $ticket);
+    [, $ticket, $token] = customerReplyFixture(true);
     DB::statement("ALTER TABLE delivery_outbox ADD CONSTRAINT reject_reply_delivery CHECK (kind <> 'staff_ticket')");
 
     $this->withHeader('X-Customer-Token', $token)
@@ -172,4 +159,30 @@ test('required outbox write failure rolls back the reply and Notification', func
     expect(DB::table('ticket_messages')->where('ticket_id', $ticket->id)->count())->toBe(0)
         ->and(DB::table('notifications')->where('ticket_id', $ticket->id)->where('activity_type', 'customer_public_reply')->count())->toBe(0)
         ->and(DB::table('delivery_outbox')->where('ticket_id', $ticket->id)->count())->toBe(0);
+});
+
+test('invalid delivery data is quarantined after five attempts and can be inspected and retried', function () {
+    Queue::fake();
+    [, $ticket, $token] = customerReplyFixture();
+    $this->withHeader('X-Customer-Token', $token)
+        ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", ['message' => 'Quarantine check'])
+        ->assertCreated();
+    $signal = DB::table('delivery_outbox')->where('kind', 'customer_ticket')->first();
+    DB::table('delivery_outbox')->where('id', $signal->id)->update(['envelope' => json_encode(['event_id' => 'wrong'])]);
+
+    for ($attempt = 1; $attempt <= 5; $attempt++) {
+        $this->artisan('delivery:dispatch')->assertSuccessful();
+        $pending = DB::table('delivery_outbox')->where('id', $signal->id)->first();
+        app(OutboxPublisher::class)->publish($signal->id, $pending->reservation_token);
+        DB::table('delivery_outbox')->where('id', $signal->id)->update(['available_at' => now()]);
+    }
+
+    $quarantined = DB::table('delivery_outbox')->where('id', $signal->id)->first();
+    expect($quarantined->failures)->toBe(5)
+        ->and($quarantined->quarantined_at)->not->toBeNull()
+        ->and($quarantined->delivered_at)->toBeNull();
+    Artisan::call('delivery:failures');
+    expect(Artisan::output())->toContain($signal->id, 'InvalidArgumentException');
+    $this->artisan('delivery:retry', ['id' => $signal->id])->assertSuccessful();
+    expect(DB::table('delivery_outbox')->where('id', $signal->id)->value('quarantined_at'))->toBeNull();
 });
