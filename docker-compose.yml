@@ -92,6 +92,25 @@ services:
     networks:
       - zeddesk-network
 
+  delivery-worker:
+    image: zeddesk-backend
+    container_name: zeddesk_delivery_worker
+    restart: unless-stopped
+    command: php artisan queue:work redis --queue=outbox --sleep=1 --tries=1 --timeout=20
+    volumes:
+      - ./backend:/var/www/backend
+      - backend_vendor:/var/www/backend/vendor
+    environment: *backend-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      reverb:
+        condition: service_started
+    networks:
+      - zeddesk-network
+
   scheduler:
     image: zeddesk-backend
     container_name: zeddesk_scheduler

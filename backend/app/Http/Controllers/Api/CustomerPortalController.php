@@ -17,6 +17,7 @@ use App\Models\TicketMessage;
 use App\Repositories\CustomerRepository;
 use App\Services\AttachmentService;
 use App\Services\CustomerTokenService;
+use App\Services\DurableDelivery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -240,7 +241,7 @@ class CustomerPortalController extends Controller
         }
 
         try {
-            return $this->attachmentService->transaction(function () use ($organization, $ticketModel, $customer, $body, $files) {
+            return $this->attachmentService->transaction(fn () => app(DurableDelivery::class)->capture(function () use ($organization, $ticketModel, $customer, $body, $files) {
                 $message = TicketMessage::create([
                     'organization_id' => $organization->id,
                     'ticket_id' => $ticketModel->id,
@@ -275,7 +276,7 @@ class CustomerPortalController extends Controller
                         'status' => $ticketModel->status instanceof TicketStatus ? $ticketModel->status->value : $ticketModel->status,
                     ],
                 ], 201);
-            });
+            }));
         } catch (InvalidTicketTransitionException $e) {
             return response()->json([
                 'message' => $e->getMessage(),

@@ -9,6 +9,7 @@ use App\Models\TicketMessage;
 use App\Policies\TicketMessagePolicy;
 use App\Policies\TicketPolicy;
 use App\Services\CustomerTicketLiveChannel;
+use App\Services\DurableDelivery;
 use App\Services\MemberNotificationChannel;
 use App\Services\OrganizationLiveChannel;
 use App\Services\OrganizationPresenceChannel;
@@ -27,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(ChannelManager::class, PresenceChannelManager::class);
+        $this->app->singleton(DurableDelivery::class);
     }
 
     /**
