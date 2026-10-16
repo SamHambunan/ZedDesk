@@ -21,7 +21,6 @@ use App\Services\DurableDelivery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerPortalController extends Controller
@@ -62,7 +61,7 @@ class CustomerPortalController extends Controller
             ], 422);
         }
 
-        return DB::transaction(function () use ($organization, $validated, $files, $request) {
+        return $this->attachmentService->transaction(function () use ($organization, $validated, $files, $request) {
             // Find or create customer
             $customer = $this->findOrCreateCustomer->execute([
                 'name' => $validated['name'],

@@ -10,10 +10,12 @@ use App\Models\TicketAttachment;
 use App\Models\TicketMessage;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Throwable;
 
 class AttachmentService
 {
@@ -48,6 +50,9 @@ class AttachmentService
 
     protected string $disk;
 
+    /** @var array<string>|null */
+    private ?array $writtenPaths = null;
+
     public function __construct(?string $disk = null)
     {
         $this->disk = $disk ?? config('filesystems.attachments_disk', 'private');
@@ -59,6 +64,34 @@ class AttachmentService
     public function getDisk(): string
     {
         return $this->disk;
+    }
+
+    /** Keep file cleanup tied to the same business transaction as its metadata. */
+    public function transaction(callable $callback): mixed
+    {
+        $previousPaths = $this->writtenPaths;
+        $this->writtenPaths = [];
+
+        try {
+            return DB::transaction($callback);
+        } catch (Throwable $e) {
+            foreach ($this->writtenPaths as $path) {
+                try {
+                    // A committed callback can throw after metadata is durable.
+                    if (! TicketAttachment::withoutGlobalScopes()->where('file_path', $path)->exists()) {
+                        Storage::disk($this->disk)->delete($path);
+                    }
+                } catch (Throwable $cleanupError) {
+                    report($cleanupError);
+                }
+            }
+
+            throw $e;
+        } finally {
+            $this->writtenPaths = $previousPaths === null
+                ? null
+                : array_merge($previousPaths, $this->writtenPaths);
+        }
     }
 
     /**
@@ -87,6 +120,10 @@ class AttachmentService
      */
     public function store(UploadedFile $file, TicketMessage $message): TicketAttachment
     {
+        if ($this->writtenPaths === null) {
+            return $this->transaction(fn () => $this->store($file, $message));
+        }
+
         $this->validateFile($file);
 
         $ticket = $message->relationLoaded('ticket')
@@ -97,8 +134,13 @@ class AttachmentService
         $extension = $file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'bin';
         $filePath = "tenants/{$message->organization_id}/tickets/{$ticket->id}/attachments/{$attachmentId}.{$extension}";
 
-        // Store file securely on private disk
-        Storage::disk($this->disk)->put($filePath, $file->getContent());
+        // Cleanup takes this same lock before checking for a metadata reference.
+        AttachmentPathLock::hold($filePath);
+        $this->writtenPaths[] = $filePath;
+
+        if (! Storage::disk($this->disk)->put($filePath, $file->getContent())) {
+            throw new \RuntimeException('Attachment storage failed.');
+        }
 
         $attachment = new TicketAttachment;
         $attachment->id = $attachmentId;

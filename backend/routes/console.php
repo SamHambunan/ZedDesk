@@ -4,6 +4,9 @@ use App\Services\OutboxDispatcher;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use App\Services\OrphanAttachmentCleaner;
+use Illuminate\Foundation\Inspiring;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
@@ -48,3 +51,10 @@ Artisan::command('delivery:retry {id}', function (string $id) {
 
 Schedule::command('delivery:dispatch')->everyTenSeconds();
 Schedule::call(fn () => DB::table('delivery_outbox')->where('delivered_at', '<', now()->subDays(7))->delete())->daily();
+Artisan::command('attachments:clean-orphans {--organization=}', function (OrphanAttachmentCleaner $cleaner) {
+    $organization = $this->option('organization');
+    $deleted = $cleaner->clean($organization === null ? null : (int) $organization);
+    $this->info("Removed {$deleted} orphan attachment files.");
+})->purpose('Remove abandoned private attachment files after a one-hour grace period');
+
+Schedule::command('attachments:clean-orphans')->hourly()->withoutOverlapping();
