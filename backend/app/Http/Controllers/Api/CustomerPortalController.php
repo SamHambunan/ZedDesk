@@ -22,6 +22,7 @@ use App\Services\DurableDelivery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerPortalController extends Controller
@@ -101,6 +102,12 @@ class CustomerPortalController extends Controller
             $accessUrl = $this->tokenService->generateTicketUrl($ticket, $token, $request);
 
             app(AuditLogWriter::class)->recordTicketCreated($ticket, $customer);
+            app(AuditLogWriter::class)->recordCredentialIssued(
+                target: $customer,
+                credentialType: 'customer_ticket_token',
+                organizationId: (int) $organization->id,
+                requestLocation: $request->path()
+            );
 
             return response()->json([
                 'message' => 'Ticket created successfully.',
@@ -148,20 +155,43 @@ class CustomerPortalController extends Controller
         $customer = $this->customerRepository->findByEmail($validated['email'], $organization);
 
         if (! $customer) {
+            try {
+                app(AuditLogWriter::class)->recordAccessDenied(
+                    actor: 'unresolved',
+                    action: 'customer.access_denied',
+                    targetType: 'customer',
+                    targetId: null,
+                    reason: 'customer_not_found',
+                    organizationId: (int) $organization->id,
+                    requestLocation: $request->path()
+                );
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
             return response()->json([
                 'message' => 'Customer not found.',
             ], 404);
         }
 
-        $token = $this->tokenService->generateToken($customer);
-        $magicLink = $this->tokenService->generateMagicLink($customer, $token, $request);
+        return DB::transaction(function () use ($customer, $organization, $request) {
+            $token = $this->tokenService->generateToken($customer);
+            $magicLink = $this->tokenService->generateMagicLink($customer, $token, $request);
 
-        return response()->json([
-            'message' => 'Magic link generated successfully.',
-            'token' => $token,
-            'magic_link' => $magicLink,
-            'url' => $magicLink,
-        ], 200);
+            app(AuditLogWriter::class)->recordCredentialIssued(
+                target: $customer,
+                credentialType: 'magic_link',
+                organizationId: (int) $organization->id,
+                requestLocation: $request->path()
+            );
+
+            return response()->json([
+                'message' => 'Magic link generated successfully.',
+                'token' => $token,
+                'magic_link' => $magicLink,
+                'url' => $magicLink,
+            ], 200);
+        });
     }
 
     /**

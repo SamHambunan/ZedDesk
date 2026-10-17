@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\AuditSanitizer;
 use App\Services\OrphanAttachmentCleaner;
 use App\Services\OutboxDispatcher;
 use App\Services\OutboxFailure;
@@ -167,3 +168,123 @@ Artisan::command('attachments:clean-orphans {--organization=}', function (Orphan
 
 Schedule::command('attachments:clean-orphans')->hourly()->withoutOverlapping();
 Schedule::call(fn () => DB::table('rate_limit_windows')->where('window_start', '<', now()->subHours(2)->timestamp)->delete())->daily();
+
+Artisan::command('security:audit {id? : Specific security audit record ID to inspect} {--action= : Filter by action} {--actor= : Filter by actor ID} {--actor-id= : Filter by actor ID} {--target= : Filter by target ID} {--target-id= : Filter by target ID} {--target-type= : Filter by target type} {--outcome= : Filter by outcome} {--from= : Filter by start date} {--to= : Filter by end date} {--global : Show only global security records} {--limit=25 : Maximum records to display} {--page=1 : Page number}', function (?string $id = null) {
+    if ($id) {
+        $record = DB::table('audit_logs')->where('id', $id)->first();
+        if (! $record) {
+            $this->error("Security audit record {$id} not found.");
+
+            return 1;
+        }
+
+        $changes = json_decode($record->changes ?? '{}', true) ?: [];
+        $sanitizedChanges = AuditSanitizer::sanitizeMetadata($changes);
+
+        $this->info("Security Audit Record Inspection: {$record->id}");
+        $this->table(['Field', 'Value'], [
+            ['ID', $record->id],
+            ['Occurred At', $record->occurred_at],
+            ['Classification', $record->classification],
+            ['Action', $record->action],
+            ['Outcome', $record->outcome],
+            ['Organization ID', $record->organization_id ? (string) $record->organization_id : 'global'],
+            ['Actor Type', $record->actor_type ?? 'unresolved'],
+            ['Actor ID', $record->actor_id ?? '-'],
+            ['Target Type', $record->target_type ?? '-'],
+            ['Target ID', $record->target_id ?? '-'],
+            ['IP Address', $record->ip_address ?? '-'],
+            ['Request Location', AuditSanitizer::sanitizeRequestLocation($record->request_location) ?? '-'],
+            ['Changes (Sanitized)', json_encode($sanitizedChanges, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)],
+        ]);
+
+        return 0;
+    }
+
+    $query = DB::table('audit_logs')
+        ->where('classification', 'security');
+
+    if ($this->option('global')) {
+        $query->whereNull('organization_id');
+    }
+
+    if ($action = $this->option('action')) {
+        $query->where('action', $action);
+    }
+
+    $actorId = $this->option('actor-id') ?? $this->option('actor');
+    if ($actorId !== null) {
+        $query->where('actor_id', $actorId);
+    }
+
+    $targetId = $this->option('target-id') ?? $this->option('target');
+    if ($targetId !== null) {
+        $query->where('target_id', $targetId);
+    }
+
+    if ($targetType = $this->option('target-type')) {
+        $query->where('target_type', $targetType);
+    }
+
+    if ($outcome = $this->option('outcome')) {
+        $query->where('outcome', $outcome);
+    }
+
+    if ($from = $this->option('from')) {
+        $query->whereDate('occurred_at', '>=', $from);
+    }
+
+    if ($to = $this->option('to')) {
+        $query->whereDate('occurred_at', '<=', $to);
+    }
+
+    $limit = max(1, min(100, (int) $this->option('limit')));
+    $page = max(1, (int) $this->option('page'));
+    $offset = ($page - 1) * $limit;
+
+    $total = (clone $query)->count();
+    $rows = $query->orderByDesc('occurred_at')
+        ->orderByDesc('id')
+        ->offset($offset)
+        ->limit($limit)
+        ->get();
+
+    $this->info("Security Audit Records (Page {$page}, Total {$total}):");
+
+    $headers = ['ID', 'Occurred At', 'Action', 'Outcome', 'Actor Type', 'Actor ID', 'Target Type', 'Target ID', 'IP Address'];
+    $tableData = $rows->map(function ($row) {
+        return [
+            $row->id,
+            $row->occurred_at,
+            $row->action,
+            $row->outcome,
+            $row->actor_type ?? 'unresolved',
+            $row->actor_id ?? '-',
+            $row->target_type ?? '-',
+            $row->target_id ?? '-',
+            $row->ip_address ?? '-',
+        ];
+    })->all();
+
+    $this->table($headers, $tableData);
+
+    return 0;
+})->purpose('Inspect global security audit records with safe identifiers');
+
+Artisan::command('audit:security {id? : Specific security audit record ID to inspect} {--action= : Filter by action} {--actor= : Filter by actor ID} {--actor-id= : Filter by actor ID} {--target= : Filter by target ID} {--target-id= : Filter by target ID} {--target-type= : Filter by target type} {--outcome= : Filter by outcome} {--from= : Filter by start date} {--to= : Filter by end date} {--global : Show only global security records} {--limit=25 : Maximum records to display} {--page=1 : Page number}', function (?string $id = null) {
+    $params = ['id' => $id];
+    foreach (['action', 'actor', 'actor-id', 'target', 'target-id', 'target-type', 'outcome', 'from', 'to', 'limit', 'page'] as $opt) {
+        if ($val = $this->option($opt)) {
+            $params['--'.$opt] = $val;
+        }
+    }
+    if ($this->option('global')) {
+        $params['--global'] = true;
+    }
+
+    return $this->call('security:audit', $params);
+})->purpose('Alias for security:audit');
+
+Artisan::command('security:inspect {id : Specific security audit record ID to inspect}', function (string $id) {
+    return $this->call('security:audit', ['id' => $id]);
+})->purpose('Inspect a specific security audit record with safe identifiers');

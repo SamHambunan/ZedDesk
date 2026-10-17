@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Context\OrganizationContext;
 use App\Models\OrganizationMember;
+use App\Services\AuditLogWriter;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,6 +31,20 @@ class EnsureOrganizationMember
             ->first();
 
         if (! $organizationMember) {
+            try {
+                app(AuditLogWriter::class)->recordAccessDenied(
+                    actor: $user,
+                    action: 'membership.denied',
+                    targetType: 'organization',
+                    targetId: (string) $organization->id,
+                    reason: 'not_organization_member',
+                    organizationId: null,
+                    requestLocation: $request->path()
+                );
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
             return response()->json(['message' => 'Forbidden. You are not an Organization Member of this Organization.'], 403);
         }
 

@@ -6,6 +6,7 @@ use App\Context\OrganizationContext;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Services\AuditLogWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -14,7 +15,23 @@ class AuditLogController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        abort_unless($request->attributes->get('role') === Role::ADMIN, 403);
+        if ($request->attributes->get('role') !== Role::ADMIN) {
+            try {
+                app(AuditLogWriter::class)->recordAccessDenied(
+                    actor: $request->user(),
+                    action: 'role.denied',
+                    targetType: 'audit_log',
+                    targetId: null,
+                    reason: 'admin_required',
+                    organizationId: OrganizationContext::getCurrentId(),
+                    requestLocation: $request->path()
+                );
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
+            abort(403);
+        }
 
         $filters = $request->validate([
             'from' => ['sometimes', 'date'],
