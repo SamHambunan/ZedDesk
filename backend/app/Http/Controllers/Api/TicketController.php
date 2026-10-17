@@ -21,6 +21,7 @@ use App\Services\DurableDelivery;
 use App\Services\TicketAssignmentService;
 use App\Services\TicketFieldEditor;
 use DomainException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -581,7 +582,25 @@ class TicketController extends Controller
     {
         $ticket = Ticket::findOrFail($ticketId);
 
-        Gate::authorize('delete', $ticket);
+        try {
+            Gate::authorize('delete', $ticket);
+        } catch (AuthorizationException $e) {
+            try {
+                app(AuditLogWriter::class)->recordAccessDenied(
+                    actor: $request->user(),
+                    action: 'role.denied',
+                    targetType: 'ticket',
+                    targetId: (string) $ticket->id,
+                    reason: 'admin_required',
+                    organizationId: OrganizationContext::getCurrentId(),
+                    requestLocation: $request->path()
+                );
+            } catch (\Throwable $auditError) {
+                report($auditError);
+            }
+
+            throw $e;
+        }
 
         DB::transaction(fn () => app(DurableDelivery::class)->capture(function () use ($ticket, $request) {
             $ticket->delete();
@@ -600,7 +619,25 @@ class TicketController extends Controller
     {
         $ticket = Ticket::withTrashed()->findOrFail($ticketId);
 
-        Gate::authorize('restore', $ticket);
+        try {
+            Gate::authorize('restore', $ticket);
+        } catch (AuthorizationException $e) {
+            try {
+                app(AuditLogWriter::class)->recordAccessDenied(
+                    actor: $request->user(),
+                    action: 'role.denied',
+                    targetType: 'ticket',
+                    targetId: (string) $ticket->id,
+                    reason: 'admin_required',
+                    organizationId: OrganizationContext::getCurrentId(),
+                    requestLocation: $request->path()
+                );
+            } catch (\Throwable $auditError) {
+                report($auditError);
+            }
+
+            throw $e;
+        }
 
         if (! $ticket->trashed()) {
             return response()->json(['message' => 'Ticket is not deleted.'], 422);

@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\AuditLogWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -19,13 +21,20 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => $validated['password'],
-        ]);
+        [$user, $token] = DB::transaction(function () use ($validated, $request) {
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => $validated['password'],
+            ]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            app(AuditLogWriter::class)->recordRegistration($user, $request->path());
+            app(AuditLogWriter::class)->recordCredentialIssued($user, 'auth_token', null, $request->path());
+
+            return [$user, $token];
+        });
 
         return response()->json([
             'user' => $user,
@@ -43,12 +52,25 @@ class AuthController extends Controller
         $user = User::where('email', $credentials['email'])->first();
 
         if (! $user || ! Hash::check($credentials['password'], $user->password)) {
+            try {
+                app(AuditLogWriter::class)->recordLoginDenied($user, $request->path());
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
             throw ValidationException::withMessages([
                 'email' => [trans('auth.failed')],
             ]);
         }
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        $token = DB::transaction(function () use ($user, $request) {
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            app(AuditLogWriter::class)->recordLoginSuccess($user, $request->path());
+            app(AuditLogWriter::class)->recordCredentialIssued($user, 'auth_token', null, $request->path());
+
+            return $token;
+        });
 
         return response()->json([
             'user' => $user,
@@ -58,7 +80,13 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        DB::transaction(function () use ($request) {
+            $user = $request->user();
+            $tokenId = $user->currentAccessToken()?->id;
+            $user->currentAccessToken()->delete();
+
+            app(AuditLogWriter::class)->recordLogout($user, $tokenId ? (string) $tokenId : null, $request->path());
+        });
 
         return response()->json([
             'message' => 'Logged out successfully',

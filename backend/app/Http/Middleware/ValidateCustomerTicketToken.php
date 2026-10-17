@@ -4,8 +4,12 @@ namespace App\Http\Middleware;
 
 use App\Context\OrganizationContext;
 use App\Models\Customer;
+use App\Models\Organization;
+use App\Models\OrganizationMember;
 use App\Models\Ticket;
+use App\Models\User;
 use App\Scopes\OrganizationScope;
+use App\Services\AuditLogWriter;
 use App\Services\CustomerTokenService;
 use Closure;
 use Illuminate\Http\Request;
@@ -37,6 +41,8 @@ class ValidateCustomerTicketToken
         }
 
         if (empty($token)) {
+            $this->recordDenial(null, 'unresolved', 'customer.token_denied', 'token_missing', $request);
+
             return response()->json(['message' => 'Customer access token is required.'], 401);
         }
 
@@ -45,8 +51,12 @@ class ValidateCustomerTicketToken
 
         if (! $inspection['valid']) {
             if ($inspection['expired']) {
+                $this->recordDenial(null, 'unresolved', 'customer.token_denied', 'token_expired', $request);
+
                 return response()->json(['message' => 'Customer access token has expired.'], 401);
             }
+
+            $this->recordDenial(null, 'unresolved', 'customer.token_denied', 'token_invalid', $request);
 
             return response()->json(['message' => 'Invalid or tampered customer token.'], 401);
         }
@@ -55,6 +65,8 @@ class ValidateCustomerTicketToken
 
         // 4. Verify organization boundary
         if ((int) $payload['organization_id'] !== (int) $organization->id) {
+            $this->recordDenial(null, 'unresolved', 'customer.token_denied', 'cross_organization', $request);
+
             return response()->json(['message' => 'Forbidden. Token belongs to another organization.'], 403);
         }
 
@@ -65,6 +77,8 @@ class ValidateCustomerTicketToken
             ->first();
 
         if (! $customer) {
+            $this->recordDenial(null, 'unresolved', 'customer.access_denied', 'customer_not_found', $request);
+
             return response()->json(['message' => 'Forbidden. Customer not found in this organization.'], 403);
         }
 
@@ -81,10 +95,14 @@ class ValidateCustomerTicketToken
             }
 
             if ($ticket->customer_id !== $customer->id) {
+                $this->recordDenial($organization, $customer, 'ticket.access_denied', 'ticket_customer_mismatch', $request, 'ticket', (string) $ticket->id);
+
                 return response()->json(['message' => 'Forbidden. You do not have permission to access this ticket.'], 403);
             }
 
             if (! empty($payload['ticket_id']) && $payload['ticket_id'] !== $ticket->id) {
+                $this->recordDenial($organization, $customer, 'ticket.access_denied', 'token_ticket_mismatch', $request, 'ticket', (string) $ticket->id);
+
                 return response()->json(['message' => 'Forbidden. Token is not valid for this ticket.'], 403);
             }
 
@@ -93,6 +111,8 @@ class ValidateCustomerTicketToken
         } elseif (! empty($payload['ticket_id'])) {
             $scopedTicket = Ticket::where('id', $payload['ticket_id'])->first();
             if (! $scopedTicket || $scopedTicket->customer_id !== $customer->id) {
+                $this->recordDenial($organization, $customer, 'ticket.access_denied', 'token_ticket_invalid', $request, 'ticket', (string) $payload['ticket_id']);
+
                 return response()->json(['message' => 'Forbidden. Token ticket is invalid.'], 403);
             }
         }
@@ -104,5 +124,29 @@ class ValidateCustomerTicketToken
         app()->instance('currentCustomer', $customer);
 
         return $next($request);
+    }
+
+    protected function recordDenial(
+        ?Organization $organization,
+        User|Customer|OrganizationMember|string|null $actor,
+        string $action,
+        string $reason,
+        Request $request,
+        string $targetType = 'customer',
+        ?string $targetId = null
+    ): void {
+        try {
+            app(AuditLogWriter::class)->recordAccessDenied(
+                actor: $actor,
+                action: $action,
+                targetType: $targetType,
+                targetId: $targetId,
+                reason: $reason,
+                organizationId: $organization ? (int) $organization->id : null,
+                requestLocation: $request->path()
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 }
