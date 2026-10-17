@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Context\OrganizationContext;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\Invitation;
@@ -209,15 +210,7 @@ class InvitationController extends Controller
             }
 
             DB::transaction(function () use ($invitation, $user) {
-                $member = OrganizationMember::create([
-                    'organization_id' => $invitation->organization_id,
-                    'user_id' => $user->id,
-                    'role' => $invitation->role,
-                ]);
-
-                $invitation->update(['accepted_at' => now()]);
-
-                app(AuditLogWriter::class)->recordInvitationAccepted($invitation, $user, $member);
+                $this->completeInvitationAcceptance($invitation, $user);
             });
 
             return response()->json([
@@ -256,15 +249,7 @@ class InvitationController extends Controller
                 'password' => Hash::make($validated['password']),
             ]);
 
-            $member = OrganizationMember::create([
-                'organization_id' => $invitation->organization_id,
-                'user_id' => $user->id,
-                'role' => $invitation->role,
-            ]);
-
-            $invitation->update(['accepted_at' => now()]);
-
-            app(AuditLogWriter::class)->recordInvitationAccepted($invitation, $user, $member);
+            $this->completeInvitationAcceptance($invitation, $user);
 
             return $user;
         });
@@ -288,6 +273,21 @@ class InvitationController extends Controller
         ], 201);
     }
 
+    private function completeInvitationAcceptance(Invitation $invitation, User $user): OrganizationMember
+    {
+        $member = OrganizationMember::create([
+            'organization_id' => $invitation->organization_id,
+            'user_id' => $user->id,
+            'role' => $invitation->role,
+        ]);
+
+        $invitation->update(['accepted_at' => now()]);
+
+        app(AuditLogWriter::class)->recordInvitationAccepted($invitation, $user, $member);
+
+        return $member;
+    }
+
     private function isAdmin(Request $request): bool
     {
         $role = $request->attributes->get('role');
@@ -307,8 +307,8 @@ class InvitationController extends Controller
             return response()->json(['message' => 'Invitation not found.'], 404);
         }
 
-        $contextOrg = request()->attributes->get('organization');
-        if ($contextOrg && (int) $invitation->organization_id !== (int) $contextOrg->id) {
+        $contextOrgId = OrganizationContext::getCurrentId();
+        if ($contextOrgId !== null && (int) $invitation->organization_id !== $contextOrgId) {
             return response()->json(['message' => 'Invitation not found.'], 404);
         }
 
