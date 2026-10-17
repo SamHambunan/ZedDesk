@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\OrganizationMember;
+use App\Services\AuditLogWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -65,6 +66,8 @@ class OrganizationController extends Controller
                 'user_id' => $user->id,
                 'role' => Role::ADMIN->value,
             ]);
+
+            app(AuditLogWriter::class)->recordOrganizationCreated($org, $user);
 
             return $org;
         });

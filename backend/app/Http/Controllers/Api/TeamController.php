@@ -7,8 +7,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\OrganizationMember;
 use App\Models\Team;
+use App\Services\AuditLogWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class TeamController extends Controller
@@ -46,11 +48,17 @@ class TeamController extends Controller
             'description' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $team = Team::create([
-            'organization_id' => $organization->id,
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? null,
-        ]);
+        $team = DB::transaction(function () use ($organization, $validated, $request) {
+            $created = Team::create([
+                'organization_id' => $organization->id,
+                'name' => $validated['name'],
+                'description' => $validated['description'] ?? null,
+            ]);
+
+            app(AuditLogWriter::class)->recordTeamCreated($created, $request->user());
+
+            return $created;
+        });
 
         return response()->json([
             'message' => 'Team created successfully.',
@@ -102,7 +110,10 @@ class TeamController extends Controller
             'description' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $team->update($validated);
+        DB::transaction(function () use ($team, $validated, $request) {
+            $team->update($validated);
+            app(AuditLogWriter::class)->recordTeamUpdated($team, $request->user());
+        });
 
         return response()->json([
             'message' => 'Team updated successfully.',
@@ -125,7 +136,10 @@ class TeamController extends Controller
             return response()->json(['message' => 'Team not found.'], 404);
         }
 
-        $team->delete();
+        DB::transaction(function () use ($team, $request) {
+            $team->delete();
+            app(AuditLogWriter::class)->recordTeamDeleted($team, $request->user());
+        });
 
         return response()->json(['message' => 'Team deleted successfully.']);
     }
@@ -187,7 +201,10 @@ class TeamController extends Controller
             ], 422);
         }
 
-        $team->members()->attach($member->id);
+        DB::transaction(function () use ($team, $member, $request) {
+            $team->members()->attach($member->id);
+            app(AuditLogWriter::class)->recordTeamMemberAdded($team, $member, $request->user());
+        });
 
         return response()->json([
             'message' => 'Member added to team successfully.',
@@ -218,7 +235,10 @@ class TeamController extends Controller
             return response()->json(['message' => 'Member not found in this team.'], 404);
         }
 
-        $team->members()->detach($teamMember->id);
+        DB::transaction(function () use ($team, $teamMember, $request) {
+            $team->members()->detach($teamMember->id);
+            app(AuditLogWriter::class)->recordTeamMemberRemoved($team, $teamMember, $request->user());
+        });
 
         return response()->json([
             'message' => 'Member removed from team successfully.',

@@ -8,6 +8,7 @@ use App\Models\Invitation;
 use App\Models\Organization;
 use App\Models\OrganizationMember;
 use App\Models\User;
+use App\Services\AuditLogWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -92,14 +93,20 @@ class InvitationController extends Controller
             ], 422);
         }
 
-        $invitation = Invitation::create([
-            'organization_id' => $organization->id,
-            'email' => $normalizedEmail,
-            'role' => $validated['role'],
-            'token' => Str::random(64),
-            'expires_at' => now()->addDays(7),
-            'invited_by_user_id' => $request->user()->id,
-        ]);
+        $invitation = DB::transaction(function () use ($organization, $normalizedEmail, $validated, $request) {
+            $created = Invitation::create([
+                'organization_id' => $organization->id,
+                'email' => $normalizedEmail,
+                'role' => $validated['role'],
+                'token' => Str::random(64),
+                'expires_at' => now()->addDays(7),
+                'invited_by_user_id' => $request->user()->id,
+            ]);
+
+            app(AuditLogWriter::class)->recordInvitationCreated($created, $request->user());
+
+            return $created;
+        });
 
         return response()->json([
             'message' => 'Invitation created successfully.',
@@ -141,7 +148,10 @@ class InvitationController extends Controller
             return response()->json(['message' => 'Cannot revoke an invitation that has already expired.'], 422);
         }
 
-        $invitation->update(['revoked_at' => now()]);
+        DB::transaction(function () use ($invitation, $request) {
+            $invitation->update(['revoked_at' => now()]);
+            app(AuditLogWriter::class)->recordInvitationRevoked($invitation, $request->user());
+        });
 
         return response()->json(['message' => 'Invitation revoked successfully.']);
     }
@@ -199,13 +209,15 @@ class InvitationController extends Controller
             }
 
             DB::transaction(function () use ($invitation, $user) {
-                OrganizationMember::create([
+                $member = OrganizationMember::create([
                     'organization_id' => $invitation->organization_id,
                     'user_id' => $user->id,
                     'role' => $invitation->role,
                 ]);
 
                 $invitation->update(['accepted_at' => now()]);
+
+                app(AuditLogWriter::class)->recordInvitationAccepted($invitation, $user, $member);
             });
 
             return response()->json([
@@ -244,13 +256,15 @@ class InvitationController extends Controller
                 'password' => Hash::make($validated['password']),
             ]);
 
-            OrganizationMember::create([
+            $member = OrganizationMember::create([
                 'organization_id' => $invitation->organization_id,
                 'user_id' => $user->id,
                 'role' => $invitation->role,
             ]);
 
             $invitation->update(['accepted_at' => now()]);
+
+            app(AuditLogWriter::class)->recordInvitationAccepted($invitation, $user, $member);
 
             return $user;
         });
@@ -290,6 +304,11 @@ class InvitationController extends Controller
             ->first();
 
         if (! $invitation) {
+            return response()->json(['message' => 'Invitation not found.'], 404);
+        }
+
+        $contextOrg = request()->attributes->get('organization');
+        if ($contextOrg && (int) $invitation->organization_id !== (int) $contextOrg->id) {
             return response()->json(['message' => 'Invitation not found.'], 404);
         }
 

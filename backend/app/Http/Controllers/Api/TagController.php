@@ -58,11 +58,17 @@ class TagController extends Controller
             ],
         ]);
 
-        $tag = Tag::create([
-            'organization_id' => $orgId,
-            'name' => $validated['name'],
-            'slug' => $validated['slug'],
-        ]);
+        $tag = DB::transaction(function () use ($orgId, $validated, $request) {
+            $created = Tag::create([
+                'organization_id' => $orgId,
+                'name' => $validated['name'],
+                'slug' => $validated['slug'],
+            ]);
+
+            app(AuditLogWriter::class)->recordTagCreated($created, $request->user());
+
+            return $created;
+        });
 
         return response()->json([
             'data' => $tag,
