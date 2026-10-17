@@ -193,8 +193,7 @@ Route::prefix('portal')->group(function () {
             $customer = $request->attributes->get('customer');
             $channelName = (string) $request->input('channel_name');
 
-            if (! $channels->tokenMatchesTicket($request->attributes->get('customer_token_payload'), $ticket)
-                || $channelName !== 'private-'.$channels->name($ticket)) {
+            $recordCustomerDenial = function () use ($customer, $channelName, $request) {
                 try {
                     app(AuditLogWriter::class)->recordAccessDenied(
                         actor: $customer,
@@ -208,6 +207,11 @@ Route::prefix('portal')->group(function () {
                 } catch (Throwable $auditError) {
                     report($auditError);
                 }
+            };
+
+            if (! $channels->tokenMatchesTicket($request->attributes->get('customer_token_payload'), $ticket)
+                || $channelName !== 'private-'.$channels->name($ticket)) {
+                $recordCustomerDenial();
 
                 abort(403);
             }
@@ -217,37 +221,13 @@ Route::prefix('portal')->group(function () {
             try {
                 $response = Broadcast::auth($request);
                 if ($response instanceof Response && $response->getStatusCode() === 403) {
-                    try {
-                        app(AuditLogWriter::class)->recordAccessDenied(
-                            actor: $customer,
-                            action: 'channel.access_denied',
-                            targetType: 'channel',
-                            targetId: $channelName,
-                            reason: 'unauthorized_channel',
-                            organizationId: OrganizationContext::getCurrentId(),
-                            requestLocation: $request->path()
-                        );
-                    } catch (Throwable $auditError) {
-                        report($auditError);
-                    }
+                    $recordCustomerDenial();
                 }
 
                 return $response;
             } catch (HttpException $e) {
                 if ($e->getStatusCode() === 403) {
-                    try {
-                        app(AuditLogWriter::class)->recordAccessDenied(
-                            actor: $customer,
-                            action: 'channel.access_denied',
-                            targetType: 'channel',
-                            targetId: $channelName,
-                            reason: 'unauthorized_channel',
-                            organizationId: OrganizationContext::getCurrentId(),
-                            requestLocation: $request->path()
-                        );
-                    } catch (Throwable $auditError) {
-                        report($auditError);
-                    }
+                    $recordCustomerDenial();
                 }
 
                 throw $e;

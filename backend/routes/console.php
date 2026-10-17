@@ -169,7 +169,7 @@ Artisan::command('attachments:clean-orphans {--organization=}', function (Orphan
 Schedule::command('attachments:clean-orphans')->hourly()->withoutOverlapping();
 Schedule::call(fn () => DB::table('rate_limit_windows')->where('window_start', '<', now()->subHours(2)->timestamp)->delete())->daily();
 
-Artisan::command('security:audit {id? : Specific security audit record ID to inspect} {--action= : Filter by action} {--actor= : Filter by actor ID} {--actor-id= : Filter by actor ID} {--target= : Filter by target ID} {--target-id= : Filter by target ID} {--target-type= : Filter by target type} {--outcome= : Filter by outcome} {--from= : Filter by start date} {--to= : Filter by end date} {--global : Show only global security records} {--limit=25 : Maximum records to display} {--page=1 : Page number}', function (?string $id = null) {
+Artisan::command('security:audit {id? : Specific security audit record ID to inspect} {--action= : Filter by action} {--actor= : Filter by actor ID} {--actor-id= : Filter by actor ID} {--target= : Filter by target ID} {--target-id= : Filter by target ID} {--target-type= : Filter by target type} {--outcome= : Filter by outcome} {--from= : Filter by start date} {--to= : Filter by end date} {--organization= : Filter by Organization ID} {--all : Include all security records instead of global-only} {--limit=25 : Maximum records to display} {--page=1 : Page number}', function (?string $id = null) {
     if ($id) {
         $record = DB::table('audit_logs')->where('id', $id)->first();
         if (! $record) {
@@ -204,7 +204,10 @@ Artisan::command('security:audit {id? : Specific security audit record ID to ins
     $query = DB::table('audit_logs')
         ->where('classification', 'security');
 
-    if ($this->option('global')) {
+    $organizationOption = $this->option('organization');
+    if ($organizationOption !== null) {
+        $query->where('organization_id', (int) $organizationOption);
+    } elseif (! $this->option('all')) {
         $query->whereNull('organization_id');
     }
 
@@ -270,21 +273,3 @@ Artisan::command('security:audit {id? : Specific security audit record ID to ins
 
     return 0;
 })->purpose('Inspect global security audit records with safe identifiers');
-
-Artisan::command('audit:security {id? : Specific security audit record ID to inspect} {--action= : Filter by action} {--actor= : Filter by actor ID} {--actor-id= : Filter by actor ID} {--target= : Filter by target ID} {--target-id= : Filter by target ID} {--target-type= : Filter by target type} {--outcome= : Filter by outcome} {--from= : Filter by start date} {--to= : Filter by end date} {--global : Show only global security records} {--limit=25 : Maximum records to display} {--page=1 : Page number}', function (?string $id = null) {
-    $params = ['id' => $id];
-    foreach (['action', 'actor', 'actor-id', 'target', 'target-id', 'target-type', 'outcome', 'from', 'to', 'limit', 'page'] as $opt) {
-        if ($val = $this->option($opt)) {
-            $params['--'.$opt] = $val;
-        }
-    }
-    if ($this->option('global')) {
-        $params['--global'] = true;
-    }
-
-    return $this->call('security:audit', $params);
-})->purpose('Alias for security:audit');
-
-Artisan::command('security:inspect {id : Specific security audit record ID to inspect}', function (string $id) {
-    return $this->call('security:audit', ['id' => $id]);
-})->purpose('Inspect a specific security audit record with safe identifiers');

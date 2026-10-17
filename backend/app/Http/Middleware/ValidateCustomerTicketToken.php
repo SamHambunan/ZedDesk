@@ -4,7 +4,10 @@ namespace App\Http\Middleware;
 
 use App\Context\OrganizationContext;
 use App\Models\Customer;
+use App\Models\Organization;
+use App\Models\OrganizationMember;
 use App\Models\Ticket;
+use App\Models\User;
 use App\Scopes\OrganizationScope;
 use App\Services\AuditLogWriter;
 use App\Services\CustomerTokenService;
@@ -124,8 +127,8 @@ class ValidateCustomerTicketToken
     }
 
     protected function recordDenial(
-        $organization,
-        $actor,
+        ?Organization $organization,
+        User|Customer|OrganizationMember|string|null $actor,
         string $action,
         string $reason,
         Request $request,

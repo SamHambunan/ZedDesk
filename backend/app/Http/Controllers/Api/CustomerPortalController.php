@@ -162,7 +162,7 @@ class CustomerPortalController extends Controller
                     targetType: 'customer',
                     targetId: null,
                     reason: 'customer_not_found',
-                    organizationId: (int) $organization->id,
+                    organizationId: null,
                     requestLocation: $request->path()
                 );
             } catch (\Throwable $e) {
@@ -174,7 +174,7 @@ class CustomerPortalController extends Controller
             ], 404);
         }
 
-        return DB::transaction(function () use ($customer, $organization, $request) {
+        [$token, $magicLink] = DB::transaction(function () use ($customer, $organization, $request) {
             $token = $this->tokenService->generateToken($customer);
             $magicLink = $this->tokenService->generateMagicLink($customer, $token, $request);
 
@@ -185,13 +185,15 @@ class CustomerPortalController extends Controller
                 requestLocation: $request->path()
             );
 
-            return response()->json([
-                'message' => 'Magic link generated successfully.',
-                'token' => $token,
-                'magic_link' => $magicLink,
-                'url' => $magicLink,
-            ], 200);
+            return [$token, $magicLink];
         });
+
+        return response()->json([
+            'message' => 'Magic link generated successfully.',
+            'token' => $token,
+            'magic_link' => $magicLink,
+            'url' => $magicLink,
+        ], 200);
     }
 
     /**

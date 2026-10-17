@@ -21,7 +21,7 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        return DB::transaction(function () use ($validated, $request) {
+        [$user, $token] = DB::transaction(function () use ($validated, $request) {
             $user = User::create([
                 'name' => $validated['name'],
                 'email' => $validated['email'],
@@ -33,11 +33,13 @@ class AuthController extends Controller
             app(AuditLogWriter::class)->recordRegistration($user, $request->path());
             app(AuditLogWriter::class)->recordCredentialIssued($user, 'auth_token', null, $request->path());
 
-            return response()->json([
-                'user' => $user,
-                'token' => $token,
-            ], 201);
+            return [$user, $token];
         });
+
+        return response()->json([
+            'user' => $user,
+            'token' => $token,
+        ], 201);
     }
 
     public function login(Request $request): JsonResponse
@@ -61,31 +63,33 @@ class AuthController extends Controller
             ]);
         }
 
-        return DB::transaction(function () use ($user, $request) {
+        $token = DB::transaction(function () use ($user, $request) {
             $token = $user->createToken('auth_token')->plainTextToken;
 
             app(AuditLogWriter::class)->recordLoginSuccess($user, $request->path());
             app(AuditLogWriter::class)->recordCredentialIssued($user, 'auth_token', null, $request->path());
 
-            return response()->json([
-                'user' => $user,
-                'token' => $token,
-            ], 200);
+            return $token;
         });
+
+        return response()->json([
+            'user' => $user,
+            'token' => $token,
+        ], 200);
     }
 
     public function logout(Request $request): JsonResponse
     {
-        return DB::transaction(function () use ($request) {
+        DB::transaction(function () use ($request) {
             $user = $request->user();
             $tokenId = $user->currentAccessToken()?->id;
             $user->currentAccessToken()->delete();
 
             app(AuditLogWriter::class)->recordLogout($user, $tokenId ? (string) $tokenId : null, $request->path());
-
-            return response()->json([
-                'message' => 'Logged out successfully',
-            ]);
         });
+
+        return response()->json([
+            'message' => 'Logged out successfully',
+        ]);
     }
 }

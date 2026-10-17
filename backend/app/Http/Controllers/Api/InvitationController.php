@@ -21,22 +21,8 @@ class InvitationController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        if (! $this->isAdmin($request)) {
-            try {
-                app(AuditLogWriter::class)->recordAccessDenied(
-                    actor: $request->user(),
-                    action: 'role.denied',
-                    targetType: 'invitation',
-                    targetId: null,
-                    reason: 'admin_required',
-                    organizationId: OrganizationContext::getCurrentId(),
-                    requestLocation: $request->path()
-                );
-            } catch (\Throwable $e) {
-                report($e);
-            }
-
-            return response()->json(['message' => 'Forbidden. Only admins can manage invitations.'], 403);
+        if ($denied = $this->denyIfNotAdmin($request)) {
+            return $denied;
         }
 
         /** @var Organization $organization */
@@ -66,22 +52,8 @@ class InvitationController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        if (! $this->isAdmin($request)) {
-            try {
-                app(AuditLogWriter::class)->recordAccessDenied(
-                    actor: $request->user(),
-                    action: 'role.denied',
-                    targetType: 'invitation',
-                    targetId: null,
-                    reason: 'admin_required',
-                    organizationId: OrganizationContext::getCurrentId(),
-                    requestLocation: $request->path()
-                );
-            } catch (\Throwable $e) {
-                report($e);
-            }
-
-            return response()->json(['message' => 'Forbidden. Only admins can manage invitations.'], 403);
+        if ($denied = $this->denyIfNotAdmin($request)) {
+            return $denied;
         }
 
         $validated = $request->validate([
@@ -152,22 +124,8 @@ class InvitationController extends Controller
 
     public function destroy(Request $request, int $id): JsonResponse
     {
-        if (! $this->isAdmin($request)) {
-            try {
-                app(AuditLogWriter::class)->recordAccessDenied(
-                    actor: $request->user(),
-                    action: 'role.denied',
-                    targetType: 'invitation',
-                    targetId: (string) $id,
-                    reason: 'admin_required',
-                    organizationId: OrganizationContext::getCurrentId(),
-                    requestLocation: $request->path()
-                );
-            } catch (\Throwable $e) {
-                report($e);
-            }
-
-            return response()->json(['message' => 'Forbidden. Only admins can manage invitations.'], 403);
+        if ($denied = $this->denyIfNotAdmin($request, $id)) {
+            return $denied;
         }
 
         /** @var Organization $organization */
@@ -298,7 +256,7 @@ class InvitationController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        return DB::transaction(function () use ($invitation, $validated, $request) {
+        [$user, $token] = DB::transaction(function () use ($invitation, $validated, $request) {
             $user = User::create([
                 'name' => $validated['name'],
                 'email' => strtolower($invitation->email),
@@ -316,22 +274,47 @@ class InvitationController extends Controller
                 requestLocation: $request->path()
             );
 
-            return response()->json([
-                'message' => 'Invitation accepted successfully.',
-                'token' => $token,
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                ],
-                'organization' => [
-                    'id' => $invitation->organization->id,
-                    'name' => $invitation->organization->name,
-                    'slug' => $invitation->organization->slug,
-                ],
-                'role' => $invitation->role instanceof Role ? $invitation->role->value : (string) $invitation->role,
-            ], 201);
+            return [$user, $token];
         });
+
+        return response()->json([
+            'message' => 'Invitation accepted successfully.',
+            'token' => $token,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ],
+            'organization' => [
+                'id' => $invitation->organization->id,
+                'name' => $invitation->organization->name,
+                'slug' => $invitation->organization->slug,
+            ],
+            'role' => $invitation->role instanceof Role ? $invitation->role->value : (string) $invitation->role,
+        ], 201);
+    }
+
+    private function denyIfNotAdmin(Request $request, ?int $invitationId = null, string $message = 'Forbidden. Only admins can manage invitations.'): ?JsonResponse
+    {
+        if ($this->isAdmin($request)) {
+            return null;
+        }
+
+        try {
+            app(AuditLogWriter::class)->recordAccessDenied(
+                actor: $request->user(),
+                action: 'role.denied',
+                targetType: 'invitation',
+                targetId: $invitationId !== null ? (string) $invitationId : null,
+                reason: 'admin_required',
+                organizationId: OrganizationContext::getCurrentId(),
+                requestLocation: $request->path()
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return response()->json(['message' => $message], 403);
     }
 
     private function completeInvitationAcceptance(Invitation $invitation, User $user): OrganizationMember

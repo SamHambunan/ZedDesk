@@ -332,7 +332,7 @@ test('customer magic link audits credential issuance and denial remains 404 on a
     $denialLog = AuditLog::where('action', 'customer.access_denied')->first();
     expect($denialLog)->not->toBeNull()
         ->and($denialLog->outcome)->toBe('denied')
-        ->and($denialLog->organization_id)->toBe($this->organization->id);
+        ->and($denialLog->organization_id)->toBeNull();
 
     // When audit storage fails, denial remains 404
     enableSecurityAuditInsertFailure();
@@ -435,9 +435,32 @@ test('role access denial is audited and remains 403 on audit failure', function 
         ->and($log->organization_id)->toBe($this->organization->id)
         ->and($log->actor_id)->toBe((string) $this->agentUser->id);
 
+    // Non-admin agent attempting to soft-delete a ticket
+    $deleteRes = $this->deleteJson("http://acme.localhost/api/tickets/{$this->ticket->id}");
+    $deleteRes->assertStatus(403);
+
+    $deleteLog = AuditLog::where('action', 'role.denied')
+        ->where('target_type', 'ticket')
+        ->where('target_id', (string) $this->ticket->id)
+        ->first();
+    expect($deleteLog)->not->toBeNull()
+        ->and($deleteLog->outcome)->toBe('denied')
+        ->and($deleteLog->organization_id)->toBe($this->organization->id);
+
+    // Non-admin agent attempting to restore a ticket
+    $restoreRes = $this->postJson("http://acme.localhost/api/tickets/{$this->ticket->id}/restore");
+    $restoreRes->assertStatus(403);
+
+    $restoreLog = AuditLog::where('action', 'role.denied')
+        ->where('target_type', 'ticket')
+        ->where('target_id', (string) $this->ticket->id)
+        ->count();
+    expect($restoreLog)->toBeGreaterThanOrEqual(2);
+
     // Under audit failure, denial remains 403
     enableSecurityAuditInsertFailure();
     $this->getJson($this->auditUrl)->assertStatus(403);
+    $this->deleteJson("http://acme.localhost/api/tickets/{$this->ticket->id}")->assertStatus(403);
     disableSecurityAuditInsertFailure();
 });
 
@@ -612,13 +635,18 @@ test('operator-only CLI inspection provides safe identifiers, filters, and bound
         'password' => 'wrong_pass',
     ])->assertStatus(422);
 
-    // Run CLI inspection listing
+    // Seed an organization-scoped security event
+    Sanctum::actingAs($this->agentUser);
+    $this->getJson($this->auditUrl)->assertStatus(403);
+
+    // Run CLI inspection listing - defaults to global security records (organization_id is null)
     Artisan::call('security:audit', ['--limit' => 10]);
     $output = Artisan::output();
 
     expect($output)->toContain('Security Audit Records')
         ->and($output)->toContain('auth.register')
-        ->and($output)->toContain('auth.login');
+        ->and($output)->toContain('auth.login')
+        ->and($output)->not->toContain('role.denied');
 
     // Verify privacy in CLI output: no passwords or emails
     expect($output)->not->toContain('inspect_secret@example.test')
@@ -645,9 +673,57 @@ test('operator-only CLI inspection provides safe identifiers, filters, and bound
     $regOutput = Artisan::output();
     expect($regOutput)->toContain('auth.register');
 
-    // Alias audit:security works identically
-    Artisan::call('audit:security', ['--limit' => 5]);
-    expect(Artisan::output())->toContain('Security Audit Records');
+    // Inspect with --all includes organization-scoped security events
+    Artisan::call('security:audit', ['--all' => true, '--limit' => 10]);
+    expect(Artisan::output())->toContain('role.denied');
+
+    // Inspect with --organization filters to that organization
+    Artisan::call('security:audit', ['--organization' => (string) $this->organization->id]);
+    expect(Artisan::output())->toContain('role.denied');
+});
+
+test('ordinary successful reads, subscriptions, and presence emit zero audit logs', function () {
+    config([
+        'broadcasting.default' => 'reverb',
+        'broadcasting.connections.reverb.key' => 'test-key',
+        'broadcasting.connections.reverb.secret' => 'test-secret',
+        'broadcasting.connections.reverb.app_id' => 'test-app',
+    ]);
+    (new AppServiceProvider(app()))->boot();
+
+    AuditLog::truncate();
+
+    // 1. Ordinary successful ticket list read
+    Sanctum::actingAs($this->agentUser);
+    $this->getJson('http://acme.localhost/api/tickets')->assertOk();
+
+    // 2. Ordinary successful ticket detail read
+    $this->getJson("http://acme.localhost/api/tickets/{$this->ticket->id}")->assertOk();
+
+    // 3. Customer portal ticket read
+    $tokenService = app(CustomerTokenService::class);
+    $token = $tokenService->generateToken($this->customer, $this->ticket);
+    $this->getJson("http://acme.localhost/api/portal/tickets/{$this->ticket->id}?token={$token}")->assertOk();
+
+    // 4. Successful presence channel lookup and authorization
+    $channel = $this->getJson('http://acme.localhost/api/live/presence-channel')
+        ->assertOk()
+        ->json('channel');
+
+    $this->postJson('http://acme.localhost/api/broadcasting/auth', [
+        'socket_id' => '123.456',
+        'channel_name' => $channel,
+    ])->assertOk();
+
+    // 5. Successful customer channel authorization
+    $generation = intdiv(now()->timestamp, 300);
+    $this->postJson("http://acme.localhost/api/portal/tickets/{$this->ticket->id}/broadcasting/auth?token={$token}", [
+        'socket_id' => '123.456',
+        'channel_name' => "private-customer.ticket.{$this->ticket->id}.{$generation}",
+    ])->assertOk();
+
+    // Zero audit logs must have been written
+    expect(AuditLog::count())->toBe(0);
 });
 
 test('privacy and redaction ensure sensitive metadata is never retained or exposed', function () {
