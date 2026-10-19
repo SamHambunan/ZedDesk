@@ -68,7 +68,10 @@ class RequestIdempotency
         }
 
         if ($record->encrypted_response !== null) {
-            $authorizeReplay();
+            $denial = $authorizeReplay();
+            if ($denial instanceof JsonResponse) {
+                return $denial;
+            }
 
             return JsonResponse::fromJsonString(Crypt::decryptString($record->encrypted_response), (int) $record->response_status);
         }

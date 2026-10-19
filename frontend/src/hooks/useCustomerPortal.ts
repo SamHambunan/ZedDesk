@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { useRef } from 'react'
 
 export type TicketPriorityType = 'low' | 'medium' | 'high' | 'urgent'
 
@@ -173,6 +174,31 @@ export interface CustomerReplyPayload {
   files?: readonly File[]
 }
 
+async function replyDigest(bytes: Uint8Array): Promise<string> {
+  if (globalThis.crypto?.subtle) {
+    const input = new Uint8Array(new ArrayBuffer(bytes.byteLength))
+    input.set(bytes)
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', input.buffer)
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+  }
+
+  // Web Crypto is unavailable in some local and test environments. The backend
+  // still compares the complete payload before accepting a reused key.
+  let hash = 2166136261
+  for (const byte of bytes) hash = Math.imul(hash ^ byte, 16777619)
+  return (hash >>> 0).toString(16).padStart(8, '0')
+}
+
+async function replyFingerprint(body: string, files: readonly File[]): Promise<string> {
+  const attachments = await Promise.all(files.map(async (file) => [
+    file.name,
+    file.type,
+    file.size,
+    await replyDigest(new Uint8Array(await file.arrayBuffer())),
+  ]))
+  return replyDigest(new TextEncoder().encode(JSON.stringify([body, attachments])))
+}
+
 export function useCustomerTicketQuery(
   apiUrl: string,
   ticketUuid: string | null,
@@ -214,14 +240,45 @@ export function useCustomerReplyMutation(
   ticketUuid: string | null,
   token: string | null
 ) {
+  const pendingReply = useRef<{
+    storageKey: string
+    fingerprint: string
+    key: string
+  } | null>(null)
+
   return useMutation({
     mutationFn: async (payload: CustomerReplyPayload) => {
       if (!ticketUuid) {
         throw new Error('Ticket identifier is required.')
       }
 
+      const body = payload.body.trim()
+      const files = payload.files ?? []
+      const storageKey = `zeddesk_customer_reply:${apiUrl}:${ticketUuid}`
+      const fingerprint = await replyFingerprint(body, files)
+      let previous = pendingReply.current?.storageKey === storageKey ? pendingReply.current : null
+      if (!previous && typeof window !== 'undefined') {
+        try {
+          const stored = JSON.parse(sessionStorage.getItem(storageKey) ?? 'null')
+          if (typeof stored?.key === 'string' && typeof stored?.fingerprint === 'string') {
+            previous = { storageKey, key: stored.key, fingerprint: stored.fingerprint }
+          }
+        } catch {
+          // The in-memory key still covers retries when session storage is unavailable.
+        }
+      }
+      const key = previous?.fingerprint === fingerprint ? previous.key : crypto.randomUUID()
+      pendingReply.current = { storageKey, fingerprint, key }
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem(storageKey, JSON.stringify({ fingerprint, key }))
+        } catch {
+          // The current composer can still retry with its in-memory key.
+        }
+      }
+
       const formData = new FormData()
-      formData.append('message', payload.body.trim())
+      formData.append('message', body)
 
       if (payload.files && payload.files.length > 0) {
         payload.files.forEach((file) => {
@@ -231,6 +288,7 @@ export function useCustomerReplyMutation(
 
       const headers: Record<string, string> = {
         Accept: 'application/json',
+        'Idempotency-Key': key,
       }
       if (token) {
         headers['X-Customer-Token'] = token
@@ -248,6 +306,16 @@ export function useCustomerReplyMutation(
         throw new Error(extractPortalErrorMessage(data, 'Failed to submit reply.'))
       }
 
+      if (pendingReply.current?.key === key) {
+        pendingReply.current = null
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.removeItem(storageKey)
+          } catch {
+            // Storage failure does not change the confirmed reply result.
+          }
+        }
+      }
       return data
     },
   })

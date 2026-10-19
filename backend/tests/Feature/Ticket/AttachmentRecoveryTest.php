@@ -125,7 +125,7 @@ test('customer reply failure on second attachment removes both files and message
     });
 
     $token = (new CustomerTokenService)->generateToken($this->ticket->customer, $this->ticket);
-    $this->withHeaders(['X-Customer-Token' => $token, 'Accept' => 'application/json'])
+    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) Str::uuid(), 'Accept' => 'application/json'])
         ->post("http://acme.localhost/api/portal/tickets/{$this->ticket->id}/reply", [
             'message' => 'Reply with two files',
             'attachments' => [
@@ -137,6 +137,7 @@ test('customer reply failure on second attachment removes both files and message
     expect(Storage::disk('private')->allFiles('tenants'))->toBe([]);
     $this->assertDatabaseMissing('ticket_messages', ['body' => 'Reply with two files']);
     $this->assertDatabaseCount('ticket_attachments', 0);
+    $this->assertDatabaseCount('request_idempotency', 0);
 });
 
 test('cleanup removes old orphans and preserves referenced, recent, and other organization files', function () {

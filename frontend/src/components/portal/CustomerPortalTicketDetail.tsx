@@ -239,7 +239,9 @@ export const CustomerPortalTicketDetail: React.FC<CustomerPortalTicketDetailProp
                 ...old.ticket,
                 status: newStatus,
               },
-              messages: newReply ? [...old.messages, newReply] : old.messages,
+              messages: newReply && !old.messages.some((message) => message.id === newReply.id)
+                ? [...old.messages, newReply]
+                : old.messages,
             }
           }
         )
@@ -247,6 +249,7 @@ export const CustomerPortalTicketDetail: React.FC<CustomerPortalTicketDetailProp
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to submit reply.'
       setReplyError(message)
+      throw err
     }
   }
 

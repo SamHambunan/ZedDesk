@@ -32,7 +32,7 @@ beforeEach(function () {
 test('verified Customer reads and writes share an allowance that survives token replacement', function () {
     $path = 'http://acme.localhost/api/portal/tickets/'.$this->ticket->id;
     $this->getJson($path)->assertOk();
-    $this->postJson($path.'/reply', ['message' => 'Hello'])->assertCreated();
+    $this->withHeader('Idempotency-Key', (string) Str::uuid())->postJson($path.'/reply', ['message' => 'Hello'])->assertCreated();
     $this->postJson($path.'/reply', ['message' => 'Again'])
         ->assertStatus(429)->assertHeader('Retry-After', '50');
     $replacement = app(CustomerTokenService::class)->generateToken($this->customer);
@@ -40,7 +40,7 @@ test('verified Customer reads and writes share an allowance that survives token 
     $this->withHeader('X-Customer-Token', $replacement)->getJson('http://acme.localhost/api/portal/auth/verify')->assertOk();
     $this->getJson($path)->assertStatus(429);
     $this->travel(51)->seconds();
-    $this->postJson($path.'/reply', ['message' => 'Next minute'])->assertCreated();
+    $this->withHeader('Idempotency-Key', (string) Str::uuid())->postJson($path.'/reply', ['message' => 'Next minute'])->assertCreated();
 });
 
 test('Customers and Organizations have independent allowances on a shared IP', function () {
