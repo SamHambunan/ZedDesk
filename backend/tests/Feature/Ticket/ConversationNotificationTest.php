@@ -55,7 +55,7 @@ test('Customer Public Reply and its Ticket Status change create one Notification
     $other = conversationMember($organization, 'Other');
     $ticket->update(['assigned_member_id' => $handler->id, 'status' => 'pending']);
 
-    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid()])
+    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) Str::uuid()])
         ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", [
             'message' => 'I have more information',
         ])->assertCreated()->assertJsonPath('ticket.status', 'open');
@@ -121,7 +121,7 @@ test('conversation activity falls back to active Team members then active Organi
     expect(DB::table('notifications')->where('recipient_member_id', $removed->id)->count())->toBe(0);
 
     $ticket->update(['assigned_team_id' => null]);
-    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid()])
+    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) Str::uuid()])
         ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", [
             'message' => 'Unassigned follow up',
         ])->assertCreated();
@@ -142,7 +142,7 @@ test('unread conversation activity groups by Ticket and activity after read crea
     $ticket->update(['assigned_member_id' => $handler->id]);
     $url = "http://acme.localhost/api/portal/tickets/{$ticket->id}/reply";
 
-    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid()])
+    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) Str::uuid()])
         ->postJson($url, ['message' => 'First update'])->assertCreated();
     $this->withHeader('Idempotency-Key', (string) Str::uuid())->postJson($url, ['message' => 'Second update'])->assertCreated();
 
@@ -154,7 +154,7 @@ test('unread conversation activity groups by Ticket and activity after read crea
         ->assertJsonPath('unread_count', 1);
     $this->postJson("http://acme.localhost/api/notifications/{$first}/mark-read")->assertOk();
 
-    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid()])
+    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) Str::uuid()])
         ->postJson($url, ['message' => 'Third update'])->assertCreated();
     Sanctum::actingAs($handler->user);
     $items = $this->getJson('http://acme.localhost/api/notifications')

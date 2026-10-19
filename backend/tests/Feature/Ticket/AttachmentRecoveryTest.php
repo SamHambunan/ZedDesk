@@ -125,7 +125,7 @@ test('customer reply failure on second attachment removes both files and message
     });
 
     $token = (new CustomerTokenService)->generateToken($this->ticket->customer, $this->ticket);
-    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid(), 'Accept' => 'application/json'])
+    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) Str::uuid(), 'Accept' => 'application/json'])
         ->post("http://acme.localhost/api/portal/tickets/{$this->ticket->id}/reply", [
             'message' => 'Reply with two files',
             'attachments' => [

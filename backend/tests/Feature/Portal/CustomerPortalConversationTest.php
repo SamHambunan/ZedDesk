@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -109,7 +110,7 @@ test('customer reply posts public message and automatically reopens pending tick
     $this->ticket->update(['status' => TicketStatus::PENDING]);
     expect($this->ticket->fresh()->status)->toBe(TicketStatus::PENDING);
 
-    $response = $this->withHeaders(['X-Customer-Token' => $this->token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid()])
+    $response = $this->withHeaders(['X-Customer-Token' => $this->token, 'Idempotency-Key' => (string) Str::uuid()])
         ->postJson("http://acme.localhost/api/portal/tickets/{$this->ticket->id}/reply", [
             'message' => 'Here is the additional information you requested.',
         ]);
@@ -141,7 +142,7 @@ test('customer reply automatically reopens resolved ticket to open and clears re
     expect($this->ticket->fresh()->status)->toBe(TicketStatus::RESOLVED)
         ->and($this->ticket->fresh()->resolved_at)->not->toBeNull();
 
-    $response = $this->withHeaders(['X-Customer-Token' => $this->token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid()])
+    $response = $this->withHeaders(['X-Customer-Token' => $this->token, 'Idempotency-Key' => (string) Str::uuid()])
         ->postJson("http://acme.localhost/api/portal/tickets/{$this->ticket->id}/reply", [
             'body' => 'Actually, the issue is still persisting after reboot.',
         ]);
@@ -157,7 +158,7 @@ test('customer reply automatically reopens resolved ticket to open and clears re
 test('customer reply preserves open status when ticket is already open', function () {
     expect($this->ticket->status)->toBe(TicketStatus::OPEN);
 
-    $response = $this->withHeaders(['X-Customer-Token' => $this->token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid()])
+    $response = $this->withHeaders(['X-Customer-Token' => $this->token, 'Idempotency-Key' => (string) Str::uuid()])
         ->postJson("http://acme.localhost/api/portal/tickets/{$this->ticket->id}/reply", [
             'message' => 'Just an update while ticket is open.',
         ]);
@@ -175,7 +176,7 @@ test('customer reply to closed ticket is rejected with 422 Unprocessable Entity'
     ]);
     expect($this->ticket->fresh()->isClosed())->toBeTrue();
 
-    $response = $this->withHeaders(['X-Customer-Token' => $this->token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid()])
+    $response = $this->withHeaders(['X-Customer-Token' => $this->token, 'Idempotency-Key' => (string) Str::uuid()])
         ->postJson("http://acme.localhost/api/portal/tickets/{$this->ticket->id}/reply", [
             'message' => 'Attempting to reply to an already closed ticket',
         ]);
@@ -192,7 +193,7 @@ test('customer reply can attach valid files and stores them on private disk', fu
 
     $response = $this->withHeaders([
         'X-Customer-Token' => $this->token,
-        'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid(),
+        'Idempotency-Key' => (string) Str::uuid(),
         'Accept' => 'application/json',
     ])->post("http://acme.localhost/api/portal/tickets/{$this->ticket->id}/reply", [
         'message' => 'Here is a screenshot of the issue.',
