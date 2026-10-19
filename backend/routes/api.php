@@ -56,8 +56,8 @@ Route::get('/health', function () {
     ], $isHealthy ? 200 : 503);
 });
 
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register'])->middleware('limit.public:registration');
+Route::post('/login', [AuthController::class, 'login'])->middleware('limit.public:login');
 
 Route::middleware(['auth:sanctum', 'limit.authenticated:global'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -69,7 +69,7 @@ Route::middleware(['auth:sanctum', 'limit.authenticated:global'])->group(functio
 
 Route::get('/invitations/{token}', [InvitationController::class, 'show']);
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept'])
-    ->middleware('limit.authenticated:optional');
+    ->middleware(['limit.authenticated:optional', 'limit.public:registration,guest']);
 
 Route::middleware(['auth:sanctum', 'ensure.organization_member', 'limit.authenticated:member'])->group(function () {
     Route::get('/audit-logs', [AuditLogController::class, 'index']);
@@ -179,10 +179,10 @@ Route::post('/broadcasting/auth', function (Request $request) {
 })->middleware(['auth:sanctum', 'limit.authenticated:global']);
 
 Route::prefix('portal')->group(function () {
-    Route::post('/tickets', [CustomerPortalController::class, 'store']);
-    Route::post('/magic-link', [CustomerPortalController::class, 'magicLink']);
+    Route::post('/tickets', [CustomerPortalController::class, 'store'])->middleware('limit.public:ticket_creation');
+    Route::post('/magic-link', [CustomerPortalController::class, 'magicLink'])->middleware('limit.public:access_link');
 
-    Route::middleware('customer.token')->group(function () {
+    Route::middleware(['customer.token', 'limit.customer'])->group(function () {
         Route::get('/tickets/{ticket}', [CustomerPortalController::class, 'show']);
         Route::get('/tickets/{ticket}/live-channel', function (Request $request, string $ticket, CustomerTicketLiveChannel $channels) {
             abort_unless($channels->tokenMatchesTicket($request->attributes->get('customer_token_payload'), $ticket), 403);

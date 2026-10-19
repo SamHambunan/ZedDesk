@@ -2,24 +2,20 @@
 
 namespace App\Http\Middleware;
 
-use App\Contracts\RateLimitStore;
 use App\Enums\Role;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\InvitationController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\TicketController;
-use App\Services\RateLimitAttempt;
-use App\Services\RedisRateLimitStore;
+use App\Services\ApiRateLimiter;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Throwable;
 
 class LimitAuthenticatedApi
 {
     public function __construct(
-        private readonly RedisRateLimitStore $redis,
-        private readonly RateLimitStore $postgres,
+        private readonly ApiRateLimiter $limiter,
     ) {}
 
     public function handle(Request $request, Closure $next, string $scope = 'member'): Response
@@ -34,41 +30,12 @@ class LimitAuthenticatedApi
         }
 
         $identity = 'user:'.$user->getAuthIdentifier().':organization:'.($organization?->id ?? 'global');
-        $key = hash_hmac('sha256', $identity, config('app.key'));
-        $now = now()->timestamp;
-        $window = intdiv($now, 60) * 60;
-        $attempt = new RateLimitAttempt(
-            $key,
-            $window,
+        $this->limiter->enforce(
+            $identity,
+            (int) config('rate_limits.authenticated_per_minute'),
             ! in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true),
-            max(1, (int) config('rate_limits.authenticated_per_minute')),
-            max(1, (int) config('rate_limits.authenticated_writes_per_minute')),
+            (int) config('rate_limits.authenticated_writes_per_minute'),
         );
-
-        try {
-            $allowed = $this->redis->allow($attempt);
-            if ($allowed) {
-                try {
-                    // Keep the fallback window current so an outage cannot grant a fresh allowance.
-                    $allowed = $this->postgres->allow($attempt);
-                } catch (Throwable) {
-                    // Redis is enforcing the policy; a mirror failure cannot block the request.
-                }
-            }
-        } catch (Throwable) {
-            try {
-                $allowed = $this->postgres->allow($attempt);
-            } catch (Throwable) {
-                return response()->json(['message' => 'Rate limiting is temporarily unavailable.'], 503);
-            }
-        }
-
-        if (! $allowed) {
-            $retryAfter = 60 - ($now % 60);
-
-            return response()->json(['message' => 'Too many requests. Retry later.'], 429)
-                ->header('Retry-After', (string) $retryAfter);
-        }
 
         return $next($request);
     }
