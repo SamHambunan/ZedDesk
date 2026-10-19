@@ -41,16 +41,9 @@ class RequestIdempotency
     }
 
     /** The caller keeps this inside the transaction that writes all business effects. */
-    public function run(int $organizationId, string $actorType, string $actorId, string $operation, string $targetId, string $key, string $fingerprint, callable $mutate, callable $authorizeReplay): JsonResponse
+    public function run(RequestIdempotencyScope $scope, string $key, string $fingerprint, callable $mutate, callable $authorizeReplay): JsonResponse
     {
-        $identity = [
-            'organization_id' => $organizationId,
-            'actor_type' => $actorType,
-            'actor_id' => $actorId,
-            'operation' => $operation,
-            'target_id' => $targetId,
-            'key_hash' => hash('sha256', $key),
-        ];
+        $identity = $scope->identityForKey($key);
 
         $insert = function () use ($identity, $fingerprint): void {
             DB::table('request_idempotency')->insertOrIgnore($identity + [
@@ -90,6 +83,7 @@ class RequestIdempotency
         DB::table('request_idempotency')->where('id', $record->id)->update([
             'response_status' => $result->getStatusCode(),
             'encrypted_response' => Crypt::encryptString($result->getContent()),
+            'expires_at' => now()->addDay(),
             'updated_at' => now(),
         ]);
 

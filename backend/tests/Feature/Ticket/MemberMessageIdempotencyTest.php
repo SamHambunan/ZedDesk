@@ -5,7 +5,9 @@ use App\Models\Customer;
 use App\Models\Organization;
 use App\Models\OrganizationMember;
 use App\Models\Ticket;
+use App\Models\TicketMessage;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -98,6 +100,47 @@ test('file content, filename, message kind, and requested status are part of the
     expect(DB::table('ticket_messages')->where('ticket_id', $ticket->id)->count())->toBe(1)
         ->and(DB::table('ticket_attachments')->count())->toBe(1)
         ->and(Storage::disk('private')->allFiles())->toHaveCount(1);
+});
+
+test('a Public Reply status override is saved once and a changed override conflicts', function () {
+    $ticket = memberMessageFixture();
+    $key = (string) Str::uuid();
+    $url = "http://acme.localhost/api/tickets/{$ticket->id}/messages";
+    $payload = ['message_type' => 'public_reply', 'body' => 'Please wait', 'target_status' => 'pending'];
+
+    $first = $this->withHeader('Idempotency-Key', $key)->postJson($url, $payload)->assertCreated()
+        ->assertJsonPath('ticket.status', 'pending');
+    $revision = $ticket->fresh()->revision;
+    $this->withHeader('Idempotency-Key', $key)->postJson($url, $payload)->assertCreated()
+        ->assertJsonPath('data.id', $first->json('data.id'))
+        ->assertJsonPath('ticket.status', 'pending');
+    $this->withHeader('Idempotency-Key', $key)->postJson($url, [
+        'message_type' => 'public_reply', 'body' => 'Please wait', 'target_status' => 'open',
+    ])->assertConflict();
+
+    expect($ticket->fresh()->revision)->toBe($revision)
+        ->and(DB::table('ticket_messages')->where('ticket_id', $ticket->id)->count())->toBe(1);
+});
+
+test('the result remains available for 24 hours after a slow mutation finishes', function () {
+    $ticket = memberMessageFixture();
+    $started = Carbon::parse('2026-10-19 00:00:00');
+    Carbon::setTestNow($started);
+    TicketMessage::creating(function () use ($started) {
+        Carbon::setTestNow($started->copy()->addHours(2));
+    });
+
+    try {
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson("http://acme.localhost/api/tickets/{$ticket->id}/messages", [
+                'message_type' => 'internal_note', 'body' => 'Slow message',
+            ])->assertCreated();
+
+        $expires = Carbon::parse(DB::table('request_idempotency')->sole()->expires_at);
+        expect(now()->diffInHours($expires))->toBe(24.0);
+    } finally {
+        Carbon::setTestNow();
+    }
 });
 
 test('expired results are replaced and removed by scheduled maintenance', function () {

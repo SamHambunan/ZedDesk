@@ -19,6 +19,7 @@ use App\Services\AttachmentService;
 use App\Services\AuditLogWriter;
 use App\Services\DurableDelivery;
 use App\Services\RequestIdempotency;
+use App\Services\RequestIdempotencyScope;
 use App\Services\TicketAssignmentService;
 use App\Services\TicketFieldEditor;
 use DomainException;
@@ -365,11 +366,13 @@ class TicketController extends Controller
 
         try {
             return $attachmentService->transaction(fn () => $idempotency->run(
-                (int) $ticket->organization_id,
-                'user',
-                (string) $request->user()->id,
-                'member.message.create',
-                $ticket->id,
+                new RequestIdempotencyScope(
+                    organizationId: (int) $ticket->organization_id,
+                    actorType: 'user',
+                    actorId: (string) $request->user()->id,
+                    operation: 'member.message.create',
+                    targetId: $ticket->id,
+                ),
                 $requestKey,
                 $fingerprint,
                 fn () => app(DurableDelivery::class)->capture(function () use ($ticket, $currentMember, $messageType, $body, $statusOverride, $files, $attachmentService) {
