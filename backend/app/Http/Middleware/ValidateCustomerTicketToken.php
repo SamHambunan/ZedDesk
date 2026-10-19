@@ -21,6 +21,14 @@ class ValidateCustomerTicketToken
         protected CustomerTokenService $tokenService = new CustomerTokenService
     ) {}
 
+    /** Recheck the same access policy at the point a retained result is returned. */
+    public function revalidate(Request $request): ?Response
+    {
+        $response = $this->handle($request, fn () => response()->noContent());
+
+        return $response->getStatusCode() === 204 ? null : $response;
+    }
+
     /**
      * Handle an incoming request and validate the customer HMAC signed access token.
      */

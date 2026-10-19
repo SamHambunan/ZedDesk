@@ -10,6 +10,7 @@ use App\Enums\TicketStatus;
 use App\Exceptions\InvalidAttachmentException;
 use App\Exceptions\InvalidTicketTransitionException;
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\ValidateCustomerTicketToken;
 use App\Models\Customer;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
@@ -336,28 +337,7 @@ class CustomerPortalController extends Controller
                         ],
                     ], 201);
                 }),
-                function () use ($request, $organization, $customer, $ticketModel): void {
-                    $token = $request->header('X-Customer-Token')
-                        ?: $request->query('token')
-                        ?: $request->query('customer_token');
-                    $inspection = $this->tokenService->inspectToken((string) $token);
-                    $payload = $inspection['payload'];
-                    if (! $inspection['valid']
-                        || (int) $payload['organization_id'] !== (int) $organization->id
-                        || (string) $payload['customer_id'] !== (string) $customer->id
-                        || (! empty($payload['ticket_id']) && (string) $payload['ticket_id'] !== (string) $ticketModel->id)) {
-                        abort(401, 'Authentication required.');
-                    }
-
-                    $currentTicket = Ticket::whereKey($ticketModel->id)->firstOrFail();
-                    abort_unless(
-                        Customer::whereKey($customer->id)->where('organization_id', $organization->id)->exists()
-                            && $currentTicket->customer_id === $customer->id
-                            && (int) $currentTicket->organization_id === (int) $organization->id,
-                        403,
-                        'Customer access to this ticket is unavailable.'
-                    );
-                }
+                fn () => app(ValidateCustomerTicketToken::class)->revalidate($request)
             ));
         } catch (InvalidTicketTransitionException $e) {
             return response()->json([
