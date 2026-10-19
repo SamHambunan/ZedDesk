@@ -79,7 +79,7 @@ test('another Organization Members Internal Note notifies the handler and never 
     $url = "http://acme.localhost/api/tickets/{$ticket->id}/messages";
 
     Sanctum::actingAs($actor->user);
-    $this->postJson($url, ['message_type' => 'internal_note', 'body' => 'Please investigate'])
+    $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson($url, ['message_type' => 'internal_note', 'body' => 'Please investigate'])
         ->assertCreated();
     $this->getJson('http://acme.localhost/api/notifications')->assertJsonCount(0, 'data');
 
@@ -89,7 +89,7 @@ test('another Organization Members Internal Note notifies the handler and never 
         ->assertJsonPath('data.0.activity_type', 'internal_note')
         ->assertJsonPath('data.0.latest_activity_metadata.actor_member_id', $actor->id);
 
-    $this->postJson($url, ['message_type' => 'internal_note', 'body' => 'My own note'])
+    $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson($url, ['message_type' => 'internal_note', 'body' => 'My own note'])
         ->assertCreated();
     $this->getJson('http://acme.localhost/api/notifications')->assertJsonCount(1, 'data');
 });
@@ -109,7 +109,7 @@ test('conversation activity falls back to active Team members then active Organi
     $ticket->update(['assigned_team_id' => $team->id]);
 
     Sanctum::actingAs($actor->user);
-    $this->postJson("http://acme.localhost/api/tickets/{$ticket->id}/messages", [
+    $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$ticket->id}/messages", [
         'message_type' => 'internal_note', 'body' => 'Team work',
     ])->assertCreated();
     $this->getJson('http://acme.localhost/api/notifications')->assertJsonCount(0, 'data');
@@ -178,7 +178,7 @@ test('standalone Ticket Status Priority and Tag changes and Organization Member 
     $tag = $this->postJson('http://acme.localhost/api/tags', ['name' => 'Follow up'])
         ->assertCreated()->json('data.id');
     $this->postJson($url.'/tags', ['tag_id' => $tag])->assertOk();
-    $this->postJson($url.'/messages', [
+    $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson($url.'/messages', [
         'message_type' => 'public_reply', 'body' => 'Staff response',
     ])->assertCreated();
 

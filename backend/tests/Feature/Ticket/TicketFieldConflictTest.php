@@ -145,16 +145,16 @@ test('Public Replies and Internal Notes append after Priority edits and closed T
     $this->patchJson($this->url.'/priority', ['priority' => 'high'])->assertOk();
 
     Sanctum::actingAs($this->members[1]);
-    $this->postJson($this->url.'/messages', [
+    $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson($this->url.'/messages', [
         'message_type' => 'internal_note', 'body' => 'Checking this',
     ])->assertCreated();
-    $this->postJson($this->url.'/messages', [
+    $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson($this->url.'/messages', [
         'message_type' => 'public_reply', 'body' => 'We are working on it',
     ])->assertCreated();
 
     $this->getJson($this->url)->assertOk()->assertJsonCount(2, 'messages');
     $this->ticket->update(['status' => 'closed']);
-    $this->postJson($this->url.'/messages', [
+    $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson($this->url.'/messages', [
         'message_type' => 'internal_note', 'body' => 'Too late',
     ])->assertUnprocessable();
     $this->getJson($this->url)->assertJsonCount(2, 'messages');

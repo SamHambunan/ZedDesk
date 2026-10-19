@@ -1,0 +1,98 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+class RequestIdempotency
+{
+    public function key(Request $request): string
+    {
+        $key = $request->header('Idempotency-Key');
+        $valid = is_string($key) && (
+            preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $key)
+            || preg_match('/^[0-9a-f]{64}$/i', $key)
+            || preg_match('/^[A-Za-z0-9_-]{43,128}$/', $key)
+        );
+
+        if (! $valid) {
+            throw ValidationException::withMessages(['idempotency_key' => 'A high-entropy Idempotency-Key is required.']);
+        }
+
+        return $key;
+    }
+
+    /** @param array<UploadedFile> $files */
+    public function messageFingerprint(string $ticketId, string $messageType, string $body, ?string $status, array $files): string
+    {
+        $attachments = array_map(static fn (UploadedFile $file) => [
+            'sha256' => hash_file('sha256', $file->getRealPath()),
+            'name' => $file->getClientOriginalName(),
+            'mime' => $file->getMimeType(),
+            'size' => $file->getSize(),
+        ], $files);
+
+        return hash('sha256', json_encode([$ticketId, $messageType, $body, $status, $attachments], JSON_THROW_ON_ERROR));
+    }
+
+    /** The caller keeps this inside the transaction that writes all business effects. */
+    public function run(int $organizationId, string $actorType, string $actorId, string $operation, string $targetId, string $key, string $fingerprint, callable $mutate, callable $authorizeReplay): JsonResponse
+    {
+        $identity = [
+            'organization_id' => $organizationId,
+            'actor_type' => $actorType,
+            'actor_id' => $actorId,
+            'operation' => $operation,
+            'target_id' => $targetId,
+            'key_hash' => hash('sha256', $key),
+        ];
+
+        $insert = function () use ($identity, $fingerprint): void {
+            DB::table('request_idempotency')->insertOrIgnore($identity + [
+                'fingerprint' => $fingerprint,
+                'expires_at' => now()->addDay(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        };
+
+        $insert();
+        $record = DB::table('request_idempotency')->where($identity)->lockForUpdate()->first();
+
+        if (now()->greaterThanOrEqualTo($record->expires_at)) {
+            DB::table('request_idempotency')->where('id', $record->id)->delete();
+            $insert();
+            $record = DB::table('request_idempotency')->where($identity)->lockForUpdate()->first();
+        }
+
+        if ($record->fingerprint !== $fingerprint) {
+            return response()->json(['message' => 'Idempotency-Key was already used for a different operation.'], 409);
+        }
+
+        if ($record->encrypted_response !== null) {
+            $authorizeReplay();
+
+            return JsonResponse::fromJsonString(Crypt::decryptString($record->encrypted_response), (int) $record->response_status);
+        }
+
+        $result = $mutate();
+        if ($result->getStatusCode() >= 400) {
+            DB::table('request_idempotency')->where('id', $record->id)->delete();
+
+            return $result;
+        }
+
+        DB::table('request_idempotency')->where('id', $record->id)->update([
+            'response_status' => $result->getStatusCode(),
+            'encrypted_response' => Crypt::encryptString($result->getContent()),
+            'updated_at' => now(),
+        ]);
+
+        return $result;
+    }
+}

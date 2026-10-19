@@ -250,7 +250,7 @@ test('agent can post public reply which defaults ticket status to pending and di
 
     expect($this->acmeTicket->status)->toBe(TicketStatus::OPEN);
 
-    $response = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
+    $response = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
         'message_type' => 'public_reply',
         'body' => 'Hello Alice, we are investigating your issue.',
     ]);
@@ -278,7 +278,7 @@ test('agent can post public reply with status override to resolved', function ()
 
     Sanctum::actingAs($this->acmeAgentUser);
 
-    $response = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
+    $response = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
         'message_type' => 'public_reply',
         'body' => 'Your issue is resolved.',
         'status' => 'resolved',
@@ -300,7 +300,7 @@ test('agent can post internal note which never alters ticket status', function (
 
     expect($this->acmeTicket->status)->toBe(TicketStatus::OPEN);
 
-    $response = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
+    $response = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
         'message_type' => 'internal_note',
         'body' => 'Private note: escalated to tier 2.',
     ]);
@@ -324,7 +324,7 @@ test('agent can post public reply with optional file attachments', function () {
     $file1 = UploadedFile::fake()->create('document.pdf', 500, 'application/pdf');
     $file2 = UploadedFile::fake()->create('screenshot.png', 100, 'image/png');
 
-    $response = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
+    $response = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
         'message_type' => 'public_reply',
         'body' => 'Here are the requested documents.',
         'attachments' => [$file1, $file2],
@@ -347,7 +347,7 @@ test('agent message post rejects disallowed attachment mime types with 422', fun
 
     $file = UploadedFile::fake()->create('malicious.exe', 100, 'application/x-msdownload');
 
-    $response = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
+    $response = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
         'message_type' => 'public_reply',
         'body' => 'Sending executable file',
         'attachments' => [$file],
@@ -362,7 +362,7 @@ test('agent message post rejects oversized attachments exceeding 10MB with 422',
 
     $largeFile = UploadedFile::fake()->create('huge.pdf', 11 * 1024, 'application/pdf');
 
-    $response = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
+    $response = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
         'message_type' => 'public_reply',
         'body' => 'Sending large file',
         'attachments' => [$largeFile],
@@ -374,7 +374,7 @@ test('agent message post rejects oversized attachments exceeding 10MB with 422',
 test('agent message post rejects missing or empty message body with 422', function () {
     Sanctum::actingAs($this->acmeAgentUser);
 
-    $response = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
+    $response = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
         'message_type' => 'public_reply',
         'body' => '',
     ]);
@@ -395,7 +395,7 @@ test('agent message post rejects replies on closed ticket with 422', function ()
 
     Sanctum::actingAs($this->acmeAgentUser);
 
-    $response = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
+    $response = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
         'message_type' => 'public_reply',
         'body' => 'Attempting reply on closed ticket',
     ]);
@@ -404,7 +404,7 @@ test('agent message post rejects replies on closed ticket with 422', function ()
 });
 
 test('agent message post rejects unauthenticated access with 401', function () {
-    $response = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
+    $response = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
         'message_type' => 'public_reply',
         'body' => 'Unauthorized reply attempt',
     ]);
@@ -415,7 +415,7 @@ test('agent message post rejects unauthenticated access with 401', function () {
 test('agent message post rejects cross-organization access with 403', function () {
     Sanctum::actingAs($this->betaAgentUser);
 
-    $response = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
+    $response = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
         'message_type' => 'public_reply',
         'body' => 'Cross-organization message attempt',
     ]);
@@ -432,7 +432,7 @@ test('agent can post internal note with file attachments without altering ticket
 
     expect($this->acmeTicket->status)->toBe(TicketStatus::OPEN);
 
-    $response = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
+    $response = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
         'message_type' => 'internal_note',
         'body' => 'Investigating server diagnostics attached.',
         'attachments' => [$file],
@@ -461,7 +461,7 @@ test('internal note never accepts or persists target status override', function 
 
     expect($this->acmeTicket->status)->toBe(TicketStatus::OPEN);
 
-    $response = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
+    $response = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
         'message_type' => 'internal_note',
         'body' => 'Internal note attempting to specify target status override',
         'status' => 'resolved',
@@ -506,7 +506,7 @@ test('customer cannot access agent ticket workspace or post agent messages', fun
     $showResponse->assertStatus(403);
 
     // Cannot post via agent messages endpoint
-    $postResponse = $this->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
+    $postResponse = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->acmeTicket->id}/messages", [
         'message_type' => 'public_reply',
         'body' => 'Attempting post as external customer user',
     ]);

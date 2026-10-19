@@ -95,7 +95,7 @@ export interface TicketCockpitActions {
   readonly removeTag: (ticketId: string, tagId: number | string) => Promise<void> | void
   readonly deleteTicket: (ticketId: string) => Promise<void> | void
   readonly restoreTicket?: (ticketId: string) => Promise<void> | void
-  readonly submitComposer: (ticketId: string, payload: ComposerSubmitPayload) => void
+  readonly submitComposer: (ticketId: string, payload: ComposerSubmitPayload) => void | Promise<void>
   readonly applyPendingQueueOrder?: () => void
   readonly sendTyping?: (ticketId: string, isTyping: boolean) => void
 }

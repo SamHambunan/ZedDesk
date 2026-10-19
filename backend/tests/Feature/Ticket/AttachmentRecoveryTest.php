@@ -56,7 +56,7 @@ test('message transaction failure after attachment write removes bytes and messa
         }
     });
 
-    $this->post("http://acme.localhost/api/tickets/{$this->ticket->id}/messages", [
+    $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->post("http://acme.localhost/api/tickets/{$this->ticket->id}/messages", [
         'message_type' => 'public_reply',
         'body' => 'Reply with a file',
         'attachments' => [UploadedFile::fake()->create('report.pdf', 10, 'application/pdf')],

@@ -94,7 +94,7 @@ test('staff Ticket channel requires current membership and generation', function
 test('staff Public Reply emits a small revisioned signal and REST exposes the conversation', function () {
     Sanctum::actingAs($this->user);
 
-    $this->postJson("http://acme.localhost/api/tickets/{$this->ticket->id}/messages", [
+    $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->ticket->id}/messages", [
         'message_type' => 'public_reply',
         'body' => 'Public answer',
     ])->assertCreated();
@@ -121,7 +121,7 @@ test('Internal Note with an attachment emits only IDs and exposes the note to st
     Sanctum::actingAs($this->user);
     $before = $this->ticket->fresh()->revision;
 
-    $this->post("http://acme.localhost/api/tickets/{$this->ticket->id}/messages", [
+    $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->post("http://acme.localhost/api/tickets/{$this->ticket->id}/messages", [
         'message_type' => 'internal_note',
         'body' => 'Private draft',
         'attachments' => [UploadedFile::fake()->create('internal.pdf', 10, 'application/pdf')],
@@ -166,7 +166,7 @@ test('Customer Public Reply with an attachment signals staff and REST recovers t
 test('closed Ticket rejects new messages without a signal', function () {
     $this->ticket->update(['status' => 'closed']);
     Sanctum::actingAs($this->user);
-    $this->postJson("http://acme.localhost/api/tickets/{$this->ticket->id}/messages", [
+    $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->ticket->id}/messages", [
         'message_type' => 'internal_note',
         'body' => 'Too late',
     ])->assertUnprocessable();
