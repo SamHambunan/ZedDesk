@@ -34,7 +34,7 @@ function ticketWorkflowFixture(): array
 test('ticket creation commits its ticket, message, notifications, and outbox delivery signals together', function () {
     [$organization, $customer, $user, $member] = ticketWorkflowFixture();
 
-    $this->postJson('http://acme.localhost/api/portal/tickets', [
+    $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://acme.localhost/api/portal/tickets', [
         'name' => 'Customer',
         'email' => 'customer@acme.test',
         'subject' => 'Portal subject',
@@ -308,7 +308,7 @@ test('failed outbox write rolls back the entire ticket mutation', function () {
 test('delayed publication broadcasts creation to organization, message to ticket and organization, and inbox to member', function () {
     [$organization, $customer, $user, $member] = ticketWorkflowFixture();
 
-    $this->postJson('http://acme.localhost/api/portal/tickets', [
+    $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://acme.localhost/api/portal/tickets', [
         'name' => 'Customer',
         'email' => 'customer@acme.test',
         'subject' => 'Delayed live recovery test',

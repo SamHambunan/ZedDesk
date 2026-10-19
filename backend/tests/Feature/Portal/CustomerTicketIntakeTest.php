@@ -33,7 +33,7 @@ afterEach(function () {
 });
 
 test('public ticket intake creates customer, sequential ticket, initial message, and returns signed token', function () {
-    $response = $this->postJson('http://acme.localhost/api/portal/tickets', [
+    $response = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://acme.localhost/api/portal/tickets', [
         'name' => 'Alice Smith',
         'email' => 'alice@example.com',
         'subject' => 'Cannot access billing portal',
@@ -111,7 +111,7 @@ test('public ticket intake matches existing customer and increments sequential t
         'subject' => 'First ticket',
     ]);
 
-    $response = $this->postJson('http://acme.localhost/api/portal/tickets', [
+    $response = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://acme.localhost/api/portal/tickets', [
         'name' => 'Alice Existing',
         'email' => 'alice@example.com',
         'subject' => 'Second inquiry',
@@ -131,7 +131,7 @@ test('public ticket intake accepts optional attachments and stores them in tenan
     $file1 = UploadedFile::fake()->create('screenshot.png', 500, 'image/png');
     $file2 = UploadedFile::fake()->create('document.pdf', 1000, 'application/pdf');
 
-    $response = $this->post('http://acme.localhost/api/portal/tickets', [
+    $response = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->post('http://acme.localhost/api/portal/tickets', [
         'name' => 'Bob Builder',
         'email' => 'bob@example.com',
         'subject' => 'Issue with attachments',
@@ -159,7 +159,7 @@ test('public ticket intake accepts optional attachments and stores them in tenan
 test('public ticket intake rejects attachments exceeding 10mb limit and does not create ticket', function () {
     $largeFile = UploadedFile::fake()->create('huge.pdf', 11 * 1024, 'application/pdf'); // 11MB
 
-    $response = $this->post('http://acme.localhost/api/portal/tickets', [
+    $response = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->post('http://acme.localhost/api/portal/tickets', [
         'name' => 'Charlie Oversize',
         'email' => 'charlie@example.com',
         'subject' => 'Large file ticket',
@@ -176,7 +176,7 @@ test('public ticket intake rejects attachments exceeding 10mb limit and does not
 test('public ticket intake rejects attachments with disallowed mime type', function () {
     $badFile = UploadedFile::fake()->create('script.exe', 100, 'application/x-msdownload');
 
-    $response = $this->post('http://acme.localhost/api/portal/tickets', [
+    $response = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->post('http://acme.localhost/api/portal/tickets', [
         'name' => 'Dave BadMime',
         'email' => 'dave@example.com',
         'subject' => 'Bad file ticket',
@@ -190,7 +190,7 @@ test('public ticket intake rejects attachments with disallowed mime type', funct
 });
 
 test('public ticket intake validates required fields and email format', function () {
-    $response = $this->postJson('http://acme.localhost/api/portal/tickets', [
+    $response = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://acme.localhost/api/portal/tickets', [
         'name' => '',
         'email' => 'not-an-email',
         'subject' => '',

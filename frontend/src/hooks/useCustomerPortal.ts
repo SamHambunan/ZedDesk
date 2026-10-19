@@ -60,14 +60,75 @@ function extractPortalErrorMessage(data: unknown, fallback: string): string {
   return fallback
 }
 
+function usePendingSubmissionKey() {
+  const pending = useRef(new Map<string, string>())
+
+  function storedKeys(storageKey: string): Record<string, string> {
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(storageKey) ?? 'null')
+      if (!stored || typeof stored !== 'object') return {}
+      if (typeof stored.fingerprint === 'string' && typeof stored.key === 'string') {
+        return { [stored.fingerprint]: stored.key }
+      }
+      return Object.fromEntries(Object.entries(stored).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+    } catch {
+      return {}
+    }
+  }
+
+  return {
+    reserve(storageKey: string, fingerprint: string): string {
+      const entry = `${storageKey}:${fingerprint}`
+      const stored = typeof window !== 'undefined' ? storedKeys(storageKey) : {}
+      const key = pending.current.get(entry) ?? stored[fingerprint] ?? crypto.randomUUID()
+      pending.current.set(entry, key)
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem(storageKey, JSON.stringify({ ...stored, [fingerprint]: key }))
+        } catch {
+          // The current form can still retry with its in-memory key.
+        }
+      }
+      return key
+    },
+    clear(storageKey: string, fingerprint: string, key: string): void {
+      const entry = `${storageKey}:${fingerprint}`
+      if (pending.current.get(entry) !== key) return
+      pending.current.delete(entry)
+      if (typeof window !== 'undefined') {
+        try {
+          const stored = storedKeys(storageKey)
+          if (stored[fingerprint] !== key) return
+          delete stored[fingerprint]
+          if (Object.keys(stored).length) sessionStorage.setItem(storageKey, JSON.stringify(stored))
+          else sessionStorage.removeItem(storageKey)
+        } catch {
+          // Storage failure does not change the confirmed result.
+        }
+      }
+    },
+  }
+}
+
 export function useSubmitTicketMutation(apiUrl: string) {
+  const submissionKey = usePendingSubmissionKey()
+
   return useMutation<TicketSubmissionResponse, Error, CreateTicketPayload>({
     mutationFn: async (payload) => {
+      const name = payload.name.trim()
+      const email = payload.email.trim()
+      const subject = payload.subject.trim()
+      const message = payload.message.trim()
+      const files = payload.attachments ?? []
+      const storageKey = `zeddesk_ticket_intake:${apiUrl}`
+      const fingerprint = await submissionFingerprint([name, email, subject, message, payload.priority ?? null], files)
+      const key = submissionKey.reserve(storageKey, fingerprint)
+
       const formData = new FormData()
-      formData.append('name', payload.name.trim())
-      formData.append('email', payload.email.trim())
-      formData.append('subject', payload.subject.trim())
-      formData.append('message', payload.message.trim())
+      formData.append('name', name)
+      formData.append('email', email)
+      formData.append('subject', subject)
+      formData.append('message', message)
       if (payload.priority) {
         formData.append('priority', payload.priority)
       }
@@ -82,6 +143,7 @@ export function useSubmitTicketMutation(apiUrl: string) {
         method: 'POST',
         headers: {
           Accept: 'application/json',
+          'Idempotency-Key': key,
         },
         body: formData,
       })
@@ -92,6 +154,7 @@ export function useSubmitTicketMutation(apiUrl: string) {
         throw new Error(extractPortalErrorMessage(data, 'Failed to submit support request.'))
       }
 
+      submissionKey.clear(storageKey, fingerprint, key)
       return data as TicketSubmissionResponse
     },
   })
@@ -174,7 +237,7 @@ export interface CustomerReplyPayload {
   files?: readonly File[]
 }
 
-async function replyDigest(bytes: Uint8Array): Promise<string> {
+async function submissionDigest(bytes: Uint8Array): Promise<string> {
   if (globalThis.crypto?.subtle) {
     const input = new Uint8Array(new ArrayBuffer(bytes.byteLength))
     input.set(bytes)
@@ -189,14 +252,14 @@ async function replyDigest(bytes: Uint8Array): Promise<string> {
   return (hash >>> 0).toString(16).padStart(8, '0')
 }
 
-async function replyFingerprint(body: string, files: readonly File[]): Promise<string> {
+async function submissionFingerprint(fields: readonly (string | null)[], files: readonly File[]): Promise<string> {
   const attachments = await Promise.all(files.map(async (file) => [
     file.name,
     file.type,
     file.size,
-    await replyDigest(new Uint8Array(await file.arrayBuffer())),
+    await submissionDigest(new Uint8Array(await file.arrayBuffer())),
   ]))
-  return replyDigest(new TextEncoder().encode(JSON.stringify([body, attachments])))
+  return submissionDigest(new TextEncoder().encode(JSON.stringify([...fields, attachments])))
 }
 
 export function useCustomerTicketQuery(
@@ -240,11 +303,7 @@ export function useCustomerReplyMutation(
   ticketUuid: string | null,
   token: string | null
 ) {
-  const pendingReply = useRef<{
-    storageKey: string
-    fingerprint: string
-    key: string
-  } | null>(null)
+  const submissionKey = usePendingSubmissionKey()
 
   return useMutation({
     mutationFn: async (payload: CustomerReplyPayload) => {
@@ -255,27 +314,8 @@ export function useCustomerReplyMutation(
       const body = payload.body.trim()
       const files = payload.files ?? []
       const storageKey = `zeddesk_customer_reply:${apiUrl}:${ticketUuid}`
-      const fingerprint = await replyFingerprint(body, files)
-      let previous = pendingReply.current?.storageKey === storageKey ? pendingReply.current : null
-      if (!previous && typeof window !== 'undefined') {
-        try {
-          const stored = JSON.parse(sessionStorage.getItem(storageKey) ?? 'null')
-          if (typeof stored?.key === 'string' && typeof stored?.fingerprint === 'string') {
-            previous = { storageKey, key: stored.key, fingerprint: stored.fingerprint }
-          }
-        } catch {
-          // The in-memory key still covers retries when session storage is unavailable.
-        }
-      }
-      const key = previous?.fingerprint === fingerprint ? previous.key : crypto.randomUUID()
-      pendingReply.current = { storageKey, fingerprint, key }
-      if (typeof window !== 'undefined') {
-        try {
-          sessionStorage.setItem(storageKey, JSON.stringify({ fingerprint, key }))
-        } catch {
-          // The current composer can still retry with its in-memory key.
-        }
-      }
+      const fingerprint = await submissionFingerprint([body], files)
+      const key = submissionKey.reserve(storageKey, fingerprint)
 
       const formData = new FormData()
       formData.append('message', body)
@@ -306,16 +346,7 @@ export function useCustomerReplyMutation(
         throw new Error(extractPortalErrorMessage(data, 'Failed to submit reply.'))
       }
 
-      if (pendingReply.current?.key === key) {
-        pendingReply.current = null
-        if (typeof window !== 'undefined') {
-          try {
-            sessionStorage.removeItem(storageKey)
-          } catch {
-            // Storage failure does not change the confirmed reply result.
-          }
-        }
-      }
+      submissionKey.clear(storageKey, fingerprint, key)
       return data
     },
   })

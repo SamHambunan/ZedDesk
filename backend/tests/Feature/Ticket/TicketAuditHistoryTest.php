@@ -94,7 +94,7 @@ function disableAuditInsertFailure(): void
 test('ticket creation via customer intake creates audit record and rolls back on failure', function () {
     $file = UploadedFile::fake()->create('financial_secret.pdf', 100, 'application/pdf');
 
-    $response = $this->postJson('http://acme.localhost/api/portal/tickets', [
+    $response = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://acme.localhost/api/portal/tickets', [
         'name' => 'Secret Customer',
         'email' => 'secret_portal@example.test',
         'subject' => 'Secret Intake Subject',
@@ -132,7 +132,7 @@ test('ticket creation via customer intake creates audit record and rolls back on
     $failFile = UploadedFile::fake()->create('rollback_secret.pdf', 100, 'application/pdf');
     $initialTicketCount = Ticket::count();
 
-    $failResponse = $this->postJson('http://acme.localhost/api/portal/tickets', [
+    $failResponse = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://acme.localhost/api/portal/tickets', [
         'name' => 'Rollback Customer',
         'email' => 'rollback@example.test',
         'subject' => 'Rollback Subject',

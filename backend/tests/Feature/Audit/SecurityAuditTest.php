@@ -257,7 +257,7 @@ test('logout audits session termination and rolls back on audit failure', functi
 });
 
 test('customer ticket intake audits credential issuance and rolls back on failure', function () {
-    $res = $this->postJson('http://acme.localhost/api/portal/tickets', [
+    $res = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://acme.localhost/api/portal/tickets', [
         'name' => 'Intake Secret User',
         'email' => 'intake_secret@acme.test',
         'subject' => 'Secret Intake Subject',
@@ -283,7 +283,7 @@ test('customer ticket intake audits credential issuance and rolls back on failur
     enableSecurityAuditInsertFailure();
     $initialTickets = Ticket::count();
 
-    $failRes = $this->postJson('http://acme.localhost/api/portal/tickets', [
+    $failRes = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://acme.localhost/api/portal/tickets', [
         'name' => 'Rollback Customer',
         'email' => 'rollback@acme.test',
         'subject' => 'Rollback Subject',

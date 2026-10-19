@@ -40,7 +40,7 @@ class CustomerPortalController extends Controller
     /**
      * Public customer ticket intake endpoint.
      */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, RequestIdempotency $idempotency): JsonResponse
     {
         $organization = OrganizationContext::getCurrent() ?? $request->attributes->get('organization');
 
@@ -66,78 +66,104 @@ class CustomerPortalController extends Controller
             ], 422);
         }
 
-        return $this->attachmentService->transaction(fn () => app(DurableDelivery::class)->capture(function () use ($organization, $validated, $files, $request) {
-            // Find or create customer
-            $customer = $this->findOrCreateCustomer->execute([
-                'name' => $validated['name'],
-                'email' => $validated['email'],
-            ], $organization);
+        $requestKey = $idempotency->key($request);
+        $fingerprint = $idempotency->ticketCreationFingerprint($validated, $files);
 
-            // Create sequential ticket
-            $ticket = Ticket::create([
-                'organization_id' => $organization->id,
-                'customer_id' => $customer->id,
-                'subject' => $validated['subject'],
-                'status' => TicketStatus::NEW,
-                'priority' => TicketPriority::MEDIUM,
-            ]);
-
-            // Create initial customer Public Reply
-            $message = TicketMessage::create([
-                'organization_id' => $organization->id,
-                'ticket_id' => $ticket->id,
-                'message_type' => TicketMessageType::PUBLIC_REPLY,
-                'author_type' => Customer::class,
-                'author_id' => $customer->id,
-                'body' => $validated['message'],
-            ]);
-
-            // Store any uploaded attachments linked to the initial message
-            $storedAttachments = [];
-            foreach ($files as $file) {
-                if ($file instanceof UploadedFile) {
-                    $storedAttachments[] = $this->attachmentService->store($file, $message);
-                }
-            }
-
-            // Generate cryptographically signed HMAC token for customer access
-            $token = $this->tokenService->generateToken($customer, $ticket);
-            $accessUrl = $this->tokenService->generateTicketUrl($ticket, $token, $request);
-
-            app(AuditLogWriter::class)->recordTicketCreated($ticket, $customer);
-            app(AuditLogWriter::class)->recordCredentialIssued(
-                target: $customer,
-                credentialType: 'customer_ticket_token',
+        return $this->attachmentService->transaction(fn () => $idempotency->run(
+            new RequestIdempotencyScope(
                 organizationId: (int) $organization->id,
-                requestLocation: $request->path()
-            );
+                actorType: 'public',
+                actorId: 'anonymous',
+                operation: 'ticket.create',
+                targetId: 'intake',
+            ),
+            $requestKey,
+            $fingerprint,
+            fn () => app(DurableDelivery::class)->capture(function () use ($organization, $validated, $files, $request) {
+                // Find or create customer
+                $customer = $this->findOrCreateCustomer->execute([
+                    'name' => $validated['name'],
+                    'email' => $validated['email'],
+                ], $organization);
 
-            return response()->json([
-                'message' => 'Ticket created successfully.',
-                'token' => $token,
-                'access_url' => $accessUrl,
-                'ticket' => [
-                    'id' => $ticket->id,
-                    'ticket_number' => $ticket->ticket_number,
-                    'revision' => $ticket->revision,
-                    'subject' => $ticket->subject,
-                    'status' => $ticket->status instanceof TicketStatus ? $ticket->status->value : $ticket->status,
-                    'priority' => $ticket->priority instanceof TicketPriority ? $ticket->priority->value : $ticket->priority,
-                    'created_at' => $ticket->created_at?->toISOString(),
-                ],
-                'customer' => [
-                    'id' => $customer->id,
-                    'name' => $customer->name,
-                    'email' => $customer->email,
-                ],
-                'initial_message' => [
-                    'id' => $message->id,
-                    'body' => $message->body,
-                    'created_at' => $message->created_at?->toISOString(),
-                ],
-                'attachments' => $storedAttachments,
-            ], 201);
-        }));
+                // Create sequential ticket
+                $ticket = Ticket::create([
+                    'organization_id' => $organization->id,
+                    'customer_id' => $customer->id,
+                    'subject' => $validated['subject'],
+                    'status' => TicketStatus::NEW,
+                    'priority' => TicketPriority::MEDIUM,
+                ]);
+
+                // Create initial customer Public Reply
+                $message = TicketMessage::create([
+                    'organization_id' => $organization->id,
+                    'ticket_id' => $ticket->id,
+                    'message_type' => TicketMessageType::PUBLIC_REPLY,
+                    'author_type' => Customer::class,
+                    'author_id' => $customer->id,
+                    'body' => $validated['message'],
+                ]);
+
+                // Store any uploaded attachments linked to the initial message
+                $storedAttachments = [];
+                foreach ($files as $file) {
+                    if ($file instanceof UploadedFile) {
+                        $storedAttachments[] = $this->attachmentService->store($file, $message);
+                    }
+                }
+
+                // Generate cryptographically signed HMAC token for customer access
+                $token = $this->tokenService->generateToken($customer, $ticket);
+                $accessUrl = $this->tokenService->generateTicketUrl($ticket, $token, $request);
+
+                app(AuditLogWriter::class)->recordTicketCreated($ticket, $customer);
+                app(AuditLogWriter::class)->recordCredentialIssued(
+                    target: $customer,
+                    credentialType: 'customer_ticket_token',
+                    organizationId: (int) $organization->id,
+                    requestLocation: $request->path()
+                );
+
+                return response()->json([
+                    'message' => 'Ticket created successfully.',
+                    'token' => $token,
+                    'access_url' => $accessUrl,
+                    'ticket' => [
+                        'id' => $ticket->id,
+                        'ticket_number' => $ticket->ticket_number,
+                        'revision' => $ticket->revision,
+                        'subject' => $ticket->subject,
+                        'status' => $ticket->status instanceof TicketStatus ? $ticket->status->value : $ticket->status,
+                        'priority' => $ticket->priority instanceof TicketPriority ? $ticket->priority->value : $ticket->priority,
+                        'created_at' => $ticket->created_at?->toISOString(),
+                    ],
+                    'customer' => [
+                        'id' => $customer->id,
+                        'name' => $customer->name,
+                        'email' => $customer->email,
+                    ],
+                    'initial_message' => [
+                        'id' => $message->id,
+                        'body' => $message->body,
+                        'created_at' => $message->created_at?->toISOString(),
+                    ],
+                    'attachments' => $storedAttachments,
+                ], 201);
+            }),
+            function (JsonResponse $replayed) use ($organization): ?JsonResponse {
+                $result = $replayed->getData(true);
+                $ticketId = $result['ticket']['id'] ?? null;
+                $customerId = $result['customer']['id'] ?? null;
+                $available = $ticketId && $customerId && Ticket::query()
+                    ->whereKey($ticketId)
+                    ->where('organization_id', $organization->id)
+                    ->where('customer_id', $customerId)
+                    ->exists();
+
+                return $available ? null : response()->json(['message' => 'Ticket not found.'], 404);
+            }
+        ));
     }
 
     /**
