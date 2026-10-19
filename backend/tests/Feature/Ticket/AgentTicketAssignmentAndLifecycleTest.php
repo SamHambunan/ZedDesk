@@ -649,7 +649,7 @@ test('agent can update ticket priority via api conforming to policy', function (
 test('customer portal intake dispatches TicketCreated domain event', function () {
     Event::fake([TicketCreated::class]);
 
-    $response = $this->postJson('http://acme.localhost/api/portal/tickets', [
+    $response = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://acme.localhost/api/portal/tickets', [
         'name' => 'Portal Customer',
         'email' => 'portal@customer.com',
         'subject' => 'Intake Ticket via Portal',

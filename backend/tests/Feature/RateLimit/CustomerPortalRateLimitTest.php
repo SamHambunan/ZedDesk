@@ -87,7 +87,7 @@ test('invalid credentials and inaccessible Tickets retain their access denials a
 
 test('public intake and access links never consume a submitted Customers authenticated allowance', function () {
     $this->getJson('http://acme.localhost/api/portal/auth/verify')->assertOk();
-    $response = $this->postJson('http://acme.localhost/api/portal/tickets', [
+    $response = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://acme.localhost/api/portal/tickets', [
         'name' => 'Person', 'email' => $this->customer->email, 'subject' => 'Help', 'message' => 'Hello',
     ])->assertCreated();
     $this->postJson('http://acme.localhost/api/portal/magic-link', ['email' => $this->customer->email])->assertOk();
@@ -128,7 +128,7 @@ test('rate-key normalization leaves case-sensitive Customer matching unchanged',
     $customer = Customer::factory()->create(['organization_id' => $this->organization->id, 'email' => 'Person@example.com']);
     $this->postJson('http://acme.localhost/api/portal/magic-link', ['email' => 'Person@example.com'])->assertOk();
     $this->postJson('http://acme.localhost/api/portal/magic-link', ['email' => 'person@example.com'])->assertNotFound();
-    $response = $this->postJson('http://acme.localhost/api/portal/tickets', [
+    $response = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://acme.localhost/api/portal/tickets', [
         'name' => 'Another Person', 'email' => 'person@example.com', 'subject' => 'Help', 'message' => 'Hello',
     ])->assertCreated();
     $this->withHeader('X-Customer-Token', $response->json('token'))

@@ -61,13 +61,47 @@ function extractPortalErrorMessage(data: unknown, fallback: string): string {
 }
 
 export function useSubmitTicketMutation(apiUrl: string) {
+  const pendingIntake = useRef<{
+    storageKey: string
+    fingerprint: string
+    key: string
+  } | null>(null)
+
   return useMutation<TicketSubmissionResponse, Error, CreateTicketPayload>({
     mutationFn: async (payload) => {
+      const name = payload.name.trim()
+      const email = payload.email.trim()
+      const subject = payload.subject.trim()
+      const message = payload.message.trim()
+      const files = payload.attachments ?? []
+      const storageKey = `zeddesk_ticket_intake:${apiUrl}`
+      const fingerprint = await submissionFingerprint([name, email, subject, message, payload.priority ?? null], files)
+      let previous = pendingIntake.current?.storageKey === storageKey ? pendingIntake.current : null
+      if (!previous && typeof window !== 'undefined') {
+        try {
+          const stored = JSON.parse(sessionStorage.getItem(storageKey) ?? 'null')
+          if (typeof stored?.key === 'string' && typeof stored?.fingerprint === 'string') {
+            previous = { storageKey, key: stored.key, fingerprint: stored.fingerprint }
+          }
+        } catch {
+          // The current form can still retry with its in-memory key.
+        }
+      }
+      const key = previous?.fingerprint === fingerprint ? previous.key : crypto.randomUUID()
+      pendingIntake.current = { storageKey, fingerprint, key }
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem(storageKey, JSON.stringify({ fingerprint, key }))
+        } catch {
+          // The in-memory key covers retries in this form.
+        }
+      }
+
       const formData = new FormData()
-      formData.append('name', payload.name.trim())
-      formData.append('email', payload.email.trim())
-      formData.append('subject', payload.subject.trim())
-      formData.append('message', payload.message.trim())
+      formData.append('name', name)
+      formData.append('email', email)
+      formData.append('subject', subject)
+      formData.append('message', message)
       if (payload.priority) {
         formData.append('priority', payload.priority)
       }
@@ -82,6 +116,7 @@ export function useSubmitTicketMutation(apiUrl: string) {
         method: 'POST',
         headers: {
           Accept: 'application/json',
+          'Idempotency-Key': key,
         },
         body: formData,
       })
@@ -92,6 +127,16 @@ export function useSubmitTicketMutation(apiUrl: string) {
         throw new Error(extractPortalErrorMessage(data, 'Failed to submit support request.'))
       }
 
+      if (pendingIntake.current?.key === key) {
+        pendingIntake.current = null
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.removeItem(storageKey)
+          } catch {
+            // Storage failure does not change the confirmed result.
+          }
+        }
+      }
       return data as TicketSubmissionResponse
     },
   })
@@ -174,7 +219,7 @@ export interface CustomerReplyPayload {
   files?: readonly File[]
 }
 
-async function replyDigest(bytes: Uint8Array): Promise<string> {
+async function submissionDigest(bytes: Uint8Array): Promise<string> {
   if (globalThis.crypto?.subtle) {
     const input = new Uint8Array(new ArrayBuffer(bytes.byteLength))
     input.set(bytes)
@@ -189,14 +234,14 @@ async function replyDigest(bytes: Uint8Array): Promise<string> {
   return (hash >>> 0).toString(16).padStart(8, '0')
 }
 
-async function replyFingerprint(body: string, files: readonly File[]): Promise<string> {
+async function submissionFingerprint(fields: readonly (string | null)[], files: readonly File[]): Promise<string> {
   const attachments = await Promise.all(files.map(async (file) => [
     file.name,
     file.type,
     file.size,
-    await replyDigest(new Uint8Array(await file.arrayBuffer())),
+    await submissionDigest(new Uint8Array(await file.arrayBuffer())),
   ]))
-  return replyDigest(new TextEncoder().encode(JSON.stringify([body, attachments])))
+  return submissionDigest(new TextEncoder().encode(JSON.stringify([...fields, attachments])))
 }
 
 export function useCustomerTicketQuery(
@@ -255,7 +300,7 @@ export function useCustomerReplyMutation(
       const body = payload.body.trim()
       const files = payload.files ?? []
       const storageKey = `zeddesk_customer_reply:${apiUrl}:${ticketUuid}`
-      const fingerprint = await replyFingerprint(body, files)
+      const fingerprint = await submissionFingerprint([body], files)
       let previous = pendingReply.current?.storageKey === storageKey ? pendingReply.current : null
       if (!previous && typeof window !== 'undefined') {
         try {

@@ -102,7 +102,7 @@ test('a commit listener failure preserves a referenced attachment', function () 
 test('customer ticket creation failure after attachment write removes bytes and business records', function () {
     TicketAttachment::created(fn () => throw new RuntimeException('later transaction step failed'));
 
-    $this->post('http://acme.localhost/api/portal/tickets', [
+    $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->post('http://acme.localhost/api/portal/tickets', [
         'name' => 'New Customer',
         'email' => 'new@example.test',
         'subject' => 'Failed intake',

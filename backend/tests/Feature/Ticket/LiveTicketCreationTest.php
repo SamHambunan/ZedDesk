@@ -28,7 +28,7 @@ beforeEach(function () {
 afterEach(fn () => OrganizationContext::clear());
 
 test('customer creation exposes revision one through authorized staff REST reads', function () {
-    $created = $this->postJson('http://acme.localhost/api/portal/tickets', [
+    $created = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://acme.localhost/api/portal/tickets', [
         'name' => 'Customer',
         'email' => 'customer@acme.test',
         'subject' => 'Live ticket',
@@ -44,7 +44,7 @@ test('customer creation exposes revision one through authorized staff REST reads
 });
 
 test('authorized REST reads expose a higher revision after a Ticket change', function () {
-    $created = $this->postJson('http://acme.localhost/api/portal/tickets', [
+    $created = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://acme.localhost/api/portal/tickets', [
         'name' => 'Customer',
         'email' => 'customer@acme.test',
         'subject' => 'Changing ticket',

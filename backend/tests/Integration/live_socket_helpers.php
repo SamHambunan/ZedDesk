@@ -9,6 +9,9 @@ function api(string $method, string $host, string $path, ?array $body = null, ?s
     if ($token !== null) {
         $headers .= "Authorization: Bearer {$token}\r\n";
     }
+    if ($method === 'POST' && $path === '/api/portal/tickets') {
+        $headers .= 'Idempotency-Key: '.bin2hex(random_bytes(32))."\r\n";
+    }
 
     return apiRequest($method, $host, $path, $body === null ? '' : json_encode($body, JSON_THROW_ON_ERROR), $headers);
 }

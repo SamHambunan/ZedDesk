@@ -234,7 +234,7 @@ test('customer token cannot access another customer ticket within the same organ
 });
 
 test('customer ticket creation via portal strictly scopes to host organization', function () {
-    $response = $this->postJson('http://beta.localhost/api/portal/tickets', [
+    $response = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://beta.localhost/api/portal/tickets', [
         'name' => 'George Newcomer',
         'email' => 'george@beta-customer.test',
         'subject' => 'Inquiry for Beta Support',

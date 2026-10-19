@@ -30,14 +30,27 @@ class RequestIdempotency
     /** @param array<UploadedFile> $files */
     public function messageFingerprint(string $ticketId, string $messageType, string $body, ?string $status, array $files): string
     {
-        $attachments = array_map(static fn (UploadedFile $file) => [
+        return hash('sha256', json_encode([$ticketId, $messageType, $body, $status, $this->attachmentFingerprints($files)], JSON_THROW_ON_ERROR));
+    }
+
+    /** @param array<UploadedFile> $files */
+    public function ticketCreationFingerprint(array $intake, array $files): string
+    {
+        return hash('sha256', json_encode([
+            $intake['name'], $intake['email'], $intake['subject'], $intake['message'],
+            $this->attachmentFingerprints($files),
+        ], JSON_THROW_ON_ERROR));
+    }
+
+    /** @param array<UploadedFile> $files */
+    private function attachmentFingerprints(array $files): array
+    {
+        return array_map(static fn (UploadedFile $file) => [
             'sha256' => hash_file('sha256', $file->getRealPath()),
             'name' => $file->getClientOriginalName(),
             'mime' => $file->getMimeType(),
             'size' => $file->getSize(),
         ], $files);
-
-        return hash('sha256', json_encode([$ticketId, $messageType, $body, $status, $attachments], JSON_THROW_ON_ERROR));
     }
 
     /** The caller keeps this inside the transaction that writes all business effects. */
@@ -68,12 +81,13 @@ class RequestIdempotency
         }
 
         if ($record->encrypted_response !== null) {
-            $denial = $authorizeReplay();
+            $replayed = JsonResponse::fromJsonString(Crypt::decryptString($record->encrypted_response), (int) $record->response_status);
+            $denial = $authorizeReplay($replayed);
             if ($denial instanceof JsonResponse) {
                 return $denial;
             }
 
-            return JsonResponse::fromJsonString(Crypt::decryptString($record->encrypted_response), (int) $record->response_status);
+            return $replayed;
         }
 
         $result = $mutate();

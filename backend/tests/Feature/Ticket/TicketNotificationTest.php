@@ -27,7 +27,7 @@ test('customer Ticket creation leaves a durable inbox item for each active Organ
         return OrganizationMember::create(['organization_id' => $organization->id, 'user_id' => $user->id, 'role' => 'agent']);
     });
 
-    $created = $this->postJson('http://acme.localhost/api/portal/tickets', [
+    $created = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://acme.localhost/api/portal/tickets', [
         'name' => 'Customer', 'email' => 'customer@acme.test',
         'subject' => 'New work', 'message' => 'Please help',
     ])->assertCreated();
@@ -57,7 +57,7 @@ test('inbox actions and private Notification channel stay with the current Organ
     $betaMember = OrganizationMember::create(['organization_id' => $beta->id, 'user_id' => $user->id, 'role' => 'agent']);
 
     foreach (['acme', 'beta'] as $slug) {
-        $this->postJson("http://{$slug}.localhost/api/portal/tickets", [
+        $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson("http://{$slug}.localhost/api/portal/tickets", [
             'name' => 'Customer', 'email' => "customer@{$slug}.test",
             'subject' => "{$slug} ticket", 'message' => 'Please help',
         ])->assertCreated();
@@ -102,7 +102,7 @@ test('reading a Ticket leaves its Notification unread and marking it read retain
     $organization = Organization::create(['name' => 'Acme', 'slug' => 'acme']);
     $user = User::create(['name' => 'Agent', 'email' => 'agent@acme.test', 'password' => bcrypt('password')]);
     OrganizationMember::create(['organization_id' => $organization->id, 'user_id' => $user->id, 'role' => 'agent']);
-    $created = $this->postJson('http://acme.localhost/api/portal/tickets', [
+    $created = $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson('http://acme.localhost/api/portal/tickets', [
         'name' => 'Customer', 'email' => 'customer@acme.test',
         'subject' => 'Follow up', 'message' => 'First message',
     ])->assertCreated();
@@ -149,7 +149,7 @@ test('inbox pagination and mark-all-read apply only to the active Organization',
         OrganizationMember::create(['organization_id' => $organization->id, 'user_id' => $user->id, 'role' => 'agent']);
     }
     foreach (['acme', 'acme', 'acme', 'beta'] as $index => $slug) {
-        $this->postJson("http://{$slug}.localhost/api/portal/tickets", [
+        $this->withHeader('Idempotency-Key', bin2hex(random_bytes(32)))->postJson("http://{$slug}.localhost/api/portal/tickets", [
             'name' => 'Customer', 'email' => "customer@{$slug}.test",
             'subject' => "Ticket {$index}", 'message' => 'Please help',
         ])->assertCreated();
