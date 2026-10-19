@@ -148,7 +148,7 @@ test('Customer Public Reply with an attachment signals staff and REST recovers t
     $this->post("http://acme.localhost/api/portal/tickets/{$this->ticket->id}/reply", [
         'message' => 'Customer update',
         'attachments' => [UploadedFile::fake()->create('screenshot.png', 10, 'image/png')],
-    ], ['X-Customer-Token' => $token, 'Accept' => 'application/json'])->assertCreated();
+    ], ['X-Customer-Token' => $token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid(), 'Accept' => 'application/json'])->assertCreated();
 
     $signal = DB::table('delivery_outbox')->where('ticket_id', $this->ticket->id)
         ->where('kind', 'staff_ticket')->where('envelope->change_type', 'message_created')->first();

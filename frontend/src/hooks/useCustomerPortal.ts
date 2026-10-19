@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { useRef } from 'react'
 
 export type TicketPriorityType = 'low' | 'medium' | 'high' | 'urgent'
 
@@ -214,14 +215,33 @@ export function useCustomerReplyMutation(
   ticketUuid: string | null,
   token: string | null
 ) {
+  const pendingReply = useRef<{
+    ticketUuid: string
+    token: string | null
+    body: string
+    files: readonly File[]
+    key: string
+  } | null>(null)
+
   return useMutation({
     mutationFn: async (payload: CustomerReplyPayload) => {
       if (!ticketUuid) {
         throw new Error('Ticket identifier is required.')
       }
 
+      const body = payload.body.trim()
+      const files = payload.files ?? []
+      const previous = pendingReply.current
+      const sameReply = previous?.ticketUuid === ticketUuid
+        && previous.token === token
+        && previous.body === body
+        && previous.files.length === files.length
+        && previous.files.every((file, index) => file === files[index])
+      const key = sameReply ? previous.key : crypto.randomUUID()
+      pendingReply.current = { ticketUuid, token, body, files: [...files], key }
+
       const formData = new FormData()
-      formData.append('message', payload.body.trim())
+      formData.append('message', body)
 
       if (payload.files && payload.files.length > 0) {
         payload.files.forEach((file) => {
@@ -231,6 +251,7 @@ export function useCustomerReplyMutation(
 
       const headers: Record<string, string> = {
         Accept: 'application/json',
+        'Idempotency-Key': key,
       }
       if (token) {
         headers['X-Customer-Token'] = token
@@ -248,6 +269,7 @@ export function useCustomerReplyMutation(
         throw new Error(extractPortalErrorMessage(data, 'Failed to submit reply.'))
       }
 
+      if (pendingReply.current?.key === key) pendingReply.current = null
       return data
     },
   })

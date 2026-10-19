@@ -39,7 +39,7 @@ test('customer reply commits its message, grouped notification, and minimal deli
     [$organization, $ticket, $token, $member] = customerReplyFixture(true);
     $ticket->update(['status' => 'pending']);
 
-    $this->withHeader('X-Customer-Token', $token)
+    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid()])
         ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", ['message' => 'Private reply body'])
         ->assertCreated()->assertJsonPath('ticket.status', 'open');
 
@@ -55,7 +55,7 @@ test('customer reply commits its message, grouped notification, and minimal deli
 test('dispatcher reserves committed signals and retries an abandoned accepted job', function () {
     Queue::fake();
     [, $ticket, $token] = customerReplyFixture();
-    $this->withHeader('X-Customer-Token', $token)
+    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid()])
         ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", ['message' => 'Recover me'])
         ->assertCreated();
 
@@ -73,7 +73,7 @@ test('dispatcher reserves committed signals and retries an abandoned accepted jo
 test('publication acknowledges only after broadcast and duplicate execution is harmless', function () {
     Queue::fake();
     [, $ticket, $token] = customerReplyFixture();
-    $this->withHeader('X-Customer-Token', $token)
+    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid()])
         ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", ['message' => 'One reply'])
         ->assertCreated();
     $this->artisan('delivery:dispatch')->assertSuccessful();
@@ -98,7 +98,7 @@ test('publication acknowledges only after broadcast and duplicate execution is h
 test('broadcast outage stays pending without exhausting the five permanent failure attempts', function () {
     Queue::fake();
     [, $ticket, $token] = customerReplyFixture();
-    $this->withHeader('X-Customer-Token', $token)
+    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid()])
         ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", ['message' => 'During outage'])
         ->assertCreated();
     $this->artisan('delivery:dispatch')->assertSuccessful();
@@ -121,7 +121,7 @@ test('broadcast outage stays pending without exhausting the five permanent failu
 test('delayed customer signal is suppressed after Ticket ownership changes', function () {
     Queue::fake();
     [$organization, $ticket, $token] = customerReplyFixture();
-    $this->withHeader('X-Customer-Token', $token)
+    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid()])
         ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", ['message' => 'Before transfer'])
         ->assertCreated();
     $this->artisan('delivery:dispatch')->assertSuccessful();
@@ -137,7 +137,7 @@ test('delayed customer signal is suppressed after Ticket ownership changes', fun
 test('delayed inbox signal is suppressed when the Ticket is unavailable', function () {
     Queue::fake();
     [, $ticket, $token] = customerReplyFixture(true);
-    $this->withHeader('X-Customer-Token', $token)
+    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid()])
         ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", ['message' => 'Before deletion'])
         ->assertCreated();
     $this->artisan('delivery:dispatch')->assertSuccessful();
@@ -153,7 +153,7 @@ test('required outbox write failure rolls back the reply and Notification', func
     [, $ticket, $token] = customerReplyFixture(true);
     DB::statement("ALTER TABLE delivery_outbox ADD CONSTRAINT reject_reply_delivery CHECK (kind <> 'staff_ticket')");
 
-    $this->withHeader('X-Customer-Token', $token)
+    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid()])
         ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", ['message' => 'Must roll back'])
         ->assertServerError();
 
@@ -165,7 +165,7 @@ test('required outbox write failure rolls back the reply and Notification', func
 test('invalid delivery data is quarantined after five attempts and can be inspected and retried', function () {
     Queue::fake();
     [, $ticket, $token] = customerReplyFixture();
-    $this->withHeader('X-Customer-Token', $token)
+    $this->withHeaders(['X-Customer-Token' => $token, 'Idempotency-Key' => (string) \Illuminate\Support\Str::uuid()])
         ->postJson("http://acme.localhost/api/portal/tickets/{$ticket->id}/reply", ['message' => 'Quarantine check'])
         ->assertCreated();
     $signal = DB::table('delivery_outbox')->where('kind', 'customer_ticket')->first();

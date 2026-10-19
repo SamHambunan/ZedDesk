@@ -19,6 +19,8 @@ use App\Services\AttachmentService;
 use App\Services\AuditLogWriter;
 use App\Services\CustomerTokenService;
 use App\Services\DurableDelivery;
+use App\Services\RequestIdempotency;
+use App\Services\RequestIdempotencyScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -229,7 +231,7 @@ class CustomerPortalController extends Controller
     /**
      * Post a customer public reply to an existing ticket.
      */
-    public function reply(Request $request, string $ticket): JsonResponse
+    public function reply(Request $request, string $ticket, RequestIdempotency $idempotency): JsonResponse
     {
         $organization = OrganizationContext::getCurrent() ?? $request->attributes->get('organization');
 
@@ -244,12 +246,6 @@ class CustomerPortalController extends Controller
         /** @var Customer $customer */
         $customer = $request->attributes->get('customer')
             ?? Customer::findOrFail($ticketModel->customer_id);
-
-        if ($ticketModel->isClosed()) {
-            return response()->json([
-                'message' => "Ticket #{$ticketModel->ticket_number} is closed and immutable. New conversation replies are rejected.",
-            ], 422);
-        }
 
         $validated = $request->validate([
             'message' => ['required_without:body', 'nullable', 'string'],
@@ -275,44 +271,94 @@ class CustomerPortalController extends Controller
             ], 422);
         }
 
+        $requestKey = $idempotency->key($request);
+        $fingerprint = $idempotency->messageFingerprint($ticketModel->id, TicketMessageType::PUBLIC_REPLY->value, $body, null, $files);
+
         try {
-            return $this->attachmentService->transaction(fn () => app(DurableDelivery::class)->capture(function () use ($organization, $ticketModel, $customer, $body, $files) {
-                $message = TicketMessage::create([
-                    'organization_id' => $organization->id,
-                    'ticket_id' => $ticketModel->id,
-                    'message_type' => TicketMessageType::PUBLIC_REPLY,
-                    'author_type' => Customer::class,
-                    'author_id' => $customer->id,
-                    'body' => $body,
-                ]);
+            return $this->attachmentService->transaction(fn () => $idempotency->run(
+                new RequestIdempotencyScope(
+                    organizationId: (int) $organization->id,
+                    actorType: 'customer',
+                    actorId: (string) $customer->id,
+                    operation: 'customer.reply.create',
+                    targetId: $ticketModel->id,
+                ),
+                $requestKey,
+                $fingerprint,
+                fn () => app(DurableDelivery::class)->capture(function () use ($organization, $ticketModel, $customer, $body, $files) {
+                    $ticketModel = Ticket::whereKey($ticketModel->id)->lockForUpdate()->firstOrFail();
+                    abort_unless(
+                        $ticketModel->customer_id === $customer->id
+                            && (int) $ticketModel->organization_id === (int) $organization->id,
+                        403,
+                        'Customer access to this ticket is unavailable.'
+                    );
 
-                $storedAttachments = [];
-                foreach ($files as $file) {
-                    if ($file instanceof UploadedFile) {
-                        $storedAttachments[] = $this->attachmentService->store($file, $message);
+                    if ($ticketModel->isClosed()) {
+                        return response()->json([
+                            'message' => "Ticket #{$ticketModel->ticket_number} is closed and immutable. New conversation replies are rejected.",
+                        ], 422);
                     }
-                }
 
-                $ticketModel->recordConversationChange($message);
-                app(AuditLogWriter::class)->recordPublicReply($ticketModel, $customer, $message);
-
-                return response()->json([
-                    'message' => 'Reply submitted successfully.',
-                    'reply' => [
-                        'id' => $message->id,
+                    $message = TicketMessage::create([
+                        'organization_id' => $organization->id,
                         'ticket_id' => $ticketModel->id,
-                        'body' => $message->body,
-                        'message_type' => $message->message_type instanceof TicketMessageType ? $message->message_type->value : $message->message_type,
-                        'created_at' => $message->created_at?->toISOString(),
-                        'attachments' => $storedAttachments,
-                    ],
-                    'ticket' => [
-                        'id' => $ticketModel->id,
-                        'ticket_number' => $ticketModel->ticket_number,
-                        'status' => $ticketModel->status instanceof TicketStatus ? $ticketModel->status->value : $ticketModel->status,
-                    ],
-                ], 201);
-            }));
+                        'message_type' => TicketMessageType::PUBLIC_REPLY,
+                        'author_type' => Customer::class,
+                        'author_id' => $customer->id,
+                        'body' => $body,
+                    ]);
+
+                    $storedAttachments = [];
+                    foreach ($files as $file) {
+                        if ($file instanceof UploadedFile) {
+                            $storedAttachments[] = $this->attachmentService->store($file, $message);
+                        }
+                    }
+
+                    $ticketModel->recordConversationChange($message);
+                    app(AuditLogWriter::class)->recordPublicReply($ticketModel, $customer, $message);
+
+                    return response()->json([
+                        'message' => 'Reply submitted successfully.',
+                        'reply' => [
+                            'id' => $message->id,
+                            'ticket_id' => $ticketModel->id,
+                            'body' => $message->body,
+                            'message_type' => $message->message_type instanceof TicketMessageType ? $message->message_type->value : $message->message_type,
+                            'created_at' => $message->created_at?->toISOString(),
+                            'attachments' => $storedAttachments,
+                        ],
+                        'ticket' => [
+                            'id' => $ticketModel->id,
+                            'ticket_number' => $ticketModel->ticket_number,
+                            'status' => $ticketModel->status instanceof TicketStatus ? $ticketModel->status->value : $ticketModel->status,
+                        ],
+                    ], 201);
+                }),
+                function () use ($request, $organization, $customer, $ticketModel): void {
+                    $token = $request->header('X-Customer-Token')
+                        ?: $request->query('token')
+                        ?: $request->query('customer_token');
+                    $inspection = $this->tokenService->inspectToken((string) $token);
+                    $payload = $inspection['payload'];
+                    if (! $inspection['valid']
+                        || (int) $payload['organization_id'] !== (int) $organization->id
+                        || (string) $payload['customer_id'] !== (string) $customer->id
+                        || (! empty($payload['ticket_id']) && (string) $payload['ticket_id'] !== (string) $ticketModel->id)) {
+                        abort(401, 'Authentication required.');
+                    }
+
+                    $currentTicket = Ticket::whereKey($ticketModel->id)->firstOrFail();
+                    abort_unless(
+                        Customer::whereKey($customer->id)->where('organization_id', $organization->id)->exists()
+                            && $currentTicket->customer_id === $customer->id
+                            && (int) $currentTicket->organization_id === (int) $organization->id,
+                        403,
+                        'Customer access to this ticket is unavailable.'
+                    );
+                }
+            ));
         } catch (InvalidTicketTransitionException $e) {
             return response()->json([
                 'message' => $e->getMessage(),

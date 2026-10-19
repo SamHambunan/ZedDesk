@@ -199,7 +199,7 @@ test('public reply and internal note create audit records without copying bodies
     $token = app(CustomerTokenService::class)->generateToken($this->customer, $this->ticket);
     $this->app['auth']->forgetGuards();
 
-    $custReplyRes = $this->postJson("http://acme.localhost/api/portal/tickets/{$this->ticket->id}/reply?token=".urlencode($token), [
+    $custReplyRes = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/portal/tickets/{$this->ticket->id}/reply?token=".urlencode($token), [
         'message' => 'Customer reply message text with secret info',
     ]);
     $custReplyRes->assertStatus(201);
