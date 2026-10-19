@@ -9,7 +9,7 @@ afterEach(() => {
   sessionStorage.clear()
 })
 
-it('keeps an uncertain intake key across remount and rotates it for changed or completed submissions', async () => {
+it('preserves each uncertain intake key across remount and rotates completed submissions', async () => {
   const requests: RequestInit[] = []
   vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
     requests.push(init)
@@ -34,6 +34,11 @@ it('keeps an uncertain intake key across remount and rotates it for changed or c
 
   await act(async () => { await retry.result.current.mutateAsync({ ...payload, message: 'Changed inquiry' }) })
   expect(key(2)).not.toBe(key(1))
-  await act(async () => { await retry.result.current.mutateAsync({ ...payload, message: 'Changed inquiry' }) })
-  expect(key(3)).not.toBe(key(2))
+  retry.unmount()
+
+  const recovered = renderHook(() => useSubmitTicketMutation('http://acme.localhost:8000'), { wrapper })
+  await act(async () => { await recovered.result.current.mutateAsync(payload) })
+  expect(key(3)).toBe(key(0))
+  await act(async () => { await recovered.result.current.mutateAsync({ ...payload, message: 'Changed inquiry' }) })
+  expect(key(4)).not.toBe(key(2))
 })
