@@ -2,6 +2,8 @@
 
 use App\Http\Middleware\EnsureOrganizationMember;
 use App\Http\Middleware\LimitAuthenticatedApi;
+use App\Http\Middleware\LimitCustomerPortal;
+use App\Http\Middleware\LimitPublicApi;
 use App\Http\Middleware\ResolveOrganization;
 use App\Http\Middleware\ValidateCustomerTicketToken;
 use Illuminate\Foundation\Application;
@@ -21,6 +23,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'ensure.organization_member' => EnsureOrganizationMember::class,
             'customer.token' => ValidateCustomerTicketToken::class,
             'limit.authenticated' => LimitAuthenticatedApi::class,
+            'limit.public' => LimitPublicApi::class,
+            'limit.customer' => LimitCustomerPortal::class,
         ]);
 
         $middleware->api(prepend: [
