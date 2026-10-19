@@ -170,6 +170,8 @@ function ComposerInternalProvider({
   )
   const [stagedFiles, setStagedFiles] = useState<StagedAttachment[]>([])
   const [fileError, setFileError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const submitInFlightRef = useRef(false)
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -212,8 +214,8 @@ function ComposerInternalProvider({
   }, [])
 
   // Stable action callbacks with refs
-  const stateRef = useRef({ tab, body, nextStatus, stagedFiles, isSubmitting, onSubmit })
-  stateRef.current = { tab, body, nextStatus, stagedFiles, isSubmitting, onSubmit }
+  const stateRef = useRef({ tab, body, nextStatus, stagedFiles, isSubmitting: isSubmitting || submitting, onSubmit })
+  stateRef.current = { tab, body, nextStatus, stagedFiles, isSubmitting: isSubmitting || submitting, onSubmit }
 
   const actions: ComposerActions = useMemo(() => ({
     setTab: (newTab: MessageType) => setTab(newTab),
@@ -272,10 +274,10 @@ function ComposerInternalProvider({
       setFileError(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
     },
-    submit: (overrideType?: MessageType) => {
+    submit: async (overrideType?: MessageType) => {
       stopTyping()
       const current = stateRef.current
-      if (!current.body.trim() || current.isSubmitting) return
+      if (!current.body.trim() || current.isSubmitting || submitInFlightRef.current) return
 
       const effectiveType = overrideType ?? current.tab
       const payload: ComposerSubmitPayload = {
@@ -291,10 +293,21 @@ function ComposerInternalProvider({
         files: current.stagedFiles.map((s) => s.file),
       }
 
-      current.onSubmit?.(payload)
-      setBody('')
-      setStagedFiles([])
+      submitInFlightRef.current = true
+      setSubmitting(true)
       setFileError(null)
+      try {
+        await current.onSubmit?.(payload)
+        if (stateRef.current.body === current.body && stateRef.current.stagedFiles === current.stagedFiles) {
+          setBody('')
+          setStagedFiles([])
+        }
+      } catch {
+        setFileError('Message could not be confirmed. Try again.')
+      } finally {
+        submitInFlightRef.current = false
+        setSubmitting(false)
+      }
     },
   }), [])
 
@@ -304,10 +317,10 @@ function ComposerInternalProvider({
     nextStatus,
     stagedFiles,
     fileError,
-    isSubmitting,
+    isSubmitting: isSubmitting || submitting,
     currentStatus,
     typingMembers,
-  }), [tab, body, nextStatus, stagedFiles, fileError, isSubmitting, currentStatus, typingMembers])
+  }), [tab, body, nextStatus, stagedFiles, fileError, isSubmitting, submitting, currentStatus, typingMembers])
 
   const meta: ComposerMeta = useMemo(() => ({
     textareaRef,

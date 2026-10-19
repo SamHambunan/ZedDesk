@@ -18,6 +18,8 @@ use App\Models\TicketMessage;
 use App\Services\AttachmentService;
 use App\Services\AuditLogWriter;
 use App\Services\DurableDelivery;
+use App\Services\RequestIdempotency;
+use App\Services\RequestIdempotencyScope;
 use App\Services\TicketAssignmentService;
 use App\Services\TicketFieldEditor;
 use DomainException;
@@ -30,6 +32,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class TicketController extends Controller
 {
@@ -320,7 +323,7 @@ class TicketController extends Controller
     /**
      * Create a new Ticket Message (Public Reply or Internal Note) in the conversation thread.
      */
-    public function storeMessage(Request $request, string $ticketId, AttachmentService $attachmentService): JsonResponse
+    public function storeMessage(Request $request, string $ticketId, AttachmentService $attachmentService, RequestIdempotency $idempotency): JsonResponse
     {
         $ticket = Ticket::findOrFail($ticketId);
 
@@ -354,69 +357,97 @@ class TicketController extends Controller
             return response()->json(['message' => 'Forbidden. You are not an Organization Member of this Organization.'], 403);
         }
 
+        $requestKey = $idempotency->key($request);
+
         // Internal notes never accept or persist target status transitions
         $rawStatusOverride = $request->input('target_status') ?? $request->input('status');
         $statusOverride = ($messageType === TicketMessageType::INTERNAL_NOTE->value) ? null : $rawStatusOverride;
+        $fingerprint = $idempotency->messageFingerprint($ticket->id, $messageType, $body, $rawStatusOverride, $files);
 
         try {
-            return $attachmentService->transaction(fn () => app(DurableDelivery::class)->capture(function () use ($ticket, $currentMember, $messageType, $body, $statusOverride, $files, $attachmentService) {
-                $ticket = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
+            return $attachmentService->transaction(fn () => $idempotency->run(
+                new RequestIdempotencyScope(
+                    organizationId: (int) $ticket->organization_id,
+                    actorType: 'user',
+                    actorId: (string) $request->user()->id,
+                    operation: 'member.message.create',
+                    targetId: $ticket->id,
+                ),
+                $requestKey,
+                $fingerprint,
+                fn () => app(DurableDelivery::class)->capture(function () use ($ticket, $currentMember, $messageType, $body, $statusOverride, $files, $attachmentService) {
+                    $ticket = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
 
-                if ($ticket->isClosed()) {
-                    return response()->json([
-                        'message' => "Ticket #{$ticket->ticket_number} is closed and immutable. New conversation replies are rejected.",
-                    ], 422);
-                }
-
-                $messageData = [
-                    'organization_id' => $ticket->organization_id,
-                    'ticket_id' => $ticket->id,
-                    'message_type' => $messageType,
-                    'author_type' => OrganizationMember::class,
-                    'author_id' => $currentMember->id,
-                    'body' => $body,
-                ];
-
-                if (! empty($statusOverride)) {
-                    $messageData['target_status'] = $statusOverride;
-                }
-
-                $message = TicketMessage::create($messageData);
-
-                $storedAttachments = [];
-                foreach ($files as $file) {
-                    if ($file instanceof UploadedFile) {
-                        $storedAttachments[] = $attachmentService->store($file, $message);
+                    if ($ticket->isClosed()) {
+                        return response()->json([
+                            'message' => "Ticket #{$ticket->ticket_number} is closed and immutable. New conversation replies are rejected.",
+                        ], 422);
                     }
-                }
 
-                $freshTicket = $ticket->recordConversationChange($message);
-
-                if ($messageType === TicketMessageType::INTERNAL_NOTE->value) {
-                    app(AuditLogWriter::class)->recordInternalNote($ticket, $currentMember, $message);
-                } else {
-                    app(AuditLogWriter::class)->recordPublicReply($ticket, $currentMember, $message);
-                }
-
-                return response()->json([
-                    'message' => 'Ticket message created successfully.',
-                    'data' => [
-                        'id' => $message->id,
+                    $messageData = [
+                        'organization_id' => $ticket->organization_id,
                         'ticket_id' => $ticket->id,
-                        'message_type' => $message->message_type instanceof TicketMessageType ? $message->message_type->value : $message->message_type,
-                        'body' => $message->body,
-                        'author' => $currentMember->load('user'),
-                        'created_at' => $message->created_at?->toISOString(),
-                        'attachments' => $storedAttachments,
-                    ],
-                    'message_record' => $message->load(['attachments', 'author.user']),
-                    'ticket' => [
-                        'id' => $freshTicket->id,
-                        'ticket_number' => $freshTicket->ticket_number,
-                        'status' => $freshTicket->status instanceof TicketStatus ? $freshTicket->status->value : $freshTicket->status,
-                    ],
-                ], 201);
-            }));
+                        'message_type' => $messageType,
+                        'author_type' => OrganizationMember::class,
+                        'author_id' => $currentMember->id,
+                        'body' => $body,
+                    ];
+
+                    if (! empty($statusOverride)) {
+                        $messageData['target_status'] = $statusOverride;
+                    }
+
+                    $message = TicketMessage::create($messageData);
+
+                    $storedAttachments = [];
+                    foreach ($files as $file) {
+                        if ($file instanceof UploadedFile) {
+                            $storedAttachments[] = $attachmentService->store($file, $message);
+                        }
+                    }
+
+                    $freshTicket = $ticket->recordConversationChange($message);
+
+                    if ($messageType === TicketMessageType::INTERNAL_NOTE->value) {
+                        app(AuditLogWriter::class)->recordInternalNote($ticket, $currentMember, $message);
+                    } else {
+                        app(AuditLogWriter::class)->recordPublicReply($ticket, $currentMember, $message);
+                    }
+
+                    return response()->json([
+                        'message' => 'Ticket message created successfully.',
+                        'data' => [
+                            'id' => $message->id,
+                            'ticket_id' => $ticket->id,
+                            'message_type' => $message->message_type instanceof TicketMessageType ? $message->message_type->value : $message->message_type,
+                            'body' => $message->body,
+                            'author' => $currentMember->load('user'),
+                            'created_at' => $message->created_at?->toISOString(),
+                            'attachments' => $storedAttachments,
+                        ],
+                        'message_record' => $message->load(['attachments', 'author.user']),
+                        'ticket' => [
+                            'id' => $freshTicket->id,
+                            'ticket_number' => $freshTicket->ticket_number,
+                            'status' => $freshTicket->status instanceof TicketStatus ? $freshTicket->status->value : $freshTicket->status,
+                        ],
+                    ], 201);
+                }),
+                function () use ($request, $ticketId): void {
+                    $token = $request->user()->currentAccessToken();
+                    if ($token instanceof PersonalAccessToken && $token->exists) {
+                        $freshToken = PersonalAccessToken::find($token->getKey());
+                        $lifetime = config('sanctum.expiration');
+                        if (! $freshToken
+                            || ($freshToken->expires_at && $freshToken->expires_at->isPast())
+                            || ($lifetime && $freshToken->created_at->addMinutes($lifetime)->isPast())) {
+                            abort(401, 'Authentication required.');
+                        }
+                    }
+
+                    Gate::authorize('create', [TicketMessage::class, Ticket::findOrFail($ticketId)]);
+                }
+            ));
         } catch (InvalidTicketTransitionException $e) {
             return response()->json([
                 'message' => $e->getMessage(),

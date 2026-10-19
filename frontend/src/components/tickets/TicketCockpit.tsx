@@ -78,6 +78,32 @@ export function resolveApiEndpoint(baseUrl: string, endpoint: string): string {
   return `${cleanBase}/api/${cleanEndpoint}`
 }
 
+function newRequestKey(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
+interface PendingMessageRequest {
+  readonly key: string
+  readonly messageType: ComposerSubmitPayload['messageType']
+  readonly body: string
+  readonly nextStatus?: ComposerSubmitPayload['nextStatus']
+  readonly files: readonly File[]
+}
+
+function matchesPendingMessage(pending: PendingMessageRequest, payload: ComposerSubmitPayload): boolean {
+  const files = payload.files ?? []
+  return pending.messageType === payload.messageType
+    && pending.body === payload.body
+    && pending.nextStatus === payload.nextStatus
+    && pending.files.length === files.length
+    && pending.files.every((file, index) => file === files[index])
+}
+
 class ApiMutationError extends Error {
   readonly status: number
   readonly current?: Record<string, unknown>
@@ -175,6 +201,7 @@ function TicketCockpitInternalProvider({
   const queryClient = useQueryClient()
   const configRef = useRef({ apiUrl, token, userRole, onComposerSubmit, queryClient })
   configRef.current = { apiUrl, token, userRole, onComposerSubmit, queryClient }
+  const pendingMessagesRef = useRef(new Map<string, PendingMessageRequest>())
 
   // Live client instance (uses injected prop or creates default when apiUrl and token are available)
   const liveClientInstance = useMemo(() => {
@@ -1388,9 +1415,8 @@ function TicketCockpitInternalProvider({
           throw err
         }
       },
-      submitComposer: (ticketId: string, payload: ComposerSubmitPayload) => {
+      submitComposer: async (ticketId: string, payload: ComposerSubmitPayload) => {
         const { apiUrl: cfgApiUrl, token: cfgToken, userRole: cfgUserRole, onComposerSubmit: cfgOnComposerSubmit, queryClient: cfgQueryClient } = configRef.current
-        cfgOnComposerSubmit?.(ticketId, payload)
         const isInternal = payload.messageType === 'internal_note'
         const newMsg: TicketMessage = {
           id: `msg-${Date.now()}`,
@@ -1403,21 +1429,19 @@ function TicketCockpitInternalProvider({
           attachments: payload.attachments,
           created_at: 'Just now',
         }
-        setInternalTickets((prev) =>
-          prev.map((t) => {
-            if (t.id !== ticketId) return t
-            const updatedStatus =
-              !isInternal && payload.nextStatus ? payload.nextStatus : t.status
-            return {
-              ...t,
-              status: updatedStatus,
-              messages: [...(t.messages || []), newMsg],
-            }
-          })
-        )
-
         // Dispatch atomic multipart POST /api/tickets/{uuid}/messages if apiUrl configured
         if (cfgApiUrl) {
+          const pending = pendingMessagesRef.current.get(ticketId)
+          const request: PendingMessageRequest = pending && matchesPendingMessage(pending, payload)
+            ? pending
+            : {
+                key: newRequestKey(),
+                messageType: payload.messageType,
+                body: payload.body,
+                nextStatus: payload.nextStatus,
+                files: payload.files ?? [],
+              }
+          pendingMessagesRef.current.set(ticketId, request)
           const formData = new FormData()
           formData.append('message_type', payload.messageType)
           formData.append('body', payload.body)
@@ -1431,27 +1455,30 @@ function TicketCockpitInternalProvider({
             }
           }
 
-          const headers: Record<string, string> = { Accept: 'application/json' }
+          const headers: Record<string, string> = { Accept: 'application/json', 'Idempotency-Key': request.key }
           if (cfgToken) {
             headers.Authorization = `Bearer ${cfgToken}`
           }
 
           const url = resolveApiEndpoint(cfgApiUrl, `tickets/${ticketId}/messages`)
-          fetch(url, {
+          const response = await fetch(url, {
             method: 'POST',
             headers,
             body: formData,
           })
-            .then(async (res) => {
-              if (res.ok) {
-                cfgQueryClient.invalidateQueries({ queryKey: ['ticket', ticketId] })
-                cfgQueryClient.invalidateQueries({ queryKey: ['tickets'] })
-              }
-            })
-            .catch((err) => {
-              console.error('Error submitting ticket message:', err)
-            })
+          if (!response.ok) throw new ApiMutationError('Message could not be confirmed.', response.status)
+          pendingMessagesRef.current.delete(ticketId)
+          cfgQueryClient.invalidateQueries({ queryKey: ['ticket', ticketId] })
+          cfgQueryClient.invalidateQueries({ queryKey: ['tickets'] })
         }
+        await cfgOnComposerSubmit?.(ticketId, payload)
+        setInternalTickets((prev) =>
+          prev.map((t) => {
+            if (t.id !== ticketId) return t
+            const updatedStatus = !isInternal && payload.nextStatus ? payload.nextStatus : t.status
+            return { ...t, status: updatedStatus, messages: [...(t.messages || []), newMsg] }
+          })
+        )
         if (activeTypingTicketRef.current === ticketId) {
           activeTypingTicketRef.current = null
           liveClientInstance?.sendTicketTyping?.(ticketId, false)

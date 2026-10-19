@@ -160,6 +160,11 @@ Artisan::command('delivery:clean {--days=7 : Retention threshold in days}', func
 
 Schedule::command('delivery:dispatch')->everyTenSeconds();
 Schedule::command('delivery:clean')->daily();
+Artisan::command('idempotency:clean', function () {
+    $count = DB::table('request_idempotency')->where('expires_at', '<=', now())->delete();
+    $this->info("Cleaned {$count} expired request results.");
+})->purpose('Remove expired request idempotency results');
+Schedule::command('idempotency:clean')->hourly()->withoutOverlapping();
 Artisan::command('attachments:clean-orphans {--organization=}', function (OrphanAttachmentCleaner $cleaner) {
     $organization = $this->option('organization');
     $deleted = $cleaner->clean($organization === null ? null : (int) $organization);

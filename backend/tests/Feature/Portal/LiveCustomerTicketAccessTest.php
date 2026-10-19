@@ -15,6 +15,7 @@ use App\Services\CustomerTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -119,8 +120,8 @@ test('only Public Reply and Ticket Status signal the Customer with no content', 
     Sanctum::actingAs($agent);
     $staffPath = "http://acme.localhost/api/tickets/{$this->ticket->id}";
 
-    $this->postJson($staffPath.'/messages', ['message_type' => 'public_reply', 'body' => 'Visible response'])->assertCreated();
-    $this->postJson($staffPath.'/messages', ['message_type' => 'internal_note', 'body' => 'Secret draft'])->assertCreated();
+    $this->withHeader('Idempotency-Key', (string) Str::uuid())->postJson($staffPath.'/messages', ['message_type' => 'public_reply', 'body' => 'Visible response'])->assertCreated();
+    $this->withHeader('Idempotency-Key', (string) Str::uuid())->postJson($staffPath.'/messages', ['message_type' => 'internal_note', 'body' => 'Secret draft'])->assertCreated();
     $this->patchJson($staffPath.'/status', ['status' => 'resolved'])->assertOk();
 
     $signals = Event::dispatched(CustomerTicketChanged::class)->map(fn ($dispatch) => $dispatch[0])->all();
