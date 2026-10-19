@@ -66,7 +66,7 @@ test('organization member public reply and internal note commit outbox signals w
     Sanctum::actingAs($user);
 
     // Public reply
-    $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$ticket->id}/messages", [
+    $this->withHeader('Idempotency-Key', (string) Str::uuid())->postJson("http://acme.localhost/api/tickets/{$ticket->id}/messages", [
         'message_type' => 'public_reply',
         'body' => 'Public response to customer',
     ])->assertCreated();
@@ -77,7 +77,7 @@ test('organization member public reply and internal note commit outbox signals w
 
     // Internal note
     DB::table('delivery_outbox')->truncate();
-    $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$ticket->id}/messages", [
+    $this->withHeader('Idempotency-Key', (string) Str::uuid())->postJson("http://acme.localhost/api/tickets/{$ticket->id}/messages", [
         'message_type' => 'internal_note',
         'body' => 'Internal secret note',
     ])->assertCreated();
@@ -362,7 +362,7 @@ test('failed background publication never changes a committed mutation into an e
     Sanctum::actingAs($user);
 
     // HTTP mutation succeeds even if publication later fails
-    $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$ticket->id}/messages", [
+    $this->withHeader('Idempotency-Key', (string) Str::uuid())->postJson("http://acme.localhost/api/tickets/{$ticket->id}/messages", [
         'message_type' => 'public_reply',
         'body' => 'Public response',
     ])->assertCreated();

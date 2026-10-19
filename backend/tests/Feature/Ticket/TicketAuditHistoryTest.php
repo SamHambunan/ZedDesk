@@ -20,6 +20,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -153,7 +154,7 @@ test('public reply and internal note create audit records without copying bodies
 
     // 1. Agent Public Reply
     $file = UploadedFile::fake()->create('reply_secret.pdf', 50, 'application/pdf');
-    $replyRes = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->ticket->id}/messages", [
+    $replyRes = $this->withHeader('Idempotency-Key', (string) Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->ticket->id}/messages", [
         'message_type' => 'public_reply',
         'body' => 'Secret reply body content with confidential information',
         'attachments' => [$file],
@@ -175,7 +176,7 @@ test('public reply and internal note create audit records without copying bodies
     expect($replyLogJson)->not->toContain('Secret reply body content', 'confidential information', 'reply_secret.pdf');
 
     // 2. Agent Internal Note
-    $noteRes = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->ticket->id}/messages", [
+    $noteRes = $this->withHeader('Idempotency-Key', (string) Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->ticket->id}/messages", [
         'message_type' => 'internal_note',
         'body' => 'Super private internal staff note credentials',
     ]);
@@ -215,7 +216,7 @@ test('public reply and internal note create audit records without copying bodies
     enableAuditInsertFailure();
     $initialMessageCount = TicketMessage::count();
 
-    $failMsg = $this->withHeader('Idempotency-Key', (string) \Illuminate\Support\Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->ticket->id}/messages", [
+    $failMsg = $this->withHeader('Idempotency-Key', (string) Str::uuid())->postJson("http://acme.localhost/api/tickets/{$this->ticket->id}/messages", [
         'message_type' => 'internal_note',
         'body' => 'Should fail to persist',
     ]);
