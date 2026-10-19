@@ -14,7 +14,9 @@ use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\TicketPriorityController;
 use App\Http\Controllers\Api\WorkspaceController;
+use App\Models\OrganizationMember;
 use App\Models\Ticket;
+use App\Services\AuditLogWriter;
 use App\Services\CustomerTicketLiveChannel;
 use App\Services\MemberNotificationChannel;
 use App\Services\OrganizationLiveChannel;
@@ -27,6 +29,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 Route::get('/health', function () {
     $probe = function (callable $check): string {
@@ -138,7 +142,40 @@ Route::middleware(['auth:sanctum', 'ensure.organization_member', 'limit.authenti
 });
 
 Route::post('/broadcasting/auth', function (Request $request) {
-    return Broadcast::auth($request);
+    $recordDenial = function () use ($request) {
+        $user = $request->user();
+        $orgId = OrganizationContext::getCurrentId();
+        $isMember = $orgId !== null && $user && OrganizationMember::where('organization_id', $orgId)->where('user_id', $user->id)->exists();
+
+        try {
+            app(AuditLogWriter::class)->recordAccessDenied(
+                actor: $user,
+                action: 'channel.access_denied',
+                targetType: 'channel',
+                targetId: (string) $request->input('channel_name'),
+                reason: 'unauthorized_channel',
+                organizationId: $isMember ? $orgId : null,
+                requestLocation: $request->path()
+            );
+        } catch (Throwable $auditError) {
+            report($auditError);
+        }
+    };
+
+    try {
+        $response = Broadcast::auth($request);
+        if ($response instanceof Response && $response->getStatusCode() === 403) {
+            $recordDenial();
+        }
+
+        return $response;
+    } catch (HttpException $e) {
+        if ($e->getStatusCode() === 403) {
+            $recordDenial();
+        }
+
+        throw $e;
+    }
 })->middleware(['auth:sanctum', 'limit.authenticated:global']);
 
 Route::prefix('portal')->group(function () {
@@ -153,15 +190,48 @@ Route::prefix('portal')->group(function () {
             return response()->json(['channel' => 'private-'.$channels->name($ticket)]);
         });
         Route::post('/tickets/{ticket}/broadcasting/auth', function (Request $request, string $ticket, CustomerTicketLiveChannel $channels) {
+            $customer = $request->attributes->get('customer');
+            $channelName = (string) $request->input('channel_name');
+
+            $recordCustomerDenial = function () use ($customer, $channelName, $request) {
+                try {
+                    app(AuditLogWriter::class)->recordAccessDenied(
+                        actor: $customer,
+                        action: 'channel.access_denied',
+                        targetType: 'channel',
+                        targetId: $channelName,
+                        reason: 'unauthorized_channel',
+                        organizationId: OrganizationContext::getCurrentId(),
+                        requestLocation: $request->path()
+                    );
+                } catch (Throwable $auditError) {
+                    report($auditError);
+                }
+            };
+
             if (! $channels->tokenMatchesTicket($request->attributes->get('customer_token_payload'), $ticket)
-                || $request->input('channel_name') !== 'private-'.$channels->name($ticket)) {
+                || $channelName !== 'private-'.$channels->name($ticket)) {
+                $recordCustomerDenial();
+
                 abort(403);
             }
 
-            $customer = $request->attributes->get('customer');
             $request->setUserResolver(fn (?string $guard = null) => $guard === null ? $customer : null);
 
-            return Broadcast::auth($request);
+            try {
+                $response = Broadcast::auth($request);
+                if ($response instanceof Response && $response->getStatusCode() === 403) {
+                    $recordCustomerDenial();
+                }
+
+                return $response;
+            } catch (HttpException $e) {
+                if ($e->getStatusCode() === 403) {
+                    $recordCustomerDenial();
+                }
+
+                throw $e;
+            }
         });
         Route::post('/tickets/{ticket}/reply', [CustomerPortalController::class, 'reply']);
         Route::get('/tickets/{ticket}/attachments/{attachment}', [CustomerPortalController::class, 'downloadAttachment']);

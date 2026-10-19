@@ -31,8 +31,8 @@ class TeamController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        if (! $this->isAdmin($request)) {
-            return response()->json(['message' => 'Forbidden. Only admins can manage teams.'], 403);
+        if ($denied = $this->denyIfNotAdmin($request)) {
+            return $denied;
         }
 
         /** @var Organization $organization */
@@ -84,8 +84,8 @@ class TeamController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
-        if (! $this->isAdmin($request)) {
-            return response()->json(['message' => 'Forbidden. Only admins can manage teams.'], 403);
+        if ($denied = $this->denyIfNotAdmin($request, $id)) {
+            return $denied;
         }
 
         /** @var Organization $organization */
@@ -123,8 +123,8 @@ class TeamController extends Controller
 
     public function destroy(Request $request, int $id): JsonResponse
     {
-        if (! $this->isAdmin($request)) {
-            return response()->json(['message' => 'Forbidden. Only admins can manage teams.'], 403);
+        if ($denied = $this->denyIfNotAdmin($request, $id)) {
+            return $denied;
         }
 
         /** @var Organization $organization */
@@ -146,8 +146,8 @@ class TeamController extends Controller
 
     public function addMember(Request $request, int $teamId): JsonResponse
     {
-        if (! $this->isAdmin($request)) {
-            return response()->json(['message' => 'Forbidden. Only admins can manage team members.'], 403);
+        if ($denied = $this->denyIfNotAdmin($request, $teamId, 'Forbidden. Only admins can manage team members.')) {
+            return $denied;
         }
 
         /** @var Organization $organization */
@@ -214,8 +214,8 @@ class TeamController extends Controller
 
     public function removeMember(Request $request, int $teamId, int $memberId): JsonResponse
     {
-        if (! $this->isAdmin($request)) {
-            return response()->json(['message' => 'Forbidden. Only admins can manage team members.'], 403);
+        if ($denied = $this->denyIfNotAdmin($request, $teamId, 'Forbidden. Only admins can manage team members.')) {
+            return $denied;
         }
 
         /** @var Organization $organization */
@@ -244,6 +244,29 @@ class TeamController extends Controller
             'message' => 'Member removed from team successfully.',
             'team' => $this->formatTeam($team->fresh('members.user')),
         ]);
+    }
+
+    private function denyIfNotAdmin(Request $request, ?int $teamId = null, string $message = 'Forbidden. Only admins can manage teams.'): ?JsonResponse
+    {
+        if ($this->isAdmin($request)) {
+            return null;
+        }
+
+        try {
+            app(AuditLogWriter::class)->recordAccessDenied(
+                actor: $request->user(),
+                action: 'role.denied',
+                targetType: 'team',
+                targetId: $teamId !== null ? (string) $teamId : null,
+                reason: 'admin_required',
+                organizationId: OrganizationContext::getCurrentId(),
+                requestLocation: $request->path()
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return response()->json(['message' => $message], 403);
     }
 
     private function isAdmin(Request $request): bool

@@ -169,9 +169,37 @@ class AttachmentService
                 ->exists();
 
             if (! $isMember) {
+                try {
+                    app(AuditLogWriter::class)->recordAccessDenied(
+                        actor: $user,
+                        action: 'attachment.access_denied',
+                        targetType: 'attachment',
+                        targetId: (string) $attachment->id,
+                        reason: 'forbidden_membership',
+                        organizationId: (int) $attachment->organization_id,
+                        requestLocation: request()?->path()
+                    );
+                } catch (Throwable $e) {
+                    report($e);
+                }
+
                 abort(403, 'Forbidden. You are not an Organization Member of this Organization.');
             }
         } else {
+            try {
+                app(AuditLogWriter::class)->recordAccessDenied(
+                    actor: 'unresolved',
+                    action: 'attachment.access_denied',
+                    targetType: 'attachment',
+                    targetId: (string) $attachment->id,
+                    reason: 'unauthenticated',
+                    organizationId: (int) $attachment->organization_id,
+                    requestLocation: request()?->path()
+                );
+            } catch (Throwable $e) {
+                report($e);
+            }
+
             abort(403, 'Unauthorized access to attachment.');
         }
 
@@ -192,11 +220,39 @@ class AttachmentService
         // 1. Organization boundary check
         if ((int) $attachment->organization_id !== (int) $customer->organization_id
             || (int) $ticket->organization_id !== (int) $customer->organization_id) {
+            try {
+                app(AuditLogWriter::class)->recordAccessDenied(
+                    actor: $customer,
+                    action: 'attachment.access_denied',
+                    targetType: 'attachment',
+                    targetId: (string) $attachment->id,
+                    reason: 'cross_organization',
+                    organizationId: (int) $customer->organization_id,
+                    requestLocation: request()?->path()
+                );
+            } catch (Throwable $e) {
+                report($e);
+            }
+
             abort(403, 'Forbidden. Attachment belongs to another organization.');
         }
 
         // 2. Ticket customer ownership check
         if ($ticket->customer_id !== $customer->id) {
+            try {
+                app(AuditLogWriter::class)->recordAccessDenied(
+                    actor: $customer,
+                    action: 'attachment.access_denied',
+                    targetType: 'attachment',
+                    targetId: (string) $attachment->id,
+                    reason: 'ticket_mismatch',
+                    organizationId: (int) $customer->organization_id,
+                    requestLocation: request()?->path()
+                );
+            } catch (Throwable $e) {
+                report($e);
+            }
+
             abort(403, 'Forbidden. You do not have permission to access this ticket.');
         }
 

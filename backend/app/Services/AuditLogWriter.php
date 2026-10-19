@@ -394,51 +394,189 @@ class AuditLogWriter
         );
     }
 
+    public function recordRegistration(User $user, ?string $requestLocation = null): void
+    {
+        $this->recordAction(
+            organizationId: null,
+            actor: $user,
+            action: 'auth.register',
+            changes: ['user_id' => (string) $user->id],
+            requestLocation: $requestLocation ?? '/api/register',
+            targetType: 'user',
+            targetId: (string) $user->id,
+            classification: 'security',
+            outcome: 'success',
+        );
+    }
+
+    public function recordLoginSuccess(User $user, ?string $requestLocation = null): void
+    {
+        $this->recordAction(
+            organizationId: null,
+            actor: $user,
+            action: 'auth.login',
+            changes: ['user_id' => (string) $user->id],
+            requestLocation: $requestLocation ?? '/api/login',
+            targetType: 'user',
+            targetId: (string) $user->id,
+            classification: 'security',
+            outcome: 'success',
+        );
+    }
+
+    public function recordLoginDenied(?User $user = null, ?string $requestLocation = null): void
+    {
+        $this->recordAction(
+            organizationId: null,
+            actor: 'unresolved',
+            action: 'auth.login',
+            changes: ['reason' => 'invalid_credentials'],
+            requestLocation: $requestLocation ?? '/api/login',
+            targetType: 'user',
+            targetId: $user ? (string) $user->id : null,
+            classification: 'security',
+            outcome: 'denied',
+        );
+    }
+
+    public function recordLogout(User $user, ?string $tokenId = null, ?string $requestLocation = null): void
+    {
+        $changes = ['user_id' => (string) $user->id];
+        if ($tokenId !== null) {
+            $changes['token_id'] = (string) $tokenId;
+        }
+
+        $this->recordAction(
+            organizationId: null,
+            actor: $user,
+            action: 'auth.logout',
+            changes: $changes,
+            requestLocation: $requestLocation ?? '/api/logout',
+            targetType: 'user',
+            targetId: (string) $user->id,
+            classification: 'security',
+            outcome: 'success',
+        );
+    }
+
+    public function recordCredentialIssued(
+        User|Customer $target,
+        string $credentialType,
+        ?int $organizationId = null,
+        ?string $requestLocation = null
+    ): void {
+        $targetType = $target instanceof User ? 'user' : 'customer';
+
+        $this->recordAction(
+            organizationId: $organizationId,
+            actor: $target,
+            action: 'credential.issued',
+            changes: ['credential_type' => $credentialType],
+            requestLocation: $requestLocation ?? request()?->path() ?? '/api/credentials',
+            targetType: $targetType,
+            targetId: (string) $target->id,
+            classification: 'security',
+            outcome: 'success',
+        );
+    }
+
+    public function recordAccessDenied(
+        User|Customer|OrganizationMember|string|null $actor,
+        string $action,
+        string $targetType,
+        ?string $targetId = null,
+        ?string $reason = null,
+        ?int $organizationId = null,
+        ?string $requestLocation = null
+    ): void {
+        $changes = [];
+        if ($reason !== null) {
+            $changes['reason'] = $reason;
+        }
+
+        $this->recordAction(
+            organizationId: $organizationId,
+            actor: $actor,
+            action: $action,
+            changes: $changes,
+            requestLocation: $requestLocation ?? request()?->path() ?? '/api',
+            targetType: $targetType,
+            targetId: $targetId,
+            classification: 'security',
+            outcome: 'denied',
+        );
+    }
+
     /**
      * Record an audit action across any target entity and verified organization.
      */
     public function recordAction(
-        int $organizationId,
-        User|Customer|OrganizationMember|null $actor,
+        ?int $organizationId,
+        User|Customer|OrganizationMember|string|null $actor,
         string $action,
         array $changes,
         string $requestLocation,
         string $targetType,
-        string $targetId,
+        ?string $targetId = null,
         string $classification = 'business',
         string $outcome = 'success',
     ): void {
         $contextOrgId = OrganizationContext::getCurrentId();
-        if ($contextOrgId !== null && $organizationId !== $contextOrgId) {
+        if ($contextOrgId !== null && $organizationId !== null && $organizationId !== $contextOrgId) {
             throw new LogicException('Audit Organization must match the verified Organization context.');
         }
 
-        $effectiveOrgId = $contextOrgId ?? $organizationId;
+        $effectiveOrgId = $organizationId !== null ? ($contextOrgId ?? $organizationId) : null;
 
         [$actorType, $actorId] = $this->resolveActor($actor);
 
-        DB::table('audit_logs')->insert([
-            'id' => (string) Str::uuid(),
-            'occurred_at' => now(),
-            'classification' => $classification,
-            'action' => $action,
-            'outcome' => $outcome,
-            'organization_id' => $effectiveOrgId,
-            'actor_type' => $actorType,
-            'actor_id' => $actorId,
-            'target_type' => $targetType,
-            'target_id' => $targetId,
-            'changes' => json_encode($changes, JSON_THROW_ON_ERROR),
-            'request_location' => $requestLocation,
-        ]);
+        $sanitizedChanges = AuditSanitizer::sanitizeMetadata($changes);
+        $sanitizedLocation = AuditSanitizer::sanitizeRequestLocation($requestLocation);
+        $ipAddress = request()?->ip();
+
+        $insert = function () use (
+            $classification,
+            $action,
+            $outcome,
+            $effectiveOrgId,
+            $actorType,
+            $actorId,
+            $targetType,
+            $targetId,
+            $sanitizedChanges,
+            $ipAddress,
+            $sanitizedLocation
+        ) {
+            DB::table('audit_logs')->insert([
+                'id' => (string) Str::uuid(),
+                'occurred_at' => now(),
+                'classification' => $classification,
+                'action' => $action,
+                'outcome' => $outcome,
+                'organization_id' => $effectiveOrgId,
+                'actor_type' => $actorType,
+                'actor_id' => $actorId,
+                'target_type' => $targetType,
+                'target_id' => $targetId,
+                'changes' => json_encode($sanitizedChanges, JSON_THROW_ON_ERROR),
+                'ip_address' => $ipAddress,
+                'request_location' => $sanitizedLocation,
+            ]);
+        };
+
+        if ($outcome === 'denied') {
+            DB::transaction($insert);
+        } else {
+            $insert();
+        }
     }
 
     /**
-     * Resolve actor identity from user, customer, or organization member.
+     * Resolve actor identity from user, customer, organization member, or unresolved.
      *
      * @return array{string, string|null} [actor_type, actor_id]
      */
-    private function resolveActor(User|Customer|OrganizationMember|null $actor): array
+    private function resolveActor(User|Customer|OrganizationMember|string|null $actor): array
     {
         if ($actor instanceof OrganizationMember) {
             return ['user', (string) $actor->user_id];
@@ -452,11 +590,15 @@ class AuditLogWriter
             return ['user', (string) $actor->id];
         }
 
+        if (is_string($actor) && in_array($actor, ['system', 'unresolved'], true)) {
+            return [$actor, null];
+        }
+
         $user = auth()->user();
         if ($user instanceof User) {
             return ['user', (string) $user->id];
         }
 
-        return ['system', null];
+        return ['unresolved', null];
     }
 }
