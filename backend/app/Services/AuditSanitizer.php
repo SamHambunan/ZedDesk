@@ -31,8 +31,11 @@ class AuditSanitizer
 
         foreach ($data as $key => $value) {
             $lowerKey = strtolower((string) $key);
+            $normalizedKey = preg_replace('/[^a-z0-9]/', '', $lowerKey);
 
-            if (in_array($lowerKey, self::SENSITIVE_KEYS, true)) {
+            if (in_array($lowerKey, self::SENSITIVE_KEYS, true)
+                || in_array($normalizedKey, ['ip', 'ipaddress', 'ipaddr', 'clientip', 'remoteip', 'remoteaddr', 'requestip', 'sourceip', 'forwardedfor', 'xforwardedfor', 'xrealip'], true)
+                || (is_string($value) && filter_var($value, FILTER_VALIDATE_IP))) {
                 continue;
             }
 
@@ -81,6 +84,23 @@ class AuditSanitizer
 
         // Redact query parameter tokens or secrets if present
         $cleaned = preg_replace('/([?&](token|secret|key|password|signature)=)[^&]+/i', '$1[REDACTED]', $cleaned) ?? $cleaned;
+
+        // IP metadata must not outlive the separately expiring ip_address column.
+        $cleaned = preg_replace_callback(
+            '/(?<![A-Za-z0-9_.])(?:[0-9a-f:.]*:[0-9a-f:.]+|(?:\d{1,3}\.){3}\d{1,3})(?![A-Za-z0-9_.:])/i',
+            function (array $match) {
+                if (filter_var($match[0], FILTER_VALIDATE_IP)) {
+                    return '[REDACTED_IP]';
+                }
+
+                $afterDelimiter = substr($match[0], 1);
+
+                return str_starts_with($match[0], ':') && filter_var($afterDelimiter, FILTER_VALIDATE_IP)
+                    ? ':[REDACTED_IP]'
+                    : $match[0];
+            },
+            $cleaned
+        ) ?? $cleaned;
 
         return $cleaned;
     }

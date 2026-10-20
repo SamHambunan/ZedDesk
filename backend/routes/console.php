@@ -160,6 +160,45 @@ Artisan::command('delivery:clean {--days=7 : Retention threshold in days}', func
 
 Schedule::command('delivery:dispatch')->everyTenSeconds();
 Schedule::command('delivery:clean')->daily();
+Artisan::command('audit:clean {--batch-size=1000 : Maximum records per database batch} {--max-batches=0 : Stop after this many batches per cleanup phase (0 means finish)}', function () {
+    $batchSize = max(1, min(5000, (int) $this->option('batch-size')));
+    $maxBatches = max(0, (int) $this->option('max-batches'));
+    $counts = [];
+
+    foreach ([
+        'business' => now()->subYear(),
+        'security' => now()->subDays(90),
+        'ip_address' => now()->subDays(30),
+    ] as $phase => $cutoff) {
+        $count = 0;
+        $batches = 0;
+
+        do {
+            $query = DB::table('audit_logs')->where('occurred_at', '<', $cutoff);
+            if ($phase === 'ip_address') {
+                $query->whereNotNull('ip_address');
+            } else {
+                $query->where('classification', $phase);
+            }
+
+            $ids = $query->orderBy('occurred_at')->orderBy('id')->limit($batchSize)->pluck('id');
+            if ($ids->isEmpty()) {
+                break;
+            }
+
+            $affected = DB::table('audit_logs')->whereIn('id', $ids);
+            $count += $phase === 'ip_address'
+                ? $affected->update(['ip_address' => null])
+                : $affected->delete();
+            $batches++;
+        } while ($ids->count() === $batchSize && ($maxBatches === 0 || $batches < $maxBatches));
+
+        $counts[$phase] = $count;
+    }
+
+    $this->info("Removed {$counts['business']} expired business and {$counts['security']} expired security Audit Logs; cleared {$counts['ip_address']} IP addresses.");
+})->purpose('Apply Audit Log and independent IP retention in bounded batches');
+Schedule::command('audit:clean')->daily()->withoutOverlapping();
 Artisan::command('idempotency:clean', function () {
     $count = DB::table('request_idempotency')->where('expires_at', '<=', now())->delete();
     $this->info("Cleaned {$count} expired request results.");
