@@ -87,8 +87,18 @@ class AuditSanitizer
 
         // IP metadata must not outlive the separately expiring ip_address column.
         $cleaned = preg_replace_callback(
-            '/(?<![A-Za-z0-9_.:])(?:[0-9a-f:.]*:[0-9a-f:.]+|(?:\d{1,3}\.){3}\d{1,3})(?![A-Za-z0-9_.:])/i',
-            fn (array $match) => filter_var($match[0], FILTER_VALIDATE_IP) ? '[REDACTED_IP]' : $match[0],
+            '/(?<![A-Za-z0-9_.])(?:[0-9a-f:.]*:[0-9a-f:.]+|(?:\d{1,3}\.){3}\d{1,3})(?![A-Za-z0-9_.:])/i',
+            function (array $match) {
+                if (filter_var($match[0], FILTER_VALIDATE_IP)) {
+                    return '[REDACTED_IP]';
+                }
+
+                $afterDelimiter = substr($match[0], 1);
+
+                return str_starts_with($match[0], ':') && filter_var($afterDelimiter, FILTER_VALIDATE_IP)
+                    ? ':[REDACTED_IP]'
+                    : $match[0];
+            },
             $cleaned
         ) ?? $cleaned;
 

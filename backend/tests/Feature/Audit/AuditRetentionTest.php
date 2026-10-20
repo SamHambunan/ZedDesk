@@ -26,6 +26,11 @@ beforeEach(function () {
         'user_id' => $admin->id,
         'role' => Role::ADMIN->value,
     ]);
+    OrganizationMember::create([
+        'organization_id' => $this->otherOrganization->id,
+        'user_id' => $admin->id,
+        'role' => Role::ADMIN->value,
+    ]);
     Sanctum::actingAs($admin);
 });
 
@@ -89,7 +94,9 @@ test('retention uses exact classification and IP boundaries while preserving sur
     Artisan::call('security:audit', ['id' => $global]);
     expect(Artisan::output())->toContain($global)->not->toContain('192.0.2.10');
     expect(Artisan::call('security:audit', ['id' => $globalExpired]))->toBe(1);
-    expect(DB::table('audit_logs')->where('id', $other)->value('ip_address'))->toBeNull();
+    $otherRecords = collect($this->getJson('http://other.localhost/api/audit-logs?per_page=100')->assertOk()->json('data'))
+        ->keyBy('id')->all();
+    expect($otherRecords[$other]['ip_address'])->toBeNull();
 
     $this->artisan('audit:clean')->assertSuccessful();
     expect(visibleAuditRecords($this))->toHaveKeys([$businessBoundary, $securityBoundary, $ipExpired, $ipBoundary, $new]);
@@ -117,7 +124,7 @@ test('audit metadata cannot retain a second copy of an IP address', function () 
             'status' => 'open',
             'ip_address' => '192.0.2.10',
             'nested' => ['client_ip' => '192.0.2.11'],
-            'note' => 'Remote 192.0.2.12 and 2001:db8::1',
+            'note' => 'Remote 192.0.2.12 and 2001:db8::1; remote:198.51.100.12; ipv6:2001:db8::2',
         ],
         requestLocation: '/api/tickets',
         targetType: 'ticket',
@@ -128,6 +135,6 @@ test('audit metadata cannot retain a second copy of an IP address', function () 
     expect($record['changes'])->toEqual([
         'status' => 'open',
         'nested' => [],
-        'note' => 'Remote [REDACTED_IP] and [REDACTED_IP]',
+        'note' => 'Remote [REDACTED_IP] and [REDACTED_IP]; remote:[REDACTED_IP]; ipv6:[REDACTED_IP]',
     ]);
 });
