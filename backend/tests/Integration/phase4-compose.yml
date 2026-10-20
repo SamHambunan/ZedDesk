@@ -1,0 +1,21 @@
+# Reproducible performance profile: keep PHP source on a Linux Docker volume
+# so Windows bind-mount filesystem latency does not dominate API timings.
+# Copy once after code changes; use this override only for the workload run.
+# docker compose -f docker-compose.yml -f backend/tests/Integration/phase4-compose.yml run --rm --no-deps -T code-copy
+# docker compose -f docker-compose.yml -f backend/tests/Integration/phase4-compose.yml up -d --no-deps --force-recreate backend nginx
+# docker compose -f docker-compose.yml -f backend/tests/Integration/phase4-compose.yml exec -T backend php tests/Integration/phase4_workload.php run
+# docker compose up -d --no-deps --force-recreate backend nginx
+services:
+  code-copy:
+    image: zeddesk-backend
+    command: sh -c 'tar -C /source --exclude=./vendor --exclude=./.env --exclude=./storage -cf /tmp/phase4.tar . && tar -C /target -xf /tmp/phase4.tar && mkdir -p /target/storage/app/private /target/storage/framework/cache/data /target/storage/framework/sessions /target/storage/framework/views /target/storage/logs && chown -R www-data:www-data /target/storage /target/bootstrap/cache'
+    volumes:
+      - ./backend:/source:ro
+      - phase4_backend_code:/target
+  backend:
+    volumes:
+      - phase4_backend_code:/var/www/backend
+      - backend_vendor:/var/www/backend/vendor
+
+volumes:
+  phase4_backend_code:
