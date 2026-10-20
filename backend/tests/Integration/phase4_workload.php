@@ -41,6 +41,29 @@ function fixture(int $number, string $prefix): object
     return $organization;
 }
 
+function seedRepresentativeMessages(int $organizationId, array $members, bool $existing): void
+{
+    $source = $existing ? 'tickets AS t' : 'phase4_ticket_ids AS t';
+    $organizationFilter = $existing ? 't.organization_id = ? AND ' : '';
+    $missingFilter = $existing
+        ? 'AND NOT EXISTS (SELECT 1 FROM ticket_messages m WHERE m.ticket_id = t.id AND m.body = ? || t.ticket_number)'
+        : '';
+    $numberColumn = $existing ? 't.ticket_number' : 't.number';
+
+    foreach ([['public_reply', 'Representative agent reply ', $members[1]],
+        ['internal_note', 'Representative internal note ', $members[2]]] as [$type, $label, $authorId]) {
+        $sql = "INSERT INTO ticket_messages (id, organization_id, ticket_id, message_type, author_type, author_id, body, created_at, updated_at)
+                SELECT gen_random_uuid(), ?, t.id, ?, ?, CAST(? AS text), ? || {$numberColumn}, now(), now()
+                FROM {$source} WHERE {$organizationFilter}{$numberColumn} % 10 = 0 {$missingFilter}";
+        $bindings = [$organizationId, $type, 'App\\Models\\OrganizationMember', $authorId, $label];
+        if ($existing) {
+            $bindings[] = $organizationId;
+            $bindings[] = $label;
+        }
+        DB::statement($sql, $bindings);
+    }
+}
+
 function seedOrganization(int $number, string $prefix, int $count): void
 {
     $slug = sprintf('%s-%02d', $prefix, $number);
@@ -75,24 +98,7 @@ function seedOrganization(int $number, string $prefix, int $count): void
             FROM tickets AS t
             WHERE tt.ticket_id = t.id AND t.organization_id = ? AND t.ticket_number % 4 = 0
             SQL, [...$tagIds, $existing->id]);
-        DB::statement(<<<'SQL'
-            INSERT INTO ticket_messages (id, organization_id, ticket_id, message_type, author_type, author_id, body, created_at, updated_at)
-            SELECT gen_random_uuid(), ?, t.id, 'public_reply', ?, CAST(? AS text),
-                   'Representative agent reply ' || t.ticket_number, now(), now()
-            FROM tickets AS t
-            WHERE t.organization_id = ? AND t.ticket_number % 10 = 0
-              AND NOT EXISTS (SELECT 1 FROM ticket_messages m WHERE m.ticket_id = t.id
-                              AND m.body = 'Representative agent reply ' || t.ticket_number)
-            SQL, [$existing->id, 'App\\Models\\OrganizationMember', $members[1], $existing->id]);
-        DB::statement(<<<'SQL'
-            INSERT INTO ticket_messages (id, organization_id, ticket_id, message_type, author_type, author_id, body, created_at, updated_at)
-            SELECT gen_random_uuid(), ?, t.id, 'internal_note', ?, CAST(? AS text),
-                   'Representative internal note ' || t.ticket_number, now(), now()
-            FROM tickets AS t
-            WHERE t.organization_id = ? AND t.ticket_number % 10 = 0
-              AND NOT EXISTS (SELECT 1 FROM ticket_messages m WHERE m.ticket_id = t.id
-                              AND m.body = 'Representative internal note ' || t.ticket_number)
-            SQL, [$existing->id, 'App\\Models\\OrganizationMember', $members[2], $existing->id]);
+        seedRepresentativeMessages($existing->id, $members, true);
         DB::statement(<<<'SQL'
             UPDATE notifications AS n
             SET recipient_member_id = CASE ((t.ticket_number / 10)::integer % 5)
@@ -163,18 +169,7 @@ function seedOrganization(int $number, string $prefix, int $count): void
                    'Representative customer conversation ' || p.number, now(), now()
             FROM phase4_ticket_ids p
             SQL, [$organizationId, 'App\\Models\\Customer', $customerId]);
-        DB::statement(<<<'SQL'
-            INSERT INTO ticket_messages (id, organization_id, ticket_id, message_type, author_type, author_id, body, created_at, updated_at)
-            SELECT gen_random_uuid(), ?, p.id, 'public_reply', ?, CAST(? AS text),
-                   'Representative agent reply ' || p.number, now(), now()
-            FROM phase4_ticket_ids p WHERE p.number % 10 = 0
-            SQL, [$organizationId, 'App\\Models\\OrganizationMember', $members[1]]);
-        DB::statement(<<<'SQL'
-            INSERT INTO ticket_messages (id, organization_id, ticket_id, message_type, author_type, author_id, body, created_at, updated_at)
-            SELECT gen_random_uuid(), ?, p.id, 'internal_note', ?, CAST(? AS text),
-                   'Representative internal note ' || p.number, now(), now()
-            FROM phase4_ticket_ids p WHERE p.number % 10 = 0
-            SQL, [$organizationId, 'App\\Models\\OrganizationMember', $members[2]]);
+        seedRepresentativeMessages($organizationId, $members, false);
         DB::statement(<<<'SQL'
             INSERT INTO ticket_assignments (id, organization_id, ticket_id, member_id, assigned_by_id, created_at)
             SELECT gen_random_uuid(), ?, p.id, ?, ?, now()
